@@ -4,12 +4,11 @@ import (
 	"fmt"
 
 	"github.com/alanshaw/go-ucanto/core"
-	coreipld "github.com/alanshaw/go-ucanto/core/ipld"
-	"github.com/ipld/go-ipld-prime"
+	"github.com/alanshaw/go-ucanto/core/ipld"
 )
 
 type AgentMessage interface {
-	coreipld.View
+	ipld.IPLDView
 	Invocations() []core.Invocation
 	Receipts() []core.Receipt
 	Get(link ipld.Link) (core.Receipt, error)

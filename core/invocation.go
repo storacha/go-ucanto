@@ -21,7 +21,7 @@ type Delegation interface {
 // Delegations. The service provider will inspect the proofs to verify that the
 // invocation has sufficient privileges to execute.
 type Invocation interface {
-	ipld.View
+	ipld.IPLDView
 	// Link returns the IPLD link of the root block of the invocation.
 	Link() ucan.Link
 	// Archive writes the invocation to a Content Addressed aRchive (CAR).
