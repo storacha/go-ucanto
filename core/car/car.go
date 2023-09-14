@@ -7,7 +7,9 @@ import (
 
 	"github.com/alanshaw/go-ucanto/core/ipld"
 	"github.com/alanshaw/go-ucanto/core/iterable"
+	"github.com/ipfs/go-cid"
 	cbor "github.com/ipfs/go-ipld-cbor"
+	ipldcar "github.com/ipld/go-car"
 	"github.com/ipld/go-car/util"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 )
@@ -16,19 +18,22 @@ import (
 // See https://www.iana.org/assignments/media-types/application/vnd.ipld.car
 const ContentType = "application/vnd.ipld.car"
 
-func init() {
-	cbor.RegisterCborType(carHeader{})
-}
-
-type carHeader struct {
-	Roots   []ipld.Link
-	Version uint64
-}
-
 func Encode(roots []ipld.Link, blocks iterable.Iterator[ipld.Block]) io.Reader {
 	reader, writer := io.Pipe()
 	go func() {
-		h := carHeader{}
+		var cids []cid.Cid
+		for _, r := range roots {
+			_, cid, err := cid.CidFromBytes([]byte(r.Binary()))
+			if err != nil {
+				writer.CloseWithError(fmt.Errorf("decoding CAR root: %s: %s", r, err))
+				return
+			}
+			cids = append(cids, cid)
+		}
+		h := ipldcar.CarHeader{
+			Roots:   cids,
+			Version: 1,
+		}
 		hb, err := cbor.DumpObject(h)
 		if err != nil {
 			writer.CloseWithError(fmt.Errorf("writing CAR header: %s", err))
@@ -54,21 +59,21 @@ func Encode(roots []ipld.Link, blocks iterable.Iterator[ipld.Block]) io.Reader {
 func Decode(reader io.Reader) ([]ipld.Link, iterable.Iterator[ipld.Block], error) {
 	br := bufio.NewReader(reader)
 
-	hb, err := util.LdRead(br)
+	h, err := ipldcar.ReadHeader(br)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	var ch carHeader
-	if err := cbor.DecodeInto(hb, &ch); err != nil {
-		return nil, nil, fmt.Errorf("invalid header: %v", err)
+	if h.Version != 1 {
+		return nil, nil, fmt.Errorf("invalid car version: %d", h.Version)
 	}
 
-	if ch.Version != 1 {
-		return nil, nil, fmt.Errorf("invalid car version: %d", ch.Version)
+	var roots []ipld.Link
+	for _, r := range h.Roots {
+		roots = append(roots, cidlink.Link{Cid: r})
 	}
 
-	return ch.Roots, iterable.NewIterator(func() (ipld.Block, error) {
+	return roots, iterable.NewIterator(func() (ipld.Block, error) {
 		cid, bytes, err := util.ReadNode(br)
 		if err != nil {
 			if err == io.EOF {
