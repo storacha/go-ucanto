@@ -2,7 +2,7 @@ package core
 
 import (
 	"github.com/alanshaw/go-ucanto/core/ipld"
-	ucan "github.com/alanshaw/go-ucanto/ucan"
+	"github.com/alanshaw/go-ucanto/ucan"
 )
 
 // Delagation is a materialized view of a UCAN delegation, which can be encoded

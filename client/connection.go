@@ -7,7 +7,7 @@ import (
 	"github.com/alanshaw/go-ucanto/core"
 	"github.com/alanshaw/go-ucanto/core/message"
 	"github.com/alanshaw/go-ucanto/transport"
-	ucan "github.com/alanshaw/go-ucanto/ucan"
+	"github.com/alanshaw/go-ucanto/ucan"
 )
 
 type Connection interface {
