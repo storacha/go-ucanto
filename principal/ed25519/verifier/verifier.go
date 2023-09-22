@@ -2,10 +2,11 @@ package verifier
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"fmt"
 
 	"github.com/alanshaw/go-ucanto/did"
-	"github.com/alanshaw/go-ucanto/principal"
+	"github.com/alanshaw/go-ucanto/ucan/crypto"
 	"github.com/multiformats/go-varint"
 )
 
@@ -18,7 +19,15 @@ const keySize = 32
 
 var size = publicTagSize + keySize
 
-func Decode(b []byte) (principal.Verifier, error) {
+func Parse(str string) (crypto.Verifier, error) {
+	did, err := did.Parse(str)
+	if err != nil {
+		return nil, fmt.Errorf("parsing DID: %s", err)
+	}
+	return Decode(did.Bytes())
+}
+
+func Decode(b []byte) (crypto.Verifier, error) {
 	if len(b) != size {
 		return nil, fmt.Errorf("invalid length: %d wanted: %d", len(b), size)
 	}
@@ -51,8 +60,11 @@ func (v Ed25519Verifier) Code() uint64 {
 	return Code
 }
 
-func (v Ed25519Verifier) Verify(payload []byte, sig principal.Signature) bool {
-	return false
+func (v Ed25519Verifier) Verify(msg []byte, sig crypto.Signature) bool {
+	if sig.Code() != crypto.EdDSA {
+		return false
+	}
+	return ed25519.Verify(ed25519.PublicKey(v[publicTagSize:]), msg, sig.Raw())
 }
 
 func (v Ed25519Verifier) DID() did.DID {

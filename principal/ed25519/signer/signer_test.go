@@ -24,3 +24,18 @@ func TestGenerateEncodeDecode(t *testing.T) {
 		t.Fatalf("public key mismatch: %s != %s", s0.DID().String(), s1.DID().String())
 	}
 }
+
+func TestVerify(t *testing.T) {
+	s0, err := Generate()
+	if err != nil {
+		t.Fatalf("generating Ed25519 key: %v", err)
+	}
+
+	msg := []byte("testy")
+	sig := s0.Sign(msg)
+
+	res := s0.Verifier().Verify(msg, sig)
+	if res != true {
+		t.Fatalf("verify failed")
+	}
+}
