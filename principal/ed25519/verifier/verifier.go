@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/alanshaw/go-ucanto/did"
 	"github.com/alanshaw/go-ucanto/principal"
 	"github.com/multiformats/go-varint"
 )
@@ -37,4 +38,28 @@ func Decode(b []byte) (principal.Verifier, error) {
 	if puc != Code {
 		return nil, fmt.Errorf("invalid public key codec: %d", prc)
 	}
+
+	v := make(Ed25519Verifier, size)
+	copy(v, b)
+
+	return v, nil
+}
+
+type Ed25519Verifier []byte
+
+func (v Ed25519Verifier) Code() uint64 {
+	return Code
+}
+
+func (v Ed25519Verifier) Verify(payload []byte, sig principal.Signature) bool {
+	return false
+}
+
+func (v Ed25519Verifier) DID() did.DID {
+	id, _ := did.Decode(v)
+	return id
+}
+
+func (v Ed25519Verifier) Encode() []byte {
+	return v
 }

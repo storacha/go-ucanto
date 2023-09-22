@@ -1,6 +1,6 @@
 package principal
 
-import "github.com/alanshaw/go-ucanto/did"
+import "github.com/alanshaw/go-ucanto/ucan"
 
 type Signature interface {
 	Bytes() []byte
@@ -9,8 +9,8 @@ type Signature interface {
 }
 
 type Signer interface {
+	ucan.Principal
 	Sign(payload []byte) Signature
-	DID() did.DID
 	Code() uint64
 	Verifier() Verifier
 	Encode() []byte

@@ -1,7 +1,9 @@
-package ed25519
+package signer
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"crypto/rand"
 	"fmt"
 
 	"github.com/alanshaw/go-ucanto/did"
@@ -21,6 +23,19 @@ const keySize = 32
 
 var size = privateTagSize + keySize + publicTagSize + keySize
 var pubKeyOffset = privateTagSize + keySize
+
+func Generate() (principal.Signer, error) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("generating Ed25519 key: %s", err)
+	}
+	s := make(Ed25519Signer, size)
+	varint.PutUvarint(s, Code)
+	copy(s[privateTagSize:], priv)
+	varint.PutUvarint(s[pubKeyOffset:], verifier.Code)
+	copy(s[pubKeyOffset+publicTagSize:], pub)
+	return s, nil
+}
 
 func Parse(str string) (principal.Signer, error) {
 	_, bytes, err := multibase.Decode(str)
@@ -51,35 +66,36 @@ func Decode(b []byte) (principal.Signer, error) {
 		return nil, fmt.Errorf("invalid public key codec: %d", prc)
 	}
 
-	vfr, err := verifier.Decode(b[pubKeyOffset:])
+	_, err = verifier.Decode(b[pubKeyOffset:])
 	if err != nil {
 		return nil, fmt.Errorf("decoding public key: %s", err)
 	}
 
-	return &edSigner{key: b, vfr: vfr}, nil
+	s := make(Ed25519Signer, size)
+	copy(s, b)
+
+	return s, nil
 }
 
-type edSigner struct {
-	key []byte
-	vfr principal.Verifier
-}
+type Ed25519Signer []byte
 
-func (s *edSigner) Code() uint64 {
+func (s Ed25519Signer) Code() uint64 {
 	return Code
 }
 
-func (s *edSigner) Verifier() principal.Verifier {
-	return s.vfr
+func (s Ed25519Signer) Verifier() principal.Verifier {
+	return verifier.Ed25519Verifier(s[pubKeyOffset:])
 }
 
-func (s *edSigner) DID() did.DID {
-	return s.vfr.DID()
+func (s Ed25519Signer) DID() did.DID {
+	id, _ := did.Decode(s[pubKeyOffset:])
+	return id
 }
 
-func (s *edSigner) Encode() []byte {
-	return s.key
+func (s Ed25519Signer) Encode() []byte {
+	return s
 }
 
-func (s *edSigner) Sign(b []byte) Signature {
-	return []byte{}
+func (s Ed25519Signer) Sign(b []byte) principal.Signature {
+	return nil
 }
