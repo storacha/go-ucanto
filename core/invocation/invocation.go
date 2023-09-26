@@ -1,6 +1,7 @@
-package core
+package invocation
 
 import (
+	"github.com/alanshaw/go-ucanto/core/dag"
 	"github.com/alanshaw/go-ucanto/core/ipld"
 	"github.com/alanshaw/go-ucanto/ucan"
 )
@@ -30,4 +31,8 @@ type Invocation interface {
 
 type IssuedInvocation interface {
 	// TODO?
+}
+
+func NewInvocation(root ipld.Link, bs dag.BlockStore) (Invocation, error) {
+	return nil, nil
 }

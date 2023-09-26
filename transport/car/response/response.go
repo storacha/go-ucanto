@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/alanshaw/go-ucanto/core/car"
+	"github.com/alanshaw/go-ucanto/core/dag"
 	"github.com/alanshaw/go-ucanto/core/message"
 	"github.com/alanshaw/go-ucanto/transport"
 )
@@ -15,5 +16,9 @@ func Decode(response transport.HTTPResponse) (message.AgentMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decoding response: %s", err)
 	}
-	return message.NewMessage(roots, blocks)
+	bstore, err := dag.NewBlockStore(blocks)
+	if err != nil {
+		return nil, fmt.Errorf("creating blockstore: %s", err)
+	}
+	return message.NewMessage(roots, bstore)
 }

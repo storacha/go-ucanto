@@ -1,0 +1,8 @@
+type AgentMessageModel union {
+	| AgentMessageData "ucanto/message@7.0.0"
+} representation keyed
+
+type AgentMessageData struct {
+	execute optional [Link] (rename "Execute")
+	report optional {String:Link} (rename "Report")
+}
