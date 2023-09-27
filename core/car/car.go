@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/alanshaw/go-ucanto/core/ipld"
+	"github.com/alanshaw/go-ucanto/core/ipld/block"
 	"github.com/alanshaw/go-ucanto/core/iterable"
 	"github.com/ipfs/go-cid"
 	cbor "github.com/ipfs/go-ipld-cbor"
@@ -91,6 +92,6 @@ func Decode(reader io.Reader) ([]ipld.Link, iterable.Iterator[ipld.Block], error
 			return nil, fmt.Errorf("mismatch in content integrity, name: %s, data: %s", cid, hashed)
 		}
 
-		return ipld.NewBlockUnsafe(cidlink.Link{Cid: cid}, bytes), nil
+		return block.NewBlock(cidlink.Link{Cid: cid}, bytes), nil
 	}), nil
 }

@@ -2,10 +2,12 @@ package client
 
 import (
 	"crypto/sha256"
+	"fmt"
 	"hash"
 
-	"github.com/alanshaw/go-ucanto/core"
+	"github.com/alanshaw/go-ucanto/core/invocation"
 	"github.com/alanshaw/go-ucanto/core/message"
+	"github.com/alanshaw/go-ucanto/core/receipt"
 	"github.com/alanshaw/go-ucanto/transport"
 	"github.com/alanshaw/go-ucanto/ucan"
 )
@@ -66,8 +68,8 @@ func (c *conn) Hasher() hash.Hash {
 	return c.hasher()
 }
 
-func Execute(invocation core.Invocation, conn Connection) (core.Receipt, error) {
-	input, err := message.Build(invocation, nil)
+func Execute(invocation invocation.Invocation, conn Connection) (receipt.Receipt, error) {
+	input, err := message.Build(invocation)
 	if err != nil {
 		return nil, err
 	}
@@ -87,9 +89,12 @@ func Execute(invocation core.Invocation, conn Connection) (core.Receipt, error) 
 		return nil, err
 	}
 
-	receipt, err := output.Get(invocation.Link())
+	receipt, ok, err := output.Get(invocation.Link())
 	if err != nil {
 		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("missing receipt for invocation: %s", invocation.Link())
 	}
 
 	return receipt, nil
