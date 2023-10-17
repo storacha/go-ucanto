@@ -12,7 +12,7 @@ type Signature interface {
 	Code() uint64
 	Size() uint64
 	Bytes() []byte
-	// Raw signature (without a signature algorithm info).
+	// Raw signature (without signature algorithm info).
 	Raw() []byte
 }
 

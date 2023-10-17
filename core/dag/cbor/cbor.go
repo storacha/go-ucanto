@@ -22,6 +22,7 @@ func Decode(b []byte) (datamodel.Node, error) {
 	return nb.Build(), nil
 }
 
+// Instantiate a new block from the CBOR encoded data.
 func NewBlock(b []byte) (ipld.Block, error) {
 	pfx := cid.Prefix{
 		Version:  1,

@@ -71,27 +71,27 @@ func (c *conn) Hasher() hash.Hash {
 func Execute(invocation invocation.Invocation, conn Connection) (receipt.Receipt, error) {
 	input, err := message.Build(invocation)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("buidling message: %s", err)
 	}
 
 	req, err := conn.Codec().Encode(input)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("encoding message: %s", err)
 	}
 
 	res, err := conn.Channel().Request(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("sending message: %s", err)
 	}
 
 	output, err := conn.Codec().Decode(res)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decoding message: %s", err)
 	}
 
 	receipt, ok, err := output.Get(invocation.Link())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting receipt: %s", err)
 	}
 	if !ok {
 		return nil, fmt.Errorf("missing receipt for invocation: %s", invocation.Link())

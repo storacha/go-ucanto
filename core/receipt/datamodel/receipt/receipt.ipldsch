@@ -1,0 +1,29 @@
+# Represents a receipt of an invocation as per IPLD schema in
+# ucan/invocation@0.2 spec.
+#
+# @see https://github.com/ucan-wg/invocation/blob/v0.2/README.md#82-receipt
+type Receipt struct {
+  ocm Outcome (rename "Ocm")
+  sig bytes (rename "Sig")
+}
+
+type Outcome struct {
+  ran Link (rename "Ran")
+  out Result (rename "Out")
+  fx Effects (rename "Fx")
+  meta {String:Any} (rename "Meta")
+  iss? optional DID (rename "Iss")
+  prf: [Link] (rename "Prf")
+}
+
+type DID = bytes
+
+type Result union {
+  | any    "ok"    # Success
+  | any    "error" # Error
+} representation kinded
+
+type Effects struct {
+  fork [Link] (rename "Fork")
+  join optional Link (rename "Join")
+}

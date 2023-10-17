@@ -8,7 +8,7 @@ import (
 	"github.com/alanshaw/go-ucanto/core/invocation"
 	"github.com/alanshaw/go-ucanto/core/ipld"
 	"github.com/alanshaw/go-ucanto/core/iterable"
-	"github.com/alanshaw/go-ucanto/core/message/schema/agentmessage"
+	"github.com/alanshaw/go-ucanto/core/message/datamodel/agentmessage"
 	"github.com/alanshaw/go-ucanto/core/receipt"
 )
 
