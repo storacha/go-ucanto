@@ -4,7 +4,7 @@
 # @see https://github.com/ucan-wg/invocation/blob/v0.2/README.md#82-receipt
 type Receipt struct {
   ocm Outcome (rename "Ocm")
-  sig bytes (rename "Sig")
+  sig Bytes (rename "Sig")
 }
 
 type Outcome struct {
@@ -12,16 +12,16 @@ type Outcome struct {
   out Result (rename "Out")
   fx Effects (rename "Fx")
   meta {String:Any} (rename "Meta")
-  iss? optional DID (rename "Iss")
-  prf: [Link] (rename "Prf")
+  iss optional Bytes (rename "Iss")
+  prf [Link] (rename "Prf")
 }
 
-type DID = bytes
+# type DID = Bytes
 
-type Result union {
-  | any    "ok"    # Success
-  | any    "error" # Error
-} representation kinded
+# type Result union {
+#   | any    "ok"    # Success
+#   | any    "error" # Error
+# } representation kinded
 
 type Effects struct {
   fork [Link] (rename "Fork")

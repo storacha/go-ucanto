@@ -4,10 +4,10 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"sync"
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
+	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/node/bindnode"
 	"github.com/ipld/go-ipld-prime/schema"
 )
@@ -15,30 +15,14 @@ import (
 //go:embed receipt.ipldsch
 var receipt []byte
 
-var (
-	once sync.Once
-	ts   *schema.TypeSystem
-	err  error
-)
-
-func loadSchema() (*schema.TypeSystem, error) {
-	once.Do(func() {
-		ts, err = ipld.LoadSchemaBytes(receipt)
-		if err != nil {
-			return
-		}
-	})
-	return ts, err
-}
-
-type Receipt struct {
-	Ocm *Ocm
+type Receipt[O any, X any] struct {
+	Ocm Ocm[O, X]
 	Sig []byte
 }
 
-type Ocm struct {
+type Ocm[O any, X any] struct {
 	Ran  ipld.Link
-	Out  any
+	Out  *Result[O, X]
 	Fx   Fx
 	Meta MetaMap
 	Iss  []byte
@@ -52,35 +36,53 @@ type Fx struct {
 
 type MetaMap struct {
 	Keys   []string
-	Values map[string]any
+	Values map[string]datamodel.Node
 }
 
-func Encode(r *Receipt) ([]byte, error) {
-	ts, err := loadSchema()
+type Result[O any, X any] struct {
+	Ok  O
+	Err X
+}
+
+// NewReceiptType creates a new schema.Type for a Receipt. You must provide the
+// schema containing a Result type, which is a a keyed union. e.g.
+//
+//	type Result union {
+//	  | Ok "ok"
+//	  | Err "error"
+//	} representation keyed
+//
+//	type Ok struct {
+//	  status String (rename "Status")
+//	}
+//
+//	type Err struct {
+//	  message String (rename "Message")
+//	}
+func NewReceiptType(resultschema []byte) (schema.Type, error) {
+	sch := bytes.Join([][]byte{resultschema, receipt}, []byte("\n"))
+	ts, err := ipld.LoadSchemaBytes(sch)
 	if err != nil {
 		return nil, err
 	}
-	schemaType := ts.TypeByName("Receipt")
-	node := bindnode.Wrap(&r, schemaType)
+	return ts.TypeByName("Receipt"), nil
+}
+
+func Encode[O any, X any](r *Receipt[O, X], typ schema.Type) ([]byte, error) {
+	node := bindnode.Wrap(r, typ)
 	var buf bytes.Buffer
-	err = dagcbor.Encode(node.Representation(), &buf)
+	err := dagcbor.Encode(node.Representation(), &buf)
 	if err != nil {
 		return nil, fmt.Errorf("encoding dag-cbor: %s", err)
 	}
 	return buf.Bytes(), nil
 }
 
-func Decode(b []byte) (*Receipt, error) {
-	ts, err := loadSchema()
+func Decode[O any, X any](b []byte, typ schema.Type) (*Receipt[O, X], error) {
+	r := Receipt[O, X]{}
+	_, err := ipld.Unmarshal(b, dagcbor.Decode, &r, typ)
 	if err != nil {
 		return nil, err
 	}
-	npt := bindnode.Prototype((*Receipt)(nil), ts.TypeByName("Receipt"))
-	nb := npt.Representation().NewBuilder()
-	err = dagcbor.Decode(nb, bytes.NewReader(b))
-	if err != nil {
-		return nil, err
-	}
-	receipt := bindnode.Unwrap(nb.Build()).(*Receipt)
-	return receipt, nil
+	return &r, nil
 }
