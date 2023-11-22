@@ -12,7 +12,7 @@ import (
 func TestEncodeDecode(t *testing.T) {
 	l := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
 	ex := []ipld.Link{l}
-	rp := agentmessage.ReportMap{
+	rp := agentmessage.ReportModel{
 		Keys:   []string{l.String()},
 		Values: map[string]ipld.Link{l.String(): l},
 	}

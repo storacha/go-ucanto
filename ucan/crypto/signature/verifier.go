@@ -1,4 +1,4 @@
-package crypto
+package signature
 
 import (
 	"github.com/alanshaw/go-ucanto/ucan"
@@ -9,6 +9,6 @@ type Verifier interface {
 	Code() uint64
 	// Takes byte encoded message and verifies that it is signed by corresponding
 	// signer.
-	Verify(msg []byte, signature Signature) bool
+	Verify(msg []byte, sig Signature) bool
 	Encode() []byte
 }

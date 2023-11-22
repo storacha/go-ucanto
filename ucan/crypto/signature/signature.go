@@ -1,4 +1,4 @@
-package crypto
+package signature
 
 import (
 	"bytes"
@@ -26,6 +26,14 @@ func NewSignature(code uint64, raw []byte) Signature {
 	return sig
 }
 
+func Encode(s Signature) []byte {
+	return s.Bytes()
+}
+
+func Decode(b []byte) Signature {
+	return signature(b)
+}
+
 type signature []byte
 
 func (s signature) Code() uint64 {
@@ -46,4 +54,36 @@ func (s signature) Raw() []byte {
 
 func (s signature) Bytes() []byte {
 	return s
+}
+
+type SignatureView interface {
+	Signature
+	// Verify that the signature was produced by the given message.
+	Verify(msg []byte, signer Verifier) bool
+}
+
+func NewSignatureView(s Signature) SignatureView {
+	return signatureView(signature(s.Bytes()))
+}
+
+type signatureView signature
+
+func (v signatureView) Bytes() []byte {
+	return signature(v).Bytes()
+}
+
+func (v signatureView) Code() uint64 {
+	return signature(v).Code()
+}
+
+func (v signatureView) Raw() []byte {
+	return signature(v).Raw()
+}
+
+func (v signatureView) Size() uint64 {
+	return signature(v).Size()
+}
+
+func (v signatureView) Verify(msg []byte, signer Verifier) bool {
+	return signer.Verify(msg, v)
 }

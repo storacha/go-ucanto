@@ -36,10 +36,10 @@ func TestEncodeDecode(t *testing.T) {
 	}
 
 	l := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
-	r0 := receipt.Receipt[*resultOk, *resultErr]{
-		Ocm: receipt.Ocm[*resultOk, *resultErr]{
+	r0 := receipt.ReceiptModel[*resultOk, *resultErr]{
+		Ocm: receipt.OutcomeModel[*resultOk, *resultErr]{
 			Ran: l,
-			Out: &receipt.Result[*resultOk, *resultErr]{
+			Out: &receipt.ResultModel[*resultOk, *resultErr]{
 				Ok: &resultOk{Status: "done"},
 			},
 		},
@@ -59,10 +59,10 @@ func TestEncodeDecode(t *testing.T) {
 		t.Fatalf("status was not done")
 	}
 
-	r2 := receipt.Receipt[*resultOk, *resultErr]{
-		Ocm: receipt.Ocm[*resultOk, *resultErr]{
+	r2 := receipt.ReceiptModel[*resultOk, *resultErr]{
+		Ocm: receipt.OutcomeModel[*resultOk, *resultErr]{
 			Ran: l,
-			Out: &receipt.Result[*resultOk, *resultErr]{
+			Out: &receipt.ResultModel[*resultOk, *resultErr]{
 				Err: &resultErr{Message: "boom"},
 			},
 		},

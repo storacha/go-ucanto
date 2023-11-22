@@ -40,10 +40,10 @@ type Data struct {
 	// Set of (invocation) delegation links to be executed by the agent.
 	Execute []ipld.Link
 	// Map of receipts keyed by the (invocation) delegation.
-	Report *ReportMap
+	Report *ReportModel
 }
 
-type ReportMap struct {
+type ReportModel struct {
 	Keys   []string
 	Values map[string]ipld.Link
 }

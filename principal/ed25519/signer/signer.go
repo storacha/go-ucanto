@@ -9,6 +9,7 @@ import (
 	"github.com/alanshaw/go-ucanto/did"
 	"github.com/alanshaw/go-ucanto/principal/ed25519/verifier"
 	"github.com/alanshaw/go-ucanto/ucan/crypto"
+	"github.com/alanshaw/go-ucanto/ucan/crypto/signature"
 	"github.com/multiformats/go-multibase"
 	"github.com/multiformats/go-varint"
 )
@@ -83,7 +84,7 @@ func (s Ed25519Signer) Code() uint64 {
 	return Code
 }
 
-func (s Ed25519Signer) Verifier() crypto.Verifier {
+func (s Ed25519Signer) Verifier() signature.Verifier {
 	return verifier.Ed25519Verifier(s[pubKeyOffset:])
 }
 
@@ -96,9 +97,9 @@ func (s Ed25519Signer) Encode() []byte {
 	return s
 }
 
-func (s Ed25519Signer) Sign(msg []byte) crypto.Signature {
+func (s Ed25519Signer) Sign(msg []byte) signature.Signature {
 	pk := make(ed25519.PrivateKey, ed25519.PrivateKeySize)
 	copy(pk, s[privateTagSize:pubKeyOffset])
 	copy(pk[ed25519.PrivateKeySize-ed25519.PublicKeySize:], s[pubKeyOffset+publicTagSize:])
-	return crypto.NewSignature(crypto.EdDSA, ed25519.Sign(pk, msg))
+	return signature.NewSignature(signature.EdDSA, ed25519.Sign(pk, msg))
 }

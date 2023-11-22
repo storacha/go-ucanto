@@ -15,31 +15,31 @@ import (
 //go:embed receipt.ipldsch
 var receipt []byte
 
-type Receipt[O any, X any] struct {
-	Ocm Ocm[O, X]
+type ReceiptModel[O any, X any] struct {
+	Ocm OutcomeModel[O, X]
 	Sig []byte
 }
 
-type Ocm[O any, X any] struct {
+type OutcomeModel[O any, X any] struct {
 	Ran  ipld.Link
-	Out  *Result[O, X]
-	Fx   Fx
-	Meta MetaMap
+	Out  *ResultModel[O, X]
+	Fx   EffectsModel
+	Meta MetaModel
 	Iss  []byte
 	Prf  []ipld.Link
 }
 
-type Fx struct {
+type EffectsModel struct {
 	Fork []ipld.Link
 	Join ipld.Link
 }
 
-type MetaMap struct {
+type MetaModel struct {
 	Keys   []string
 	Values map[string]datamodel.Node
 }
 
-type Result[O any, X any] struct {
+type ResultModel[O any, X any] struct {
 	Ok  O
 	Err X
 }
@@ -68,7 +68,7 @@ func NewReceiptType(resultschema []byte) (schema.Type, error) {
 	return ts.TypeByName("Receipt"), nil
 }
 
-func Encode[O any, X any](r *Receipt[O, X], typ schema.Type) ([]byte, error) {
+func Encode[O any, X any](r *ReceiptModel[O, X], typ schema.Type) ([]byte, error) {
 	node := bindnode.Wrap(r, typ)
 	var buf bytes.Buffer
 	err := dagcbor.Encode(node.Representation(), &buf)
@@ -78,8 +78,8 @@ func Encode[O any, X any](r *Receipt[O, X], typ schema.Type) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func Decode[O any, X any](b []byte, typ schema.Type) (*Receipt[O, X], error) {
-	r := Receipt[O, X]{}
+func Decode[O any, X any](b []byte, typ schema.Type) (*ReceiptModel[O, X], error) {
+	r := ReceiptModel[O, X]{}
 	_, err := ipld.Unmarshal(b, dagcbor.Decode, &r, typ)
 	if err != nil {
 		return nil, err

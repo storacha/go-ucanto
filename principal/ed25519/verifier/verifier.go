@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/alanshaw/go-ucanto/did"
-	"github.com/alanshaw/go-ucanto/ucan/crypto"
+	"github.com/alanshaw/go-ucanto/ucan/crypto/signature"
 	"github.com/multiformats/go-varint"
 )
 
@@ -19,7 +19,7 @@ const keySize = 32
 
 var size = publicTagSize + keySize
 
-func Parse(str string) (crypto.Verifier, error) {
+func Parse(str string) (signature.Verifier, error) {
 	did, err := did.Parse(str)
 	if err != nil {
 		return nil, fmt.Errorf("parsing DID: %s", err)
@@ -27,7 +27,7 @@ func Parse(str string) (crypto.Verifier, error) {
 	return Decode(did.Bytes())
 }
 
-func Decode(b []byte) (crypto.Verifier, error) {
+func Decode(b []byte) (signature.Verifier, error) {
 	if len(b) != size {
 		return nil, fmt.Errorf("invalid length: %d wanted: %d", len(b), size)
 	}
@@ -60,8 +60,8 @@ func (v Ed25519Verifier) Code() uint64 {
 	return Code
 }
 
-func (v Ed25519Verifier) Verify(msg []byte, sig crypto.Signature) bool {
-	if sig.Code() != crypto.EdDSA {
+func (v Ed25519Verifier) Verify(msg []byte, sig signature.Signature) bool {
+	if sig.Code() != signature.EdDSA {
 		return false
 	}
 	return ed25519.Verify(ed25519.PublicKey(v[publicTagSize:]), msg, sig.Raw())
