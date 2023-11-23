@@ -15,10 +15,10 @@ type Ability = string
 
 // Capability represents an ability that a UCAN holder can perform with some
 // resource.
-type Capability interface {
+type Capability[Caveats any] interface {
 	can() Ability
 	with() Resource
-	nb() any
+	nb() Caveats
 }
 
 type Principal interface {
@@ -29,3 +29,7 @@ type Principal interface {
 type Link interface {
 	ipld.Link
 }
+
+// Version of the UCAN spec used to produce a specific UCAN.
+// It MUST have format `${number}.${number}.${number}`
+type Version = string

@@ -4,24 +4,30 @@ import (
 	"fmt"
 
 	"github.com/alanshaw/go-ucanto/core/dag/blockstore"
-	"github.com/alanshaw/go-ucanto/core/dag/cbor"
 	"github.com/alanshaw/go-ucanto/core/invocation"
 	"github.com/alanshaw/go-ucanto/core/ipld"
+	"github.com/alanshaw/go-ucanto/core/ipld/block"
+	"github.com/alanshaw/go-ucanto/core/ipld/codec/cbor"
+	"github.com/alanshaw/go-ucanto/core/ipld/hash/sha256"
 	"github.com/alanshaw/go-ucanto/core/iterable"
-	"github.com/alanshaw/go-ucanto/core/message/datamodel/agentmessage"
-	"github.com/alanshaw/go-ucanto/core/receipt"
+	mdm "github.com/alanshaw/go-ucanto/core/message/datamodel"
 )
 
 type AgentMessage interface {
 	ipld.IPLDView
-	Invocations() ([]invocation.Invocation, error)
-	Receipts() ([]receipt.Receipt, error)
-	Get(link ipld.Link) (receipt.Receipt, bool, error)
+	// Invocations is a list of links to the root block of invocations than can
+	// be found in the message.
+	Invocations() []ipld.Link
+	// Receipts is a list of links to the root block of receipts that can be
+	// found in the message.
+	Receipts() []ipld.Link
+	// Get returns a receipt link from the message, given an invocation link.
+	Get(link ipld.Link) (ipld.Link, bool)
 }
 
 type message struct {
 	root ipld.Block
-	data *agentmessage.Data
+	data *mdm.DataModel
 	blks blockstore.BlockReader
 }
 
@@ -33,41 +39,33 @@ func (m *message) Blocks() iterable.Iterator[ipld.Block] {
 	return m.blks.Iterator()
 }
 
-func (m *message) Invocations() ([]invocation.Invocation, error) {
-	var invs []invocation.Invocation
-	for _, l := range m.data.Execute {
-		inv, err := invocation.NewInvocation(l, m.blks)
-		if err != nil {
-			return nil, err
-		}
-		invs = append(invs, inv)
-	}
-	return invs, nil
+func (m *message) Invocations() []ipld.Link {
+	return m.data.Execute
 }
 
-func (m *message) Receipts() ([]receipt.Receipt, error) {
-	var rcpts []receipt.Receipt
+func (m *message) Receipts() []ipld.Link {
+	var rcpts []ipld.Link
 	for _, k := range m.data.Report.Keys {
 		l, _ := m.data.Report.Values[k]
-		rcpt, err := receipt.NewReceipt(l, m.blks)
-		if err != nil {
-			return nil, err
-		}
-		rcpts = append(rcpts, rcpt)
+		rcpts = append(rcpts, l)
 	}
-	return rcpts, nil
+	return rcpts
 }
 
-func (m *message) Get(link ipld.Link) (receipt.Receipt, bool, error) {
-	r, ok := m.data.Report.Values[link.String()]
-	if !ok {
-		return nil, false, nil
+func (m *message) Get(link ipld.Link) (ipld.Link, bool) {
+	var rcpt ipld.Link
+	found := false
+	for _, k := range m.data.Report.Keys {
+		if k == link.String() {
+			rcpt = m.data.Report.Values[k]
+			found = true
+			break
+		}
 	}
-	rcpt, err := receipt.NewReceipt(r, m.blks)
-	if err != nil {
-		return nil, false, err
+	if !found {
+		return nil, false
 	}
-	return rcpt, true, nil
+	return rcpt, true
 }
 
 func Build(invocation invocation.Invocation) (AgentMessage, error) {
@@ -82,13 +80,18 @@ func Build(invocation invocation.Invocation) (AgentMessage, error) {
 		ex = append(ex, ib.Link())
 	}
 
-	data := agentmessage.Data{Execute: ex}
-	m, err := agentmessage.Encode(&data)
-	if err != nil {
-		return nil, err
+	msg := mdm.AgentMessageModel{
+		UcantoMessage7: &mdm.DataModel{
+			Execute: ex,
+		},
 	}
 
-	rt, err := cbor.NewBlock(m)
+	rt, err := block.Encode(
+		msg,
+		mdm.Type(),
+		cbor.Codec,
+		sha256.Hasher,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +100,7 @@ func Build(invocation invocation.Invocation) (AgentMessage, error) {
 		return nil, err
 	}
 
-	return &message{root: rt, data: &data, blks: bs}, nil
+	return &message{root: rt, data: msg.UcantoMessage7, blks: bs}, nil
 }
 
 func NewMessage(roots []ipld.Link, blks blockstore.BlockReader) (AgentMessage, error) {
@@ -113,10 +116,17 @@ func NewMessage(roots []ipld.Link, blks blockstore.BlockReader) (AgentMessage, e
 		return nil, fmt.Errorf("missing root block: %s", roots[0])
 	}
 
-	data, err := agentmessage.Decode(rblock.Bytes())
+	msg := mdm.AgentMessageModel{}
+	err = block.Decode(
+		rblock,
+		&msg,
+		mdm.Type(),
+		cbor.Codec,
+		sha256.Hasher,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("decoding message: %s", err)
 	}
 
-	return &message{root: rblock, data: data, blks: blks}, nil
+	return &message{root: rblock, data: msg.UcantoMessage7, blks: blks}, nil
 }

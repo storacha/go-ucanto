@@ -7,8 +7,11 @@ import (
 	"github.com/alanshaw/go-ucanto/core/invocation"
 	"github.com/alanshaw/go-ucanto/core/ipld"
 	"github.com/alanshaw/go-ucanto/core/ipld/block"
+	"github.com/alanshaw/go-ucanto/core/ipld/codec/cbor"
+	"github.com/alanshaw/go-ucanto/core/ipld/hash/sha256"
 	"github.com/alanshaw/go-ucanto/core/iterable"
-	rdm "github.com/alanshaw/go-ucanto/core/receipt/datamodel/receipt"
+	"github.com/alanshaw/go-ucanto/core/message"
+	rdm "github.com/alanshaw/go-ucanto/core/receipt/datamodel"
 	"github.com/alanshaw/go-ucanto/core/result"
 	"github.com/alanshaw/go-ucanto/did"
 	"github.com/alanshaw/go-ucanto/ucan"
@@ -21,7 +24,7 @@ type Effects interface {
 	Join() ipld.Link
 }
 
-type Receipt[O any, X any] interface {
+type Receipt[O, X any] interface {
 	ipld.IPLDView
 	Ran() invocation.Invocation
 	Out() result.Result[O, X]
@@ -31,7 +34,7 @@ type Receipt[O any, X any] interface {
 	Signature() signature.SignatureView
 }
 
-type results[O any, X any] struct {
+type results[O, X any] struct {
 	model *rdm.ResultModel[O, X]
 }
 
@@ -55,13 +58,14 @@ func (fx effects) Join() ipld.Link {
 	return fx.model.Join
 }
 
-type receipt[O any, X any] struct {
+type receipt[O, X any] struct {
 	rt   block.Block
 	blks blockstore.BlockReader
 	data *rdm.ReceiptModel[O, X]
 }
 
 func (r *receipt[O, X]) Blocks() iterable.Iterator[block.Block] {
+	// TODO: iterate only: ran, fx, proofs, root
 	return r.blks.Iterator()
 }
 
@@ -70,7 +74,8 @@ func (r *receipt[O, X]) Fx() Effects {
 }
 
 func (r *receipt[O, X]) Issuer() ucan.Principal {
-	principal, _ := did.Decode(r.data.Ocm.Iss)
+	principal, err := did.Decode(r.data.Ocm.Iss)
+	fmt.Printf("Error: decoding issuer DID: %s\n", err)
 	return principal
 }
 
@@ -87,9 +92,10 @@ func (r *receipt[O, X]) Out() result.Result[O, X] {
 	return results[O, X]{r.data.Ocm.Out}
 }
 
-// Ran implements Receipt.
-func (receipt[O, X]) Ran() invocation.Invocation {
-	panic("unimplemented")
+func (r *receipt[O, X]) Ran() invocation.Invocation {
+	inv, err := invocation.NewInvocationView(r.data.Ocm.Ran, r.blks)
+	fmt.Printf("Error: creating invocation view: %s\n", err)
+	return inv
 }
 
 func (r *receipt[O, X]) Root() block.Block {
@@ -100,8 +106,8 @@ func (r *receipt[O, X]) Signature() signature.SignatureView {
 	return signature.NewSignatureView(signature.Decode(r.data.Sig))
 }
 
-func NewReceipt[O any, X any](root ipld.Link, blocks blockstore.BlockReader, typ schema.Type) (Receipt[O, X], error) {
-	block, ok, err := blocks.Get(root)
+func NewReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, typ schema.Type) (Receipt[O, X], error) {
+	rblock, ok, err := blocks.Get(root)
 	if err != nil {
 		return nil, fmt.Errorf("getting receipt root block: %s", err)
 	}
@@ -109,16 +115,47 @@ func NewReceipt[O any, X any](root ipld.Link, blocks blockstore.BlockReader, typ
 		return nil, fmt.Errorf("missing receipt root block: %s", root)
 	}
 
-	data, err := rdm.Decode[O, X](block.Bytes(), typ)
+	rmdl := rdm.ReceiptModel[O, X]{}
+	err = block.Decode(rblock, &rmdl, typ, cbor.Codec, sha256.Hasher)
 	if err != nil {
 		return nil, fmt.Errorf("decoding receipt: %s", err)
 	}
 
 	rcpt := receipt[O, X]{
-		rt:   block,
+		rt:   rblock,
 		blks: blocks,
-		data: data,
+		data: &rmdl,
 	}
 
 	return &rcpt, nil
+}
+
+type ReceiptReader[O, X any] interface {
+	Get(msg message.AgentMessage, root ipld.Link) (Receipt[O, X], error)
+}
+
+type receiptReader[O, X any] struct {
+	typ schema.Type
+}
+
+func (d *receiptReader[O, X]) Get(msg message.AgentMessage, inv ipld.Link) (Receipt[O, X], error) {
+	rl, ok := msg.Get(inv)
+	if !ok {
+		return nil, fmt.Errorf("missing receipt for invocation: %s", inv)
+	}
+
+	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(msg.Blocks()))
+	if err != nil {
+		return nil, fmt.Errorf("creating block reader: %s", err)
+	}
+
+	return NewReceipt[O, X](rl, br, d.typ)
+}
+
+func NewReceiptReader[O, X any](resultschema []byte) (ReceiptReader[O, X], error) {
+	typ, err := rdm.NewReceiptModelType(resultschema)
+	if err != nil {
+		return nil, fmt.Errorf("loading receipt data model: %s", err)
+	}
+	return &receiptReader[O, X]{typ}, nil
 }

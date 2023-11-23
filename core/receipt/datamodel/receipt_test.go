@@ -1,9 +1,12 @@
-package receipt_test
+package datamodel_test
 
 import (
 	"testing"
 
-	"github.com/alanshaw/go-ucanto/core/receipt/datamodel/receipt"
+	"github.com/alanshaw/go-ucanto/core/ipld/block"
+	"github.com/alanshaw/go-ucanto/core/ipld/codec/cbor"
+	"github.com/alanshaw/go-ucanto/core/ipld/hash/sha256"
+	rdm "github.com/alanshaw/go-ucanto/core/receipt/datamodel"
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 )
@@ -17,7 +20,7 @@ type resultErr struct {
 }
 
 func TestEncodeDecode(t *testing.T) {
-	typ, err := receipt.NewReceiptType([]byte(`
+	typ, err := rdm.NewReceiptModelType([]byte(`
 		type Result union {
 			| Ok "ok"
 			| Err "error"
@@ -36,19 +39,20 @@ func TestEncodeDecode(t *testing.T) {
 	}
 
 	l := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
-	r0 := receipt.ReceiptModel[*resultOk, *resultErr]{
-		Ocm: receipt.OutcomeModel[*resultOk, *resultErr]{
+	r0 := rdm.ReceiptModel[*resultOk, *resultErr]{
+		Ocm: rdm.OutcomeModel[*resultOk, *resultErr]{
 			Ran: l,
-			Out: &receipt.ResultModel[*resultOk, *resultErr]{
+			Out: &rdm.ResultModel[*resultOk, *resultErr]{
 				Ok: &resultOk{Status: "done"},
 			},
 		},
 	}
-	b0, err := receipt.Encode(&r0, typ)
+	b0, err := block.Encode(&r0, typ, cbor.Codec, sha256.Hasher)
 	if err != nil {
 		t.Fatalf("encoding receipt: %s", err)
 	}
-	r1, err := receipt.Decode[*resultOk, *resultErr](b0, typ)
+	r1 := rdm.ReceiptModel[*resultOk, *resultErr]{}
+	err = block.Decode(b0, &r1, typ, cbor.Codec, sha256.Hasher)
 	if err != nil {
 		t.Fatalf("decoding receipt: %s", err)
 	}
@@ -59,19 +63,20 @@ func TestEncodeDecode(t *testing.T) {
 		t.Fatalf("status was not done")
 	}
 
-	r2 := receipt.ReceiptModel[*resultOk, *resultErr]{
-		Ocm: receipt.OutcomeModel[*resultOk, *resultErr]{
+	r2 := rdm.ReceiptModel[*resultOk, *resultErr]{
+		Ocm: rdm.OutcomeModel[*resultOk, *resultErr]{
 			Ran: l,
-			Out: &receipt.ResultModel[*resultOk, *resultErr]{
+			Out: &rdm.ResultModel[*resultOk, *resultErr]{
 				Err: &resultErr{Message: "boom"},
 			},
 		},
 	}
-	b1, err := receipt.Encode(&r2, typ)
+	b1, err := block.Encode(&r2, typ, cbor.Codec, sha256.Hasher)
 	if err != nil {
 		t.Fatalf("encoding receipt: %s", err)
 	}
-	r3, err := receipt.Decode[*resultOk, *resultErr](b1, typ)
+	r3 := rdm.ReceiptModel[*resultOk, *resultErr]{}
+	err = block.Decode(b1, &r3, typ, cbor.Codec, sha256.Hasher)
 	if err != nil {
 		t.Fatalf("decoding receipt: %s", err)
 	}

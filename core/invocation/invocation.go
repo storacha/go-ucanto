@@ -2,15 +2,9 @@ package invocation
 
 import (
 	"github.com/alanshaw/go-ucanto/core/dag/blockstore"
+	"github.com/alanshaw/go-ucanto/core/delegation"
 	"github.com/alanshaw/go-ucanto/core/ipld"
-	"github.com/alanshaw/go-ucanto/ucan"
 )
-
-// Delagation is a materialized view of a UCAN delegation, which can be encoded
-// into a UCAN token and used as proof for an invocation or further delegations.
-type Delegation interface {
-	// TODO
-}
 
 // Invocation represents a UCAN that can be presented to a service provider to
 // invoke or "exercise" a Capability. You can think of invocations as a
@@ -22,17 +16,22 @@ type Delegation interface {
 // Delegations. The service provider will inspect the proofs to verify that the
 // invocation has sufficient privileges to execute.
 type Invocation interface {
-	ipld.IPLDView
-	// Link returns the IPLD link of the root block of the invocation.
-	Link() ucan.Link
-	// Archive writes the invocation to a Content Addressed aRchive (CAR).
-	// Archive() io.Reader
+	delegation.Delegation
+}
+
+func NewInvocation(root ipld.Block, bs blockstore.BlockReader) Invocation {
+	return delegation.NewDelegation(root, bs)
+}
+
+func NewInvocationView(root ipld.Link, bs blockstore.BlockReader) (Invocation, error) {
+	return delegation.NewDelegationView(root, bs)
 }
 
 type IssuedInvocation interface {
 	// TODO?
 }
 
-func NewInvocation(root ipld.Link, bs blockstore.BlockReader) (Invocation, error) {
-	return nil, nil
+// TODO
+func Invoke() IssuedInvocation {
+	return nil
 }

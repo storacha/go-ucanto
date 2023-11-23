@@ -68,10 +68,11 @@ func (c *conn) Hasher() hash.Hash {
 	return c.hasher()
 }
 
-func Execute(invocation invocation.Invocation, conn Connection) (receipt.Receipt, error) {
+// TODO: move single execute onto invocation for now...
+func Execute[O, X any](invocation invocation.Invocation, rcptreader receipt.ReceiptReader[O, X], conn Connection) (receipt.Receipt[O, X], error) {
 	input, err := message.Build(invocation)
 	if err != nil {
-		return nil, fmt.Errorf("buidling message: %s", err)
+		return nil, fmt.Errorf("building message: %s", err)
 	}
 
 	req, err := conn.Codec().Encode(input)
@@ -89,15 +90,12 @@ func Execute(invocation invocation.Invocation, conn Connection) (receipt.Receipt
 		return nil, fmt.Errorf("decoding message: %s", err)
 	}
 
-	receipt, ok, err := output.Get(invocation.Link())
-	if err != nil {
-		return nil, fmt.Errorf("getting receipt: %s", err)
-	}
+	rt, ok := output.Get(invocation.Link())
 	if !ok {
 		return nil, fmt.Errorf("missing receipt for invocation: %s", invocation.Link())
 	}
 
-	return receipt, nil
+	return rcptreader.Get(output, rt)
 }
 
 var _ Connection = (*conn)(nil)
