@@ -13,6 +13,9 @@ import (
 	"github.com/alanshaw/go-ucanto/core/ipld/hash/sha256"
 	"github.com/alanshaw/go-ucanto/core/iterable"
 	"github.com/alanshaw/go-ucanto/ucan"
+	"github.com/alanshaw/go-ucanto/ucan/crypto/signature"
+	"github.com/alanshaw/go-ucanto/ucan/datamodel"
+	"github.com/alanshaw/go-ucanto/ucan/view"
 )
 
 // Delagation is a materialized view of a UCAN delegation, which can be encoded
@@ -23,12 +26,44 @@ type Delegation interface {
 	Link() ucan.Link
 	// Archive writes the invocation to a Content Addressed aRchive (CAR).
 	Archive() io.Reader
+
+	Issuer() ucan.Principal
+	Audience() ucan.Principal
+
 	Version() ucan.Version
+
+	Capabilities() []ucan.Capability[any]
+
+	Expiration() ucan.UTCUnixTimestamp
+	NotBefore() ucan.UTCUnixTimestamp
+	Nonce() ucan.Nonce
+	Facts() []ucan.Fact
+	Proofs() []ucan.Link
+
+	Signature() signature.SignatureView
 }
 
 type delegation struct {
 	rt   ipld.Block
 	blks blockstore.BlockReader
+	ucan view.UCANView
+}
+
+var _ Delegation = (*delegation)(nil)
+
+func (d *delegation) data() view.UCANView {
+	if d.ucan == nil {
+		data := datamodel.UCANModel{}
+		err := block.Decode(d.rt, &data, datamodel.Type(), cbor.Codec, sha256.Hasher)
+		if err != nil {
+			fmt.Printf("Error: decoding UCAN: %s\n", err)
+		}
+		d.ucan, err = view.NewUCANView(&data)
+		if err != nil {
+			fmt.Printf("Error: constructing UCAN view: %s\n", err)
+		}
+	}
+	return d.ucan
 }
 
 func (d *delegation) Root() ipld.Block {
@@ -47,9 +82,44 @@ func (d *delegation) Archive() io.Reader {
 	return Archive(d)
 }
 
+func (d *delegation) Issuer() ucan.Principal {
+	return d.data().Issuer()
+}
+
+func (d *delegation) Audience() ucan.Principal {
+	return d.data().Audience()
+}
+
 func (d *delegation) Version() ucan.Version {
-	data, _ := ucan.Decode(d.rt.Bytes())
-	return data.Version()
+	return d.data().Version()
+}
+
+func (d *delegation) Capabilities() []ucan.Capability[any] {
+	return d.data().Capabilities()
+}
+
+func (d *delegation) Expiration() ucan.UTCUnixTimestamp {
+	return d.data().Expiration()
+}
+
+func (d *delegation) NotBefore() ucan.UTCUnixTimestamp {
+	return d.data().NotBefore()
+}
+
+func (d *delegation) Nonce() ucan.Nonce {
+	return d.data().Nonce()
+}
+
+func (d *delegation) Facts() []ucan.Fact {
+	return d.data().Facts()
+}
+
+func (d *delegation) Proofs() []ucan.Link {
+	return d.data().Proofs()
+}
+
+func (d *delegation) Signature() signature.SignatureView {
+	return d.data().Signature()
 }
 
 func NewDelegation(root ipld.Block, bs blockstore.BlockReader) Delegation {

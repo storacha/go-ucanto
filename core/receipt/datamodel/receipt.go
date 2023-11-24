@@ -19,7 +19,7 @@ type ReceiptModel[O any, X any] struct {
 
 type OutcomeModel[O any, X any] struct {
 	Ran  ipld.Link
-	Out  *ResultModel[O, X]
+	Out  ResultModel[O, X]
 	Fx   EffectsModel
 	Meta MetaModel
 	Iss  []byte

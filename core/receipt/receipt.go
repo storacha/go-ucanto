@@ -64,8 +64,10 @@ type receipt[O, X any] struct {
 	data *rdm.ReceiptModel[O, X]
 }
 
+var _ Receipt[any, any] = (*receipt[any, any])(nil)
+
 func (r *receipt[O, X]) Blocks() iterable.Iterator[block.Block] {
-	// TODO: iterate only: ran, fx, proofs, root
+	panic("TODO: iterate only: ran, fx, proofs, root")
 	return r.blks.Iterator()
 }
 
@@ -75,7 +77,9 @@ func (r *receipt[O, X]) Fx() Effects {
 
 func (r *receipt[O, X]) Issuer() ucan.Principal {
 	principal, err := did.Decode(r.data.Ocm.Iss)
-	fmt.Printf("Error: decoding issuer DID: %s\n", err)
+	if err != nil {
+		fmt.Printf("Error: decoding issuer DID: %s\n", err)
+	}
 	return principal
 }
 
@@ -89,12 +93,14 @@ func (r *receipt[O, X]) Meta() map[string]any {
 }
 
 func (r *receipt[O, X]) Out() result.Result[O, X] {
-	return results[O, X]{r.data.Ocm.Out}
+	return results[O, X]{&r.data.Ocm.Out}
 }
 
 func (r *receipt[O, X]) Ran() invocation.Invocation {
 	inv, err := invocation.NewInvocationView(r.data.Ocm.Ran, r.blks)
-	fmt.Printf("Error: creating invocation view: %s\n", err)
+	if err != nil {
+		fmt.Printf("Error: creating invocation view: %s\n", err)
+	}
 	return inv
 }
 

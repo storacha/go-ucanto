@@ -42,7 +42,7 @@ func TestEncodeDecode(t *testing.T) {
 	r0 := rdm.ReceiptModel[*resultOk, *resultErr]{
 		Ocm: rdm.OutcomeModel[*resultOk, *resultErr]{
 			Ran: l,
-			Out: &rdm.ResultModel[*resultOk, *resultErr]{
+			Out: rdm.ResultModel[*resultOk, *resultErr]{
 				Ok: &resultOk{Status: "done"},
 			},
 		},
@@ -66,7 +66,7 @@ func TestEncodeDecode(t *testing.T) {
 	r2 := rdm.ReceiptModel[*resultOk, *resultErr]{
 		Ocm: rdm.OutcomeModel[*resultOk, *resultErr]{
 			Ran: l,
-			Out: &rdm.ResultModel[*resultOk, *resultErr]{
+			Out: rdm.ResultModel[*resultOk, *resultErr]{
 				Err: &resultErr{Message: "boom"},
 			},
 		},

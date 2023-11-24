@@ -21,6 +21,7 @@ type Capability[Caveats any] interface {
 	nb() Caveats
 }
 
+// Principal is a DID object representation with a `did` accessor for the DID.
 type Principal interface {
 	DID() did.DID
 }
@@ -33,3 +34,17 @@ type Link interface {
 // Version of the UCAN spec used to produce a specific UCAN.
 // It MUST have format `${number}.${number}.${number}`
 type Version = string
+
+// UTCUnixTimestamp is a timestamp in seconds since the Unix epoch.
+type UTCUnixTimestamp = uint64
+
+// https://github.com/ucan-wg/spec/#324-nonce
+type Nonce = string
+
+// A map of arbitrary facts and proofs of knowledge. The enclosed data MUST
+// be self-evident and externally verifiable. It MAY include information such
+// as hash preimages, server challenges, a Merkle proof, dictionary data, etc.
+// See https://github.com/ucan-wg/spec/#325-facts
+type Fact = map[string]any
+
+type Code = uint64

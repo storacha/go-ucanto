@@ -1,8 +1,6 @@
 package signature
 
-import (
-	"github.com/alanshaw/go-ucanto/ucan"
-)
+import "github.com/alanshaw/go-ucanto/ucan"
 
 type Verifier interface {
 	ucan.Principal

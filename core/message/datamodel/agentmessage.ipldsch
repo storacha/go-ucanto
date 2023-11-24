@@ -3,6 +3,6 @@ type AgentMessage union {
 } representation keyed
 
 type Data struct {
-	execute optional [Link] (rename "Execute")
-	report optional {String:Link} (rename "Report")
+	execute optional [Link]
+	report  optional {String:Link}
 }

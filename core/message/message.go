@@ -31,6 +31,8 @@ type message struct {
 	blks blockstore.BlockReader
 }
 
+var _ AgentMessage = (*message)(nil)
+
 func (m *message) Root() ipld.Block {
 	return m.root
 }
@@ -46,8 +48,10 @@ func (m *message) Invocations() []ipld.Link {
 func (m *message) Receipts() []ipld.Link {
 	var rcpts []ipld.Link
 	for _, k := range m.data.Report.Keys {
-		l, _ := m.data.Report.Values[k]
-		rcpts = append(rcpts, l)
+		l, ok := m.data.Report.Values[k]
+		if ok {
+			rcpts = append(rcpts, l)
+		}
 	}
 	return rcpts
 }
@@ -74,6 +78,9 @@ func Build(invocation invocation.Invocation) (AgentMessage, error) {
 		return nil, err
 	}
 	bs, err := blockstore.NewBlockStore(blockstore.WithBlocks(iblks))
+	if err != nil {
+		return nil, err
+	}
 
 	ex := []ipld.Link{}
 	for _, ib := range iblks {

@@ -3,17 +3,17 @@
 #
 # @see https://github.com/ucan-wg/invocation/blob/v0.2/README.md#82-receipt
 type Receipt struct {
-  ocm Outcome (rename "Ocm")
-  sig Bytes (rename "Sig")
+  ocm Outcome
+  sig Bytes
 }
 
 type Outcome struct {
-  ran Link (rename "Ran")
-  out Result (rename "Out")
-  fx Effects (rename "Fx")
-  meta {String:Any} (rename "Meta")
-  iss optional Bytes (rename "Iss")
-  prf [Link] (rename "Prf")
+  ran  Link
+  out  Result
+  fx   Effects
+  meta {String:Any}
+  iss  optional Bytes
+  prf  [Link]
 }
 
 # type DID = Bytes
@@ -24,6 +24,6 @@ type Outcome struct {
 # } representation kinded
 
 type Effects struct {
-  fork [Link] (rename "Fork")
-  join optional Link (rename "Join")
+  fork [Link]
+  join optional Link
 }
