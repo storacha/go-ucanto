@@ -41,8 +41,8 @@ type ResultModel[O any, X any] struct {
 	Err X
 }
 
-// NewReceiptModelType creates a new schema.Type for a Receipt. You must provide the
-// schema containing a Result type, which is a keyed union. e.g.
+// NewReceiptModelType creates a new schema.Type for a Receipt. You must
+// provide the schema containing a Result type, which is a keyed union. e.g.
 //
 //	type Result union {
 //	  | Ok "ok"

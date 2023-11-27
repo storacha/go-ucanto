@@ -7,6 +7,7 @@ import (
 	pdm "github.com/alanshaw/go-ucanto/ucan/datamodel/payload"
 	udm "github.com/alanshaw/go-ucanto/ucan/datamodel/ucan"
 	"github.com/ipld/go-ipld-prime"
+	"github.com/ipld/go-ipld-prime/codec/dagjson"
 	"github.com/ipld/go-ipld-prime/datamodel"
 )
 
@@ -19,7 +20,7 @@ type ucanConfig struct {
 	exp uint64
 	nbf uint64
 	nnc string
-	fct []map[string]any
+	fct []NodeBuilder
 	prf []Link
 }
 
@@ -50,7 +51,7 @@ func WithNonce(nnc string) Option {
 }
 
 // WithFacts configures the facts for the UCAN.
-func WithFacts(fct []map[string]any) Option {
+func WithFacts(fct []NodeBuilder) Option {
 	return func(cfg *ucanConfig) error {
 		cfg.fct = fct
 		return nil
@@ -65,9 +66,14 @@ func WithProofs(prf []Link) Option {
 	}
 }
 
+// NodeBuilder builds a datamodel.Node from the underlying data.
+type NodeBuilder interface {
+	Build() (datamodel.Node, error)
+}
+
 // Issue creates a new signed token with a given issuer. If expiration is
 // not set it defaults to 30 seconds from now.
-func Issue(issuer crypto.Signer, audience Principal, capabilities []Capability[any], options ...Option) (UCANView, error) {
+func Issue(issuer crypto.Signer, audience Principal, capabilities []Capability[NodeBuilder], options ...Option) (UCANView, error) {
 	cfg := ucanConfig{}
 	for _, opt := range options {
 		if err := opt(&cfg); err != nil {
@@ -75,40 +81,60 @@ func Issue(issuer crypto.Signer, audience Principal, capabilities []Capability[a
 		}
 	}
 
-	var capsmdl []pdm.CapabilityModel
+	var capsmdl []udm.CapabilityModel
 	for _, cap := range capabilities {
-		nb, ok := cap.Nb().(datamodel.Node)
-		if !ok {
-			return nil, fmt.Errorf("expected caveats to be a datamodel.Node")
+		nd, err := cap.Nb().Build()
+		if err != nil {
+			return nil, fmt.Errorf("building caveats: %s", err)
 		}
-		m := pdm.CapabilityModel{
+		m := udm.CapabilityModel{
 			With: cap.With(),
-			Can: cap.Can(),
-			Nb: nb,
+			Can:  cap.Can(),
+			Nb:   nd,
 		}
 		capsmdl = append(capsmdl, m)
 	}
 
+	var prfstrs []string
+	for _, link := range cfg.prf {
+		prfstrs = append(prfstrs, link.String())
+	}
+
+	var fctsmdl []datamodel.Node
+	for _, f := range cfg.fct {
+		nd, err := f.Build()
+		if err != nil {
+			return nil, fmt.Errorf("building fact: %s", err)
+		}
+		fctsmdl = append(fctsmdl, nd)
+	}
 
 	payload := pdm.PayloadModel{
 		Iss: issuer.DID().String(),
 		Aud: audience.DID().String(),
-		Att: capabilities
+		Att: capsmdl,
+		Prf: prfstrs,
+		Exp: cfg.exp,
+		Fct: fctsmdl,
+		Nnc: cfg.nnc,
+		Nbf: cfg.nbf,
+	}
+	bytes, err := ipld.Marshal(dagjson.Encode, payload, pdm.Type())
+	if err != nil {
+		return nil, fmt.Errorf("encoding payload: %s", err)
 	}
 
-
-
-	model := datamodel.UCANModel{
-		V: version,
-		Iss: issuer.DID().String(),
-		Aud: audience.DID().String(),
-		S   []byte
-		Att []CapabilityModel
-		Prf []ipld.Link
-		Exp uint64
-		Fct []FactModel
-		Nnc string
-		Nbf uint64
+	model := udm.UCANModel{
+		V:   version,
+		Iss: issuer.DID().Bytes(),
+		Aud: audience.DID().Bytes(),
+		S:   []byte{},
+		Att: capsmdl,
+		Prf: cfg.prf,
+		Exp: cfg.exp,
+		Fct: fctsmdl,
+		Nnc: cfg.nnc,
+		Nbf: cfg.nbf,
 	}
 	return NewUCANView(&model)
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	udm "github.com/alanshaw/go-ucanto/ucan/datamodel/ucan"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/schema"
@@ -34,28 +35,12 @@ func Type() schema.Type {
 }
 
 type PayloadModel struct {
-	Iss []string
-	Aud []string
-	Att []CapabilityModel
+	Iss string
+	Aud string
+	Att []udm.CapabilityModel
 	Prf []string
 	Exp uint64
-	Fct []FactModel
+	Fct []datamodel.Node
 	Nnc string
 	Nbf uint64
-}
-
-type CapabilityModel struct {
-	With string
-	Can  string
-	Nb   NbModel
-}
-
-type NbModel struct {
-	Keys   []string
-	Values map[string]datamodel.Node
-}
-
-type FactModel struct {
-	Keys   []string
-	Values map[string]datamodel.Node
 }
