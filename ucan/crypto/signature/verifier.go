@@ -1,9 +1,9 @@
 package signature
 
-import "github.com/alanshaw/go-ucanto/ucan"
+import "github.com/alanshaw/go-ucanto/did"
 
 type Verifier interface {
-	ucan.Principal
+	DID() did.DID
 	Code() uint64
 	// Takes byte encoded message and verifies that it is signed by corresponding
 	// signer.

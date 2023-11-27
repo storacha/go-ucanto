@@ -1,4 +1,4 @@
-package datamodel
+package ucan
 
 import (
 	_ "embed"
@@ -41,7 +41,6 @@ type UCANModel struct {
 	Att []CapabilityModel
 	Prf []ipld.Link
 	Exp uint64
-
 	Fct []FactModel
 	Nnc string
 	Nbf uint64

@@ -1,7 +1,7 @@
 package ucan
 
 import (
-	did "github.com/alanshaw/go-ucanto/did"
+	"github.com/alanshaw/go-ucanto/did"
 	"github.com/ipld/go-ipld-prime"
 )
 
@@ -16,9 +16,9 @@ type Ability = string
 // Capability represents an ability that a UCAN holder can perform with some
 // resource.
 type Capability[Caveats any] interface {
-	can() Ability
-	with() Resource
-	nb() Caveats
+	Can() Ability
+	With() Resource
+	Nb() Caveats
 }
 
 // Principal is a DID object representation with a `did` accessor for the DID.
@@ -27,9 +27,7 @@ type Principal interface {
 }
 
 // Link is an IPLD link to UCAN data.
-type Link interface {
-	ipld.Link
-}
+type Link = ipld.Link
 
 // Version of the UCAN spec used to produce a specific UCAN.
 // It MUST have format `${number}.${number}.${number}`
@@ -46,5 +44,3 @@ type Nonce = string
 // as hash preimages, server challenges, a Merkle proof, dictionary data, etc.
 // See https://github.com/ucan-wg/spec/#325-facts
 type Fact = map[string]any
-
-type Code = uint64

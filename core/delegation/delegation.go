@@ -3,6 +3,7 @@ package delegation
 import (
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/alanshaw/go-ucanto/core/car"
 	"github.com/alanshaw/go-ucanto/core/dag/blockstore"
@@ -14,8 +15,7 @@ import (
 	"github.com/alanshaw/go-ucanto/core/iterable"
 	"github.com/alanshaw/go-ucanto/ucan"
 	"github.com/alanshaw/go-ucanto/ucan/crypto/signature"
-	"github.com/alanshaw/go-ucanto/ucan/datamodel"
-	"github.com/alanshaw/go-ucanto/ucan/view"
+	udm "github.com/alanshaw/go-ucanto/ucan/datamodel/ucan"
 )
 
 // Delagation is a materialized view of a UCAN delegation, which can be encoded
@@ -26,43 +26,51 @@ type Delegation interface {
 	Link() ucan.Link
 	// Archive writes the invocation to a Content Addressed aRchive (CAR).
 	Archive() io.Reader
-
+	// Issuer is the signer of the UCAN.
 	Issuer() ucan.Principal
+	// Audience is the principal delegated to.
 	Audience() ucan.Principal
-
+	// Version is the spec version the UCAN conforms to.
 	Version() ucan.Version
-
+	// Capabilities are claimed abilities that can be performed on a resource.
 	Capabilities() []ucan.Capability[any]
-
+	// Expiration is the time in seconds since the Unix epoch that the UCAN
+	// becomes invalid.
 	Expiration() ucan.UTCUnixTimestamp
+	// NotBefore is the time in seconds since the Unix epoch that the UCAN
+	// becomes valid.
 	NotBefore() ucan.UTCUnixTimestamp
+	// Nonce is a randomly generated string to provide a unique UCAN.
 	Nonce() ucan.Nonce
+	// Facts are arbitrary facts and proofs of knowledge.
 	Facts() []ucan.Fact
+	// Proofs of delegation.
 	Proofs() []ucan.Link
-
+	// Signature of the UCAN issuer.
 	Signature() signature.SignatureView
 }
 
 type delegation struct {
 	rt   ipld.Block
 	blks blockstore.BlockReader
-	ucan view.UCANView
+	ucan ucan.UCANView
+	once sync.Once
 }
 
 var _ Delegation = (*delegation)(nil)
 
-func (d *delegation) data() view.UCANView {
-	if d.ucan == nil {
-		data := datamodel.UCANModel{}
-		err := block.Decode(d.rt, &data, datamodel.Type(), cbor.Codec, sha256.Hasher)
+func (d *delegation) data() ucan.UCANView {
+	d.once.Do(func() {
+		data := udm.UCANModel{}
+		err := block.Decode(d.rt, &data, udm.Type(), cbor.Codec, sha256.Hasher)
 		if err != nil {
 			fmt.Printf("Error: decoding UCAN: %s\n", err)
 		}
-		d.ucan, err = view.NewUCANView(&data)
+		d.ucan, err = ucan.NewUCANView(&data)
 		if err != nil {
 			fmt.Printf("Error: constructing UCAN view: %s\n", err)
 		}
-	}
+	})
 	return d.ucan
 }
 

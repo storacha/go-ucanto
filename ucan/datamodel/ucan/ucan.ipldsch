@@ -10,10 +10,10 @@ type UCAN struct {
   att [Capability]
   # All proofs are links, however you could still inline proof
   # by using CID with identity hashing algorithm
-  prf [&UCAN] (implied [])
+  prf optional [&UCAN]
   exp Int
 
-  fct [Fact] (implied [])
+  fct optional [Fact]
   nnc optional String
   nbf optional Int
 } representation map
