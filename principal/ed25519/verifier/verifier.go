@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/alanshaw/go-ucanto/did"
+	"github.com/alanshaw/go-ucanto/principal"
 	"github.com/alanshaw/go-ucanto/ucan/crypto/signature"
 	"github.com/multiformats/go-varint"
 )
@@ -13,13 +14,16 @@ import (
 const Code = 0xed
 const Name = "Ed25519"
 
+const SignatureCode = signature.EdDSA
+const SignatureAlgorithm = "EdDSA"
+
 var publicTagSize = varint.UvarintSize(Code)
 
 const keySize = 32
 
 var size = publicTagSize + keySize
 
-func Parse(str string) (signature.Verifier, error) {
+func Parse(str string) (principal.Verifier, error) {
 	did, err := did.Parse(str)
 	if err != nil {
 		return nil, fmt.Errorf("parsing DID: %s", err)
@@ -27,7 +31,7 @@ func Parse(str string) (signature.Verifier, error) {
 	return Decode(did.Bytes())
 }
 
-func Decode(b []byte) (signature.Verifier, error) {
+func Decode(b []byte) (principal.Verifier, error) {
 	if len(b) != size {
 		return nil, fmt.Errorf("invalid length: %d wanted: %d", len(b), size)
 	}

@@ -1,15 +1,11 @@
 package crypto
 
 import (
-	"github.com/alanshaw/go-ucanto/did"
 	"github.com/alanshaw/go-ucanto/ucan/crypto/signature"
 )
 
+// Signer is an entity that can sign a payload.
 type Signer interface {
-	DID() did.DID
-	// Takes byte encoded message and produces a verifiable signature.
-	Sign(msg []byte) signature.Signature
-	Code() uint64
-	Verifier() signature.Verifier
-	Encode() []byte
+	// Sign takes a byte encoded message and produces a verifiable signature.
+	Sign(msg []byte) signature.SignatureView
 }

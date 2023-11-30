@@ -20,7 +20,7 @@ type ucanConfig struct {
 	exp uint64
 	nbf uint64
 	nnc string
-	fct []NodeBuilder
+	fct []FactBuilder
 	prf []Link
 }
 
@@ -51,7 +51,7 @@ func WithNonce(nnc string) Option {
 }
 
 // WithFacts configures the facts for the UCAN.
-func WithFacts(fct []NodeBuilder) Option {
+func WithFacts(fct []FactBuilder) Option {
 	return func(cfg *ucanConfig) error {
 		cfg.fct = fct
 		return nil
@@ -66,14 +66,17 @@ func WithProofs(prf []Link) Option {
 	}
 }
 
-// NodeBuilder builds a datamodel.Node from the underlying data.
-type NodeBuilder interface {
-	Build() (datamodel.Node, error)
+// MapBuilder builds a map of string => datamodel.Node from the underlying data.
+type MapBuilder interface {
+	Build() (map[string]datamodel.Node, error)
 }
+
+type CaveatBuilder = MapBuilder
+type FactBuilder = MapBuilder
 
 // Issue creates a new signed token with a given issuer. If expiration is
 // not set it defaults to 30 seconds from now.
-func Issue(issuer crypto.Signer, audience Principal, capabilities []Capability[NodeBuilder], options ...Option) (UCANView, error) {
+func Issue(issuer crypto.Signer, audience Principal, capabilities []Capability[CaveatBuilder], options ...Option) (UCANView, error) {
 	cfg := ucanConfig{}
 	for _, opt := range options {
 		if err := opt(&cfg); err != nil {
@@ -83,14 +86,21 @@ func Issue(issuer crypto.Signer, audience Principal, capabilities []Capability[N
 
 	var capsmdl []udm.CapabilityModel
 	for _, cap := range capabilities {
-		nd, err := cap.Nb().Build()
+		vals, err := cap.Nb().Build()
 		if err != nil {
 			return nil, fmt.Errorf("building caveats: %s", err)
+		}
+		var keys []string
+		for k, _ := range vals {
+			keys = append(keys, k)
 		}
 		m := udm.CapabilityModel{
 			With: cap.With(),
 			Can:  cap.Can(),
-			Nb:   nd,
+			Nb: udm.NbModel{
+				Keys:   keys,
+				Values: vals,
+			},
 		}
 		capsmdl = append(capsmdl, m)
 	}
@@ -100,13 +110,20 @@ func Issue(issuer crypto.Signer, audience Principal, capabilities []Capability[N
 		prfstrs = append(prfstrs, link.String())
 	}
 
-	var fctsmdl []datamodel.Node
+	var fctsmdl []udm.FactModel
 	for _, f := range cfg.fct {
-		nd, err := f.Build()
+		vals, err := f.Build()
 		if err != nil {
 			return nil, fmt.Errorf("building fact: %s", err)
 		}
-		fctsmdl = append(fctsmdl, nd)
+		var keys []string
+		for k, _ := range vals {
+			keys = append(keys, k)
+		}
+		fctsmdl = append(fctsmdl, udm.FactModel{
+			Keys:   keys,
+			Values: vals,
+		})
 	}
 
 	payload := pdm.PayloadModel{

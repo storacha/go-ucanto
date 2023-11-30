@@ -7,7 +7,6 @@ import (
 
 	udm "github.com/alanshaw/go-ucanto/ucan/datamodel/ucan"
 	"github.com/ipld/go-ipld-prime"
-	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/schema"
 )
 
@@ -40,7 +39,7 @@ type PayloadModel struct {
 	Att []udm.CapabilityModel
 	Prf []string
 	Exp uint64
-	Fct []datamodel.Node
+	Fct []udm.FactModel
 	Nnc string
 	Nbf uint64
 }

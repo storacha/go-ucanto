@@ -2,6 +2,7 @@ package ucan
 
 import (
 	"github.com/alanshaw/go-ucanto/did"
+	"github.com/alanshaw/go-ucanto/ucan/crypto"
 	"github.com/ipld/go-ipld-prime"
 )
 
@@ -44,3 +45,25 @@ type Nonce = string
 // as hash preimages, server challenges, a Merkle proof, dictionary data, etc.
 // See https://github.com/ucan-wg/spec/#325-facts
 type Fact = map[string]any
+
+// Entity that can sign UCANs with keys from a `Principal` using the signing
+// algorithm `Alg`.
+type Signer[Alg crypto.SigAlg] interface {
+	Principal
+	crypto.Signer
+
+	// SignatureCode is an integer corresponding to the byteprefix of the
+	// signature algorithm. It is used to tag the [signature] so it can self
+	// describe what algorithm was used.
+	//
+	// [signature]: https://github.com/ucan-wg/ucan-ipld/#25-signature
+	SignatureCode() Alg
+
+	// SignatureAlgorithm is the name of the signature algorithm. It is a human
+	// readable equivalent of the `SignatureCode`, however it is also used as the
+	// last segment in [Nonstandard Signatures], which is used as an `alg` field
+	// of the JWT header.
+	//
+	// [Nonstandard Signatures]: https://github.com/ucan-wg/ucan-ipld/#251-nonstandard-signatures
+	SignatureAlgorithm() string
+}
