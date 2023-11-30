@@ -2,6 +2,7 @@ package message
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/alanshaw/go-ucanto/core/dag/blockstore"
 	"github.com/alanshaw/go-ucanto/core/invocation"
@@ -72,19 +73,30 @@ func (m *message) Get(link ipld.Link) (ipld.Link, bool) {
 	return rcpt, true
 }
 
-func Build(invocation invocation.Invocation) (AgentMessage, error) {
-	iblks, err := iterable.Collect(invocation.Blocks())
-	if err != nil {
-		return nil, err
-	}
-	bs, err := blockstore.NewBlockStore(blockstore.WithBlocks(iblks))
+func Build(invocations []invocation.Invocation) (AgentMessage, error) {
+	bs, err := blockstore.NewBlockStore()
 	if err != nil {
 		return nil, err
 	}
 
 	ex := []ipld.Link{}
-	for _, ib := range iblks {
-		ex = append(ex, ib.Link())
+	for _, inv := range invocations {
+		ex = append(ex, inv.Link())
+
+		blks := inv.Blocks()
+		for {
+			b, err := blks.Next()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				return nil, fmt.Errorf("reading invocation blocks: %s", err)
+			}
+			err = bs.Put(b)
+			if err != nil {
+				return nil, fmt.Errorf("putting invocation block: %s", err)
+			}
+		}
 	}
 
 	msg := mdm.AgentMessageModel{

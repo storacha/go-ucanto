@@ -4,6 +4,7 @@ import (
 	"github.com/alanshaw/go-ucanto/core/dag/blockstore"
 	"github.com/alanshaw/go-ucanto/core/delegation"
 	"github.com/alanshaw/go-ucanto/core/ipld"
+	"github.com/alanshaw/go-ucanto/ucan"
 )
 
 // Invocation represents a UCAN that can be presented to a service provider to
@@ -31,7 +32,6 @@ type IssuedInvocation interface {
 	Invocation
 }
 
-// TODO
-func Invoke[O any, X any]() IssuedInvocation {
-	return nil
+func Invoke(issuer ucan.Signer, audience ucan.Principal, capabilities []ucan.Capability[ucan.CaveatBuilder], options ...delegation.Option) (IssuedInvocation, error) {
+	return delegation.Delegate(issuer, audience, capabilities, options...)
 }

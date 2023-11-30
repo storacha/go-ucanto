@@ -6,8 +6,9 @@ import (
 	"hash"
 
 	"github.com/alanshaw/go-ucanto/core/invocation"
+	"github.com/alanshaw/go-ucanto/core/ipld/block"
+	"github.com/alanshaw/go-ucanto/core/iterable"
 	"github.com/alanshaw/go-ucanto/core/message"
-	"github.com/alanshaw/go-ucanto/core/receipt"
 	"github.com/alanshaw/go-ucanto/transport"
 	"github.com/alanshaw/go-ucanto/ucan"
 )
@@ -70,8 +71,16 @@ func (c *conn) Hasher() hash.Hash {
 	return c.hasher()
 }
 
-func Execute[O, X any](invocation invocation.Invocation, rcptreader receipt.ReceiptReader[O, X], conn Connection) (receipt.Receipt[O, X], error) {
-	input, err := message.Build(invocation)
+type ExecutionResponse interface {
+	// Blocks returns an iterator of all the IPLD blocks that are included in
+	// the response.
+	Blocks() iterable.Iterator[block.Block]
+	// Get returns a link to a receipt, given an invocation link.
+	Get(inv ucan.Link) (ucan.Link, bool)
+}
+
+func Execute(invocations []invocation.Invocation, conn Connection) (ExecutionResponse, error) {
+	input, err := message.Build(invocations)
 	if err != nil {
 		return nil, fmt.Errorf("building message: %s", err)
 	}
@@ -91,10 +100,5 @@ func Execute[O, X any](invocation invocation.Invocation, rcptreader receipt.Rece
 		return nil, fmt.Errorf("decoding message: %s", err)
 	}
 
-	rt, ok := output.Get(invocation.Link())
-	if !ok {
-		return nil, fmt.Errorf("missing receipt for invocation: %s", invocation.Link())
-	}
-
-	return rcptreader.Get(output, rt)
+	return ExecutionResponse(output), nil
 }

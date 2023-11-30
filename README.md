@@ -11,7 +11,7 @@ import (
 
   "github.com/alanshaw/go-ucanto/client"
   "github.com/alanshaw/go-ucanto/did"
-  "github.com/alanshaw/go-ucanto/principal/ed25519/signer"
+  ed25519 "github.com/alanshaw/go-ucanto/principal/ed25519/signer"
   "github.com/alanshaw/go-ucanto/transport/car"
   "github.com/alanshaw/go-ucanto/transport/http"
   "github.com/alanshaw/go-ucanto/core/invocation"
@@ -19,40 +19,77 @@ import (
 )
 
 // service URL & DID
-u, _ := url.Parse("https://up.web3.storage")
-p, _ := did.Parse("did:web:web3.storage")
+serviceURL, _ := url.Parse("https://up.web3.storage")
+servicePrincipal, _ := did.Parse("did:web:web3.storage")
 
 // HTTP transport and CAR encoding
-ch := http.NewHTTPChannel(u)
-co := car.NewCAROutboundCodec()
+channel := http.NewHTTPChannel(serviceURL)
+codec := car.NewCAROutboundCodec()
 
-cn, _ := client.NewConnection(p, co, ch)
+conn, _ := client.NewConnection(servicePrincipal, codec, channel)
 
 // private key to sign UCANs with
-ss, _ := ioutil.ReadFile("path/to/private.key")
-snr, _ := signer.Parse(ss)
+priv, _ := ioutil.ReadFile("path/to/private.key")
+signer, _ := ed25519.Parse(priv)
 
-// create an invocation to perform a task with granted capabilities
-inv := invocation.Invoke(snr, p, ...TODO)
+audience := servicePrincipal
 
-typ := []byte(`
+type StoreAddCaveats struct {
+  link ipld.Link
+  size uint64
+}
+
+func (c *StoreAddCaveats) Build() (map[string]datamodel.Node, error) {
+  // TODO
+}
+
+caps := []Capability[any]{
+  ucan.NewCapability(
+    "store/add",
+    did.Parse("did:key:z6MkwDuRThQcyWjqNsK54yKAmzfsiH6BTkASyiucThMtHt1T").DID(),
+    &StoreAddCaveats{
+      // TODO
+    },
+  ),
+}
+
+// create invocation(s) to perform a task with granted capabilities
+invocations := []invocation.Invocation{
+  invocation.Invoke(signer, servicePrincipal, caps)
+}
+
+// send the invocation(s) to the service
+resp, _ := client.Execute(invocations, conn)
+
+// define datamodels for ok and error outcome
+type OkModel struct {
+  Status string
+}
+type ErrModel struct {
+  Message string
+}
+
+// create new receipt reader, passing the IPLD schema for the result and the
+// ok and error types
+reader, _ := receipt.NewReceiptReader[OkModel, ErrModel]([]byte(`
   type Result union {
     | Ok "ok"
     | Err "error"
   } representation keyed
 
   type Ok struct {
-    status String (rename "Status")
+    status String
   }
 
   type Err struct {
-    message String (rename "Message")
+    message String
   }
-`)
-rr := receipt.NewReceiptReader[O, X](typ)
+`))
 
-// send the invocation to the service
-rcpt, _ := client.Execute[O, X](inv, rr, cn)
+// get the receipt link for the invocation from the response
+rcptlnk, _ := resp.Get(invocations[0].Link())
+// read the receipt for the invocation from the response
+rcpt := reader.Read(rcptlnk, res.Blocks())
 
 fmt.Println(rcpt.Out.Ok)
 ```

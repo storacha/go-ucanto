@@ -4,13 +4,13 @@ import (
 	"fmt"
 
 	"github.com/alanshaw/go-ucanto/core/dag/blockstore"
+	"github.com/alanshaw/go-ucanto/core/delegation"
 	"github.com/alanshaw/go-ucanto/core/invocation"
 	"github.com/alanshaw/go-ucanto/core/ipld"
 	"github.com/alanshaw/go-ucanto/core/ipld/block"
 	"github.com/alanshaw/go-ucanto/core/ipld/codec/cbor"
 	"github.com/alanshaw/go-ucanto/core/ipld/hash/sha256"
 	"github.com/alanshaw/go-ucanto/core/iterable"
-	"github.com/alanshaw/go-ucanto/core/message"
 	rdm "github.com/alanshaw/go-ucanto/core/receipt/datamodel"
 	"github.com/alanshaw/go-ucanto/core/result"
 	"github.com/alanshaw/go-ucanto/did"
@@ -24,6 +24,9 @@ type Effects interface {
 	Join() ipld.Link
 }
 
+// Receipt represents a view of the invocation receipt. This interface provides
+// an ergonomic API and allows you to reference linked IPLD objects of they are
+// included in the source DAG.
 type Receipt[O, X any] interface {
 	ipld.IPLDView
 	Ran() invocation.Invocation
@@ -31,6 +34,7 @@ type Receipt[O, X any] interface {
 	Fx() Effects
 	Meta() map[string]any
 	Issuer() ucan.Principal
+	Proofs() []delegation.Delegation
 	Signature() signature.SignatureView
 }
 
@@ -67,8 +71,16 @@ type receipt[O, X any] struct {
 var _ Receipt[any, any] = (*receipt[any, any])(nil)
 
 func (r *receipt[O, X]) Blocks() iterable.Iterator[block.Block] {
-	panic("TODO: iterate only: ran, fx, proofs, root")
-	return r.blks.Iterator()
+	var iterators []iterable.Iterator[block.Block]
+	iterators = append(iterators, r.Ran().Blocks())
+
+	for _, prf := range r.Proofs() {
+		iterators = append(iterators, prf.Blocks())
+	}
+
+	iterators = append(iterators, iterable.From([]block.Block{r.Root()}))
+
+	return iterable.Concat(iterators...)
 }
 
 func (r *receipt[O, X]) Fx() Effects {
@@ -81,6 +93,19 @@ func (r *receipt[O, X]) Issuer() ucan.Principal {
 		fmt.Printf("Error: decoding issuer DID: %s\n", err)
 	}
 	return principal
+}
+
+func (r *receipt[O, X]) Proofs() []delegation.Delegation {
+	var proofs []delegation.Delegation
+	for _, link := range r.data.Ocm.Prf {
+		prf, err := delegation.NewDelegationView(link, r.blks)
+		if err != nil {
+			fmt.Printf("Error: creating delegation view: %s\n", err)
+			continue
+		}
+		proofs = append(proofs, prf)
+	}
+	return proofs
 }
 
 // Map values are datamodel.Node
@@ -137,25 +162,19 @@ func NewReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, typ sch
 }
 
 type ReceiptReader[O, X any] interface {
-	Get(msg message.AgentMessage, root ipld.Link) (Receipt[O, X], error)
+	Read(rcpt ipld.Link, blks iterable.Iterator[block.Block]) (Receipt[O, X], error)
 }
 
 type receiptReader[O, X any] struct {
 	typ schema.Type
 }
 
-func (d *receiptReader[O, X]) Get(msg message.AgentMessage, inv ipld.Link) (Receipt[O, X], error) {
-	rl, ok := msg.Get(inv)
-	if !ok {
-		return nil, fmt.Errorf("missing receipt for invocation: %s", inv)
-	}
-
-	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(msg.Blocks()))
+func (rr *receiptReader[O, X]) Read(rcpt ipld.Link, blks iterable.Iterator[block.Block]) (Receipt[O, X], error) {
+	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(blks))
 	if err != nil {
 		return nil, fmt.Errorf("creating block reader: %s", err)
 	}
-
-	return NewReceipt[O, X](rl, br, d.typ)
+	return NewReceipt[O, X](rcpt, br, rr.typ)
 }
 
 func NewReceiptReader[O, X any](resultschema []byte) (ReceiptReader[O, X], error) {
