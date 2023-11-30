@@ -13,7 +13,7 @@ import (
 type UCANView interface {
 	// Model references the underlying IPLD datamodel instance.
 	Model() *udm.UCANModel
-	// Issuer is the signer of the
+	// Issuer is the signer of the UCAN.
 	Issuer() Principal
 	// Audience is the principal delegated to.
 	Audience() Principal

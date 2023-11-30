@@ -33,12 +33,26 @@ ss, _ := ioutil.ReadFile("path/to/private.key")
 snr, _ := signer.Parse(ss)
 
 // create an invocation to perform a task with granted capabilities
-inv := invocation.Invoke(/* ...TODO... */)
+inv := invocation.Invoke(snr, p, ...TODO)
 
+typ := []byte(`
+  type Result union {
+    | Ok "ok"
+    | Err "error"
+  } representation keyed
+
+  type Ok struct {
+    status String (rename "Status")
+  }
+
+  type Err struct {
+    message String (rename "Message")
+  }
+`)
 rr := receipt.NewReceiptReader[O, X](typ)
 
 // send the invocation to the service
-rcpt := inv.Execute[O, X](inv, rr, cn)
+rcpt, _ := client.Execute[O, X](inv, rr, cn)
 
 fmt.Println(rcpt.Out.Ok)
 ```

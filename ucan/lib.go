@@ -2,12 +2,12 @@ package ucan
 
 import (
 	"fmt"
+	"time"
 
-	"github.com/alanshaw/go-ucanto/ucan/crypto"
+	hdm "github.com/alanshaw/go-ucanto/ucan/datamodel/header"
 	pdm "github.com/alanshaw/go-ucanto/ucan/datamodel/payload"
 	udm "github.com/alanshaw/go-ucanto/ucan/datamodel/ucan"
-	"github.com/ipld/go-ipld-prime"
-	"github.com/ipld/go-ipld-prime/codec/dagjson"
+	"github.com/alanshaw/go-ucanto/ucan/formatter"
 	"github.com/ipld/go-ipld-prime/datamodel"
 )
 
@@ -25,7 +25,7 @@ type ucanConfig struct {
 }
 
 // WithExpiration configures the expiration time in UTC seconds since Unix
-// epoch. Set this to -1 for no expiration.
+// epoch.
 func WithExpiration(exp uint64) Option {
 	return func(cfg *ucanConfig) error {
 		cfg.exp = exp
@@ -76,12 +76,16 @@ type FactBuilder = MapBuilder
 
 // Issue creates a new signed token with a given issuer. If expiration is
 // not set it defaults to 30 seconds from now.
-func Issue(issuer crypto.Signer, audience Principal, capabilities []Capability[CaveatBuilder], options ...Option) (UCANView, error) {
+func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBuilder], options ...Option) (UCANView, error) {
 	cfg := ucanConfig{}
 	for _, opt := range options {
 		if err := opt(&cfg); err != nil {
 			return nil, err
 		}
+	}
+
+	if cfg.exp == 0 {
+		cfg.exp = Now() + 30
 	}
 
 	var capsmdl []udm.CapabilityModel
@@ -91,7 +95,7 @@ func Issue(issuer crypto.Signer, audience Principal, capabilities []Capability[C
 			return nil, fmt.Errorf("building caveats: %s", err)
 		}
 		var keys []string
-		for k, _ := range vals {
+		for k := range vals {
 			keys = append(keys, k)
 		}
 		m := udm.CapabilityModel{
@@ -117,7 +121,7 @@ func Issue(issuer crypto.Signer, audience Principal, capabilities []Capability[C
 			return nil, fmt.Errorf("building fact: %s", err)
 		}
 		var keys []string
-		for k, _ := range vals {
+		for k := range vals {
 			keys = append(keys, k)
 		}
 		fctsmdl = append(fctsmdl, udm.FactModel{
@@ -126,6 +130,11 @@ func Issue(issuer crypto.Signer, audience Principal, capabilities []Capability[C
 		})
 	}
 
+	header := hdm.HeaderModel{
+		Alg: issuer.SignatureAlgorithm(),
+		Ucv: version,
+		Typ: "JWT",
+	}
 	payload := pdm.PayloadModel{
 		Iss: issuer.DID().String(),
 		Aud: audience.DID().String(),
@@ -136,16 +145,16 @@ func Issue(issuer crypto.Signer, audience Principal, capabilities []Capability[C
 		Nnc: cfg.nnc,
 		Nbf: cfg.nbf,
 	}
-	bytes, err := ipld.Marshal(dagjson.Encode, payload, pdm.Type())
+	bytes, err := encodeSignaturePayload(&header, &payload)
 	if err != nil {
-		return nil, fmt.Errorf("encoding payload: %s", err)
+		return nil, fmt.Errorf("encoding signature payload: %s", err)
 	}
 
 	model := udm.UCANModel{
 		V:   version,
 		Iss: issuer.DID().Bytes(),
 		Aud: audience.DID().Bytes(),
-		S:   []byte{},
+		S:   issuer.Sign(bytes).Bytes(),
 		Att: capsmdl,
 		Prf: cfg.prf,
 		Exp: cfg.exp,
@@ -154,4 +163,29 @@ func Issue(issuer crypto.Signer, audience Principal, capabilities []Capability[C
 		Nbf: cfg.nbf,
 	}
 	return NewUCANView(&model)
+}
+
+func encodeSignaturePayload(header *hdm.HeaderModel, payload *pdm.PayloadModel) ([]byte, error) {
+	str, err := formatter.FormatSignPayload(header, payload)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(str), nil
+}
+
+// IsExpired checks if a UCAN is expired.
+func IsExpired(ucan UCANView) bool {
+	return ucan.Expiration() <= Now()
+}
+
+// IsTooEarly checks if a UCAN is not active yet.
+func IsTooEarly(ucan UCANView) bool {
+	nbf := ucan.NotBefore()
+	return nbf != 0 && Now() <= nbf
+}
+
+// Now returns a UTC Unix timestamp for comparing it against time window of the
+// UCAN.
+func Now() uint64 {
+	return uint64(time.Now().Unix())
 }

@@ -22,9 +22,9 @@ import (
 // into a UCAN token and used as proof for an invocation or further delegations.
 type Delegation interface {
 	ipld.IPLDView
-	// Link returns the IPLD link of the root block of the invocation.
+	// Link returns the IPLD link of the root block of the delegation.
 	Link() ucan.Link
-	// Archive writes the invocation to a Content Addressed aRchive (CAR).
+	// Archive writes the delegation to a Content Addressed aRchive (CAR).
 	Archive() io.Reader
 	// Issuer is the signer of the UCAN.
 	Issuer() ucan.Principal

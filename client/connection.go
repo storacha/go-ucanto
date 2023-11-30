@@ -52,6 +52,8 @@ type conn struct {
 	hasher  func() hash.Hash
 }
 
+var _ Connection = (*conn)(nil)
+
 func (c *conn) ID() ucan.Principal {
 	return c.id
 }
@@ -68,7 +70,6 @@ func (c *conn) Hasher() hash.Hash {
 	return c.hasher()
 }
 
-// TODO: move single execute onto invocation for now...
 func Execute[O, X any](invocation invocation.Invocation, rcptreader receipt.ReceiptReader[O, X], conn Connection) (receipt.Receipt[O, X], error) {
 	input, err := message.Build(invocation)
 	if err != nil {
@@ -97,5 +98,3 @@ func Execute[O, X any](invocation invocation.Invocation, rcptreader receipt.Rece
 
 	return rcptreader.Get(output, rt)
 }
-
-var _ Connection = (*conn)(nil)

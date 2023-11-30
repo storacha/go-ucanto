@@ -1,0 +1,5 @@
+type Header struct {
+  alg String
+  ucv String
+  typ String
+} representation map

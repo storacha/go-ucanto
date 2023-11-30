@@ -28,10 +28,10 @@ func NewInvocationView(root ipld.Link, bs blockstore.BlockReader) (Invocation, e
 }
 
 type IssuedInvocation interface {
-	// TODO?
+	Invocation
 }
 
 // TODO
-func Invoke() IssuedInvocation {
+func Invoke[O any, X any]() IssuedInvocation {
 	return nil
 }
