@@ -47,7 +47,7 @@ func (c *StoreAddCaveats) Build() (map[string]datamodel.Node, error) {
 
 capability := ucan.NewCapability(
   "store/add",
-  did.Parse("did:key:z6MkwDuRThQcyWjqNsK54yKAmzfsiH6BTkASyiucThMtHt1T").DID(),
+  did.Parse("did:key:z6MkwDuRThQcyWjqNsK54yKAmzfsiH6BTkASyiucThMtHt1T").String(),
   &StoreAddCaveats{
     // TODO
   },

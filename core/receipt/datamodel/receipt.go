@@ -22,7 +22,7 @@ type OutcomeModel[O any, X any] struct {
 	Out  ResultModel[O, X]
 	Fx   EffectsModel
 	Meta MetaModel
-	Iss  []byte
+	Iss  *string
 	Prf  []ipld.Link
 }
 

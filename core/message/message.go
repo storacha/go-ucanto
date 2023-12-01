@@ -106,7 +106,7 @@ func Build(invocations []invocation.Invocation) (AgentMessage, error) {
 	}
 
 	rt, err := block.Encode(
-		msg,
+		&msg,
 		mdm.Type(),
 		cbor.Codec,
 		sha256.Hasher,

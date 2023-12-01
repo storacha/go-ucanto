@@ -88,11 +88,17 @@ func (v *ucanView) Model() *udm.UCANModel {
 }
 
 func (v *ucanView) Nonce() string {
-	return v.model.Nnc
+	if v.model.Nnc == nil {
+		return ""
+	}
+	return *v.model.Nnc
 }
 
 func (v *ucanView) NotBefore() uint64 {
-	return v.model.Nbf
+	if v.model.Nbf == nil {
+		return 0
+	}
+	return *v.model.Nbf
 }
 
 func (v *ucanView) Proofs() []Link {

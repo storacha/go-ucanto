@@ -1,31 +1,24 @@
 type Payload struct {
-  iss Principal
-  aud Principal
+  # String representation of a DID.
+  iss String
+  # String representation of a DID.
+  aud String
   att [Capability]
-  prf [UCANLink] (implied [])
+  # String representation of a link to a UCAN.
+  prf [String] (implied [])
   exp Int
   fct optional [Fact]
   nnc optional String
   nbf optional Int
-} representation map
+}
 
 type Capability struct {
-  with Resource
-  can Ability
+  # The resource pointer in URI format.
+  with String
+  # Must be all lower-case `/` delimeted with at least one path segment.
+  can String
   # Any additional domain specific details and/or restrictions of the capability
   nb { String: Any }
 }
 
 type Fact { String: Any }
-
-# The resource pointer in URI format.
-type Resource = String
-
-# Must be all lower-case `/` delimeted with at least one path segment.
-type Ability = String
-
-# String representation of a DID.
-type Principal = String
-
-# String representation of a link to a UCAN.
-type UCANLink = String

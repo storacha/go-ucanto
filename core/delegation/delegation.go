@@ -185,6 +185,10 @@ func Extract(b []byte) (Delegation, error) {
 	}
 
 	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(blks))
+	if err != nil {
+		return nil, fmt.Errorf("creating block reader: %s", err)
+	}
+
 	rt, ok, err := br.Get(roots[0])
 	if err != nil {
 		return nil, fmt.Errorf("getting root block: %s", err)

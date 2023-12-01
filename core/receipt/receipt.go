@@ -88,7 +88,10 @@ func (r *receipt[O, X]) Fx() Effects {
 }
 
 func (r *receipt[O, X]) Issuer() ucan.Principal {
-	principal, err := did.Decode(r.data.Ocm.Iss)
+	if r.data.Ocm.Iss == nil {
+		return nil
+	}
+	principal, err := did.Parse(*r.data.Ocm.Iss)
 	if err != nil {
 		fmt.Printf("Error: decoding issuer DID: %s\n", err)
 	}

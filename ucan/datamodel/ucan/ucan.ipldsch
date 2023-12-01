@@ -3,9 +3,9 @@
 type UCAN struct {
   v String
 
-  iss Principal
-  aud Principal
-  s Signature
+  iss Bytes
+  aud Bytes
+  s Bytes
 
   att [Capability]
   # All proofs are links, however you could still inline proof
@@ -16,71 +16,13 @@ type UCAN struct {
   fct optional [Fact]
   nnc optional String
   nbf optional Int
-} representation map
+}
 
 type Capability struct {
-  with Resource
-  can Ability
+  with String
+  can String
   # Any additional domain specific details and/or restrictions of the capability
   nb { String: Any }
 }
 
 type Fact { String: Any }
-
-# The resource pointer in URI format
-type Resource = String
-
-# Must be all lower-case `/` delimeted with at least one path segment
-type Ability = String
-
-type Principal union {
-  # This specification defines principals in terms of `did:key`s (multicodec
-  # identifiers for the public key type followed by the raw bytes of the key).
-  # We represent those as raw public key bytes prefixed with public key
-  # multiformat code.
-  | secp256k1  "0xe7"
-  | BLS12381G1 "0xea"
-  | BLS12381G2 "0xeb"
-  | Ed25519    "0xed"
-  | P256       "0x1200"
-  | P384       "0x1201"
-  | P512       "0x1202"
-  | RSA        "0x1205"
-
-  # To accomodate additional DID methods we represent those as UTF8 encoding
-  # of the DID omitting `did:` prefix itself. E.g. `did:dns:ucan.xyz` can be
-  # represented as [0xd1d, ...new TextEncoder().encode('dns:ucan.xyz')] bytes.
-  | DID "0x0d1d"
-} representation bytesprefix
-
-# Signatures are computed by:
-# 1. Deriving JWT header & payload using DAG-JSON omitting all empty
-#    optional fields (to achieve for hash consitency)
-# 2. Formating it into base64 string
-# 3. Signing via issuers private key
-#
-# Signatures are encoded into a "varsig" multiformat representation:
-# <varint sig_alg_code><vairint multihash_code><varint multihash_size><bytes sig_output>
-type Signature union {
-  # Algorithms here are expected to be valid "varsig" multiformat codes.
-  | NonStandard "0xd000"
-  | ES256K      "0xd0e7" # secp256k1
-  | BLS12381G1  "0xd0ea" # NB: G1 is a signature for BLS-12381 G2
-  | BLS12381G2  "0xd0eb" # NB: G2 is a signature for BLS-12381 G1
-  | EdDSA       "0xd0ed"
-  | ES256       "0xd01200"
-  | ES384       "0xd01201"
-  | ES512       "0xd01202"
-  | RS256       "0xd01205"
-  | EIP191      "0xd191"
-} representation bytesprefix
-
-# UCAN-IPLD spec will register non standard signature algorithms here and
-# recommend registering them as valid "varsig" multiformat codes to remove
-# need for 0xd000 varint prefix. Implementatations MAY be also augmented
-# with additional non standard signature types.
-#
-# The `0xd000` prefix MUST be used if a nonstandard signature is used.
-# Nonstandrad signatures MUST be additionally prefixed with a varint of
-# the signature length, and the UTF-8 UCAN `alg` field appended afterwards.
-# Symbolically: <varint 0xd000><varint sig_size><bytes sig><utf8 alg>.

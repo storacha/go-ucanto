@@ -125,7 +125,12 @@ func NewBlockStore(options ...Option) (BlockStore, error) {
 			return nil, err
 		}
 	}
-	bs := &blockstore{}
+	bs := &blockstore{
+		blockreader: blockreader{
+			keys: []string{},
+			blks: map[string]ipld.Block{},
+		},
+	}
 	for _, b := range cfg.blks {
 		err := bs.Put(b)
 		if err != nil {

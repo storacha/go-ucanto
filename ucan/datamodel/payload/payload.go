@@ -40,6 +40,6 @@ type PayloadModel struct {
 	Prf []string
 	Exp uint64
 	Fct []udm.FactModel
-	Nnc string
-	Nbf uint64
+	Nnc *string
+	Nbf *uint64
 }

@@ -142,8 +142,8 @@ func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBu
 		Prf: prfstrs,
 		Exp: cfg.exp,
 		Fct: fctsmdl,
-		Nnc: cfg.nnc,
-		Nbf: cfg.nbf,
+		Nnc: &cfg.nnc,
+		Nbf: &cfg.nbf,
 	}
 	bytes, err := encodeSignaturePayload(&header, &payload)
 	if err != nil {
@@ -159,8 +159,8 @@ func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBu
 		Prf: cfg.prf,
 		Exp: cfg.exp,
 		Fct: fctsmdl,
-		Nnc: cfg.nnc,
-		Nbf: cfg.nbf,
+		Nnc: &cfg.nnc,
+		Nbf: &cfg.nbf,
 	}
 	return NewUCANView(&model)
 }

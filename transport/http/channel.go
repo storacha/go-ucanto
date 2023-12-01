@@ -14,7 +14,7 @@ type channel struct {
 }
 
 func (c *channel) Request(req transport.HTTPRequest) (transport.HTTPResponse, error) {
-	hr, err := http.NewRequest("POST", c.url.String(), nil)
+	hr, err := http.NewRequest("POST", c.url.String(), req.Body())
 	if err != nil {
 		return nil, fmt.Errorf("creating HTTP request: %s", err)
 	}

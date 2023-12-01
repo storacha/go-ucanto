@@ -12,7 +12,7 @@ type Outcome struct {
   out  Result
   fx   Effects
   meta {String:Any}
-  iss  optional Bytes
+  iss  optional String
   prf  [Link]
 }
 

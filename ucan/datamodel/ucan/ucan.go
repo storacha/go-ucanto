@@ -42,8 +42,8 @@ type UCANModel struct {
 	Prf []ipld.Link
 	Exp uint64
 	Fct []FactModel
-	Nnc string
-	Nbf uint64
+	Nnc *string
+	Nbf *uint64
 }
 
 type CapabilityModel struct {
