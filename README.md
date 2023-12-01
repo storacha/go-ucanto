@@ -14,6 +14,7 @@ import (
   ed25519 "github.com/alanshaw/go-ucanto/principal/ed25519/signer"
   "github.com/alanshaw/go-ucanto/transport/car"
   "github.com/alanshaw/go-ucanto/transport/http"
+  "github.com/alanshaw/go-ucanto/core/delegation"
   "github.com/alanshaw/go-ucanto/core/invocation"
   "github.com/alanshaw/go-ucanto/core/receipt"
 )
@@ -35,27 +36,26 @@ signer, _ := ed25519.Parse(priv)
 audience := servicePrincipal
 
 type StoreAddCaveats struct {
-  link ipld.Link
-  size uint64
+  Link ipld.Link
+  Size uint64
 }
 
 func (c *StoreAddCaveats) Build() (map[string]datamodel.Node, error) {
-  // TODO
+  n := bindnode.Wrap(c, typ)
+  return n.Representation(), nil
 }
 
-caps := []Capability[any]{
-  ucan.NewCapability(
-    "store/add",
-    did.Parse("did:key:z6MkwDuRThQcyWjqNsK54yKAmzfsiH6BTkASyiucThMtHt1T").DID(),
-    &StoreAddCaveats{
-      // TODO
-    },
-  ),
-}
+capability := ucan.NewCapability(
+  "store/add",
+  did.Parse("did:key:z6MkwDuRThQcyWjqNsK54yKAmzfsiH6BTkASyiucThMtHt1T").DID(),
+  &StoreAddCaveats{
+    // TODO
+  },
+)
 
 // create invocation(s) to perform a task with granted capabilities
 invocations := []invocation.Invocation{
-  invocation.Invoke(signer, servicePrincipal, caps)
+  invocation.Invoke(signer, audience, capability, delegation.WithProofs(...))
 }
 
 // send the invocation(s) to the service

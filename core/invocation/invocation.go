@@ -32,6 +32,6 @@ type IssuedInvocation interface {
 	Invocation
 }
 
-func Invoke(issuer ucan.Signer, audience ucan.Principal, capabilities []ucan.Capability[ucan.CaveatBuilder], options ...delegation.Option) (IssuedInvocation, error) {
-	return delegation.Delegate(issuer, audience, capabilities, options...)
+func Invoke(issuer ucan.Signer, audience ucan.Principal, capability ucan.Capability[ucan.CaveatBuilder], options ...delegation.Option) (IssuedInvocation, error) {
+	return delegation.Delegate(issuer, audience, []ucan.Capability[ucan.CaveatBuilder]{capability}, options...)
 }
