@@ -1,6 +1,7 @@
 package delegation
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"sync"
@@ -169,4 +170,40 @@ func Archive(d Delegation) io.Reader {
 		return reader
 	}
 	return car.Encode([]ipld.Link{variant.Link()}, blks.Iterator())
+}
+
+func Extract(b []byte) (Delegation, error) {
+	roots, blks, err := car.Decode(bytes.NewReader(b))
+	if err != nil {
+		return nil, fmt.Errorf("decoding CAR: %s", err)
+	}
+	if len(roots) == 0 {
+		return nil, fmt.Errorf("missing root CID in delegation archive")
+	}
+	if len(roots) > 1 {
+		return nil, fmt.Errorf("unexpected number of root CIDs in archive: %d", len(roots))
+	}
+
+	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(blks))
+	rt, ok, err := br.Get(roots[0])
+	if err != nil {
+		return nil, fmt.Errorf("getting root block: %s", err)
+	}
+	if !ok {
+		return nil, fmt.Errorf("missing root block: %d", len(roots))
+	}
+
+	model := adm.ArchiveModel{}
+	err = block.Decode(
+		rt,
+		&model,
+		adm.Type(),
+		cbor.Codec,
+		sha256.Hasher,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("decoding root block: %s", err)
+	}
+
+	return NewDelegationView(model.Ucan0_9_1, br)
 }
