@@ -102,6 +102,14 @@ rcpt, _ := reader.Read(rcptlnk, res.Blocks())
 fmt.Println(rcpt.Out().Ok())
 ```
 
+## API
+
+[pkg.go.dev Reference](https://pkg.go.dev/github.com/web3-storage/go-ucanto)
+
+## Related
+
+* [Ucanto in Javascript](https://github.com/web3-storage/ucanto)
+
 ## Contributing
 
 Feel free to join in. All welcome. Please [open an issue](https://github.com/web3-storage/go-ucanto/issues)!
