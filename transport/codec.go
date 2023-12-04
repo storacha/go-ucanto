@@ -1,7 +1,7 @@
 package transport
 
 import (
-	"github.com/alanshaw/go-ucanto/core/message"
+	"github.com/web3-storage/go-ucanto/core/message"
 )
 
 type RequestEncoder interface {

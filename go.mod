@@ -1,4 +1,4 @@
-module github.com/alanshaw/go-ucanto
+module github.com/web3-storage/go-ucanto
 
 go 1.21
 

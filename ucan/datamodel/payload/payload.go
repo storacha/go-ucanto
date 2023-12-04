@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"sync"
 
-	udm "github.com/alanshaw/go-ucanto/ucan/datamodel/ucan"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/schema"
+	udm "github.com/web3-storage/go-ucanto/ucan/datamodel/ucan"
 )
 
 //go:embed payload.ipldsch

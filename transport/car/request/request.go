@@ -3,11 +3,11 @@ package request
 import (
 	"net/http"
 
-	"github.com/alanshaw/go-ucanto/core/car"
-	"github.com/alanshaw/go-ucanto/core/message"
-	"github.com/alanshaw/go-ucanto/transport"
-	uhttp "github.com/alanshaw/go-ucanto/transport/http"
 	"github.com/ipld/go-ipld-prime"
+	"github.com/web3-storage/go-ucanto/core/car"
+	"github.com/web3-storage/go-ucanto/core/message"
+	"github.com/web3-storage/go-ucanto/transport"
+	uhttp "github.com/web3-storage/go-ucanto/transport/http"
 )
 
 const ContentType = car.ContentType

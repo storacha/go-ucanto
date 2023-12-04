@@ -1,10 +1,10 @@
 package invocation
 
 import (
-	"github.com/alanshaw/go-ucanto/core/dag/blockstore"
-	"github.com/alanshaw/go-ucanto/core/delegation"
-	"github.com/alanshaw/go-ucanto/core/ipld"
-	"github.com/alanshaw/go-ucanto/ucan"
+	"github.com/web3-storage/go-ucanto/core/dag/blockstore"
+	"github.com/web3-storage/go-ucanto/core/delegation"
+	"github.com/web3-storage/go-ucanto/core/ipld"
+	"github.com/web3-storage/go-ucanto/ucan"
 )
 
 // Invocation represents a UCAN that can be presented to a service provider to

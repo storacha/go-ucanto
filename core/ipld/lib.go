@@ -1,8 +1,8 @@
 package ipld
 
 import (
-	"github.com/alanshaw/go-ucanto/core/ipld/block"
 	"github.com/ipld/go-ipld-prime"
+	"github.com/web3-storage/go-ucanto/core/ipld/block"
 )
 
 type Link = ipld.Link

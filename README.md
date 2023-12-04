@@ -17,14 +17,14 @@ import (
   "net/url"
   "ioutil"
 
-  "github.com/alanshaw/go-ucanto/client"
-  "github.com/alanshaw/go-ucanto/did"
-  ed25519 "github.com/alanshaw/go-ucanto/principal/ed25519/signer"
-  "github.com/alanshaw/go-ucanto/transport/car"
-  "github.com/alanshaw/go-ucanto/transport/http"
-  "github.com/alanshaw/go-ucanto/core/delegation"
-  "github.com/alanshaw/go-ucanto/core/invocation"
-  "github.com/alanshaw/go-ucanto/core/receipt"
+  "github.com/web3-storage/go-ucanto/client"
+  "github.com/web3-storage/go-ucanto/did"
+  ed25519 "github.com/web3-storage/go-ucanto/principal/ed25519/signer"
+  "github.com/web3-storage/go-ucanto/transport/car"
+  "github.com/web3-storage/go-ucanto/transport/http"
+  "github.com/web3-storage/go-ucanto/core/delegation"
+  "github.com/web3-storage/go-ucanto/core/invocation"
+  "github.com/web3-storage/go-ucanto/core/receipt"
 )
 
 // service URL & DID

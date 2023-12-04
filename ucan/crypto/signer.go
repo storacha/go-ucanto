@@ -1,7 +1,7 @@
 package crypto
 
 import (
-	"github.com/alanshaw/go-ucanto/ucan/crypto/signature"
+	"github.com/web3-storage/go-ucanto/ucan/crypto/signature"
 )
 
 // Signer is an entity that can sign a payload.

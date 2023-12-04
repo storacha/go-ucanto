@@ -1,7 +1,7 @@
 package principal
 
 import (
-	"github.com/alanshaw/go-ucanto/ucan"
+	"github.com/web3-storage/go-ucanto/ucan"
 )
 
 type Signer interface {

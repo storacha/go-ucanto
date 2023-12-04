@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/alanshaw/go-ucanto/core/ipld/codec"
-	"github.com/alanshaw/go-ucanto/core/ipld/hash"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipld/go-ipld-prime/schema"
+	"github.com/web3-storage/go-ucanto/core/ipld/codec"
+	"github.com/web3-storage/go-ucanto/core/ipld/hash"
 )
 
 type Block interface {

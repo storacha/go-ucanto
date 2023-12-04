@@ -5,10 +5,10 @@ import (
 	"crypto/ed25519"
 	"fmt"
 
-	"github.com/alanshaw/go-ucanto/did"
-	"github.com/alanshaw/go-ucanto/principal"
-	"github.com/alanshaw/go-ucanto/ucan/crypto/signature"
 	"github.com/multiformats/go-varint"
+	"github.com/web3-storage/go-ucanto/did"
+	"github.com/web3-storage/go-ucanto/principal"
+	"github.com/web3-storage/go-ucanto/ucan/crypto/signature"
 )
 
 const Code = 0xed

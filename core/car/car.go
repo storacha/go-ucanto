@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/alanshaw/go-ucanto/core/ipld"
-	"github.com/alanshaw/go-ucanto/core/ipld/block"
-	"github.com/alanshaw/go-ucanto/core/iterable"
 	"github.com/ipfs/go-cid"
 	cbor "github.com/ipfs/go-ipld-cbor"
 	ipldcar "github.com/ipld/go-car"
 	"github.com/ipld/go-car/util"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/web3-storage/go-ucanto/core/ipld"
+	"github.com/web3-storage/go-ucanto/core/ipld/block"
+	"github.com/web3-storage/go-ucanto/core/iterable"
 )
 
 // ContentType is the value the HTTP Content-Type header should have for CARs.

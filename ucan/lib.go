@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"time"
 
-	hdm "github.com/alanshaw/go-ucanto/ucan/datamodel/header"
-	pdm "github.com/alanshaw/go-ucanto/ucan/datamodel/payload"
-	udm "github.com/alanshaw/go-ucanto/ucan/datamodel/ucan"
-	"github.com/alanshaw/go-ucanto/ucan/formatter"
 	"github.com/ipld/go-ipld-prime/datamodel"
+	hdm "github.com/web3-storage/go-ucanto/ucan/datamodel/header"
+	pdm "github.com/web3-storage/go-ucanto/ucan/datamodel/payload"
+	udm "github.com/web3-storage/go-ucanto/ucan/datamodel/ucan"
+	"github.com/web3-storage/go-ucanto/ucan/formatter"
 )
 
 const version = "0.9.1"

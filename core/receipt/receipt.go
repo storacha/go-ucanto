@@ -3,20 +3,20 @@ package receipt
 import (
 	"fmt"
 
-	"github.com/alanshaw/go-ucanto/core/dag/blockstore"
-	"github.com/alanshaw/go-ucanto/core/delegation"
-	"github.com/alanshaw/go-ucanto/core/invocation"
-	"github.com/alanshaw/go-ucanto/core/ipld"
-	"github.com/alanshaw/go-ucanto/core/ipld/block"
-	"github.com/alanshaw/go-ucanto/core/ipld/codec/cbor"
-	"github.com/alanshaw/go-ucanto/core/ipld/hash/sha256"
-	"github.com/alanshaw/go-ucanto/core/iterable"
-	rdm "github.com/alanshaw/go-ucanto/core/receipt/datamodel"
-	"github.com/alanshaw/go-ucanto/core/result"
-	"github.com/alanshaw/go-ucanto/did"
-	"github.com/alanshaw/go-ucanto/ucan"
-	"github.com/alanshaw/go-ucanto/ucan/crypto/signature"
 	"github.com/ipld/go-ipld-prime/schema"
+	"github.com/web3-storage/go-ucanto/core/dag/blockstore"
+	"github.com/web3-storage/go-ucanto/core/delegation"
+	"github.com/web3-storage/go-ucanto/core/invocation"
+	"github.com/web3-storage/go-ucanto/core/ipld"
+	"github.com/web3-storage/go-ucanto/core/ipld/block"
+	"github.com/web3-storage/go-ucanto/core/ipld/codec/cbor"
+	"github.com/web3-storage/go-ucanto/core/ipld/hash/sha256"
+	"github.com/web3-storage/go-ucanto/core/iterable"
+	rdm "github.com/web3-storage/go-ucanto/core/receipt/datamodel"
+	"github.com/web3-storage/go-ucanto/core/result"
+	"github.com/web3-storage/go-ucanto/did"
+	"github.com/web3-storage/go-ucanto/ucan"
+	"github.com/web3-storage/go-ucanto/ucan/crypto/signature"
 )
 
 type Effects interface {

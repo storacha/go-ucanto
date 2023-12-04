@@ -3,9 +3,9 @@ package ucan
 import (
 	"fmt"
 
-	"github.com/alanshaw/go-ucanto/did"
-	"github.com/alanshaw/go-ucanto/ucan/crypto/signature"
-	udm "github.com/alanshaw/go-ucanto/ucan/datamodel/ucan"
+	"github.com/web3-storage/go-ucanto/did"
+	"github.com/web3-storage/go-ucanto/ucan/crypto/signature"
+	udm "github.com/web3-storage/go-ucanto/ucan/datamodel/ucan"
 )
 
 // UCANView represents a decoded "view" of a UCAN that can be used in your

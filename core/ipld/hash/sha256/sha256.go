@@ -3,8 +3,8 @@ package sha256
 import (
 	"crypto/sha256"
 
-	"github.com/alanshaw/go-ucanto/core/ipld/hash"
 	"github.com/multiformats/go-multihash"
+	"github.com/web3-storage/go-ucanto/core/ipld/hash"
 )
 
 // sha2-256

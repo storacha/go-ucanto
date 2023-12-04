@@ -4,11 +4,11 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/alanshaw/go-ucanto/ucan/crypto/signature"
-	hdm "github.com/alanshaw/go-ucanto/ucan/datamodel/header"
-	pdm "github.com/alanshaw/go-ucanto/ucan/datamodel/payload"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagjson"
+	"github.com/web3-storage/go-ucanto/ucan/crypto/signature"
+	hdm "github.com/web3-storage/go-ucanto/ucan/datamodel/header"
+	pdm "github.com/web3-storage/go-ucanto/ucan/datamodel/payload"
 )
 
 func FormatSignPayload(header *hdm.HeaderModel, payload *pdm.PayloadModel) (string, error) {
