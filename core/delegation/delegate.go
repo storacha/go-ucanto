@@ -113,6 +113,9 @@ func Delegate(issuer ucan.Signer, audience ucan.Principal, capabilities []ucan.C
 		ucan.WithNotBefore(cfg.nbf),
 		ucan.WithProofs(links),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("issuing UCAN: %s", err)
+	}
 
 	rt, err := block.Encode(data.Model(), udm.Type(), cbor.Codec, sha256.Hasher)
 	if err != nil {

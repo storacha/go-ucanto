@@ -110,7 +110,7 @@ func (s Ed25519Signer) Encode() []byte {
 
 func (s Ed25519Signer) Sign(msg []byte) signature.SignatureView {
 	pk := make(ed25519.PrivateKey, ed25519.PrivateKeySize)
-	copy(pk, s[privateTagSize:pubKeyOffset])
-	copy(pk[ed25519.PrivateKeySize-ed25519.PublicKeySize:], s[pubKeyOffset+publicTagSize:])
+	copy(pk[0:ed25519.PublicKeySize], s[privateTagSize:pubKeyOffset])
+	copy(pk[ed25519.PrivateKeySize-ed25519.PublicKeySize:ed25519.PrivateKeySize], s[pubKeyOffset+publicTagSize:pubKeyOffset+publicTagSize+keySize])
 	return signature.NewSignatureView(signature.NewSignature(signature.EdDSA, ed25519.Sign(pk, msg)))
 }

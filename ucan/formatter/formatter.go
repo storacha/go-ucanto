@@ -3,7 +3,6 @@ package formatter
 import (
 	"encoding/base64"
 	"fmt"
-	"strings"
 
 	"github.com/alanshaw/go-ucanto/ucan/crypto/signature"
 	hdm "github.com/alanshaw/go-ucanto/ucan/datamodel/header"
@@ -21,7 +20,7 @@ func FormatSignPayload(header *hdm.HeaderModel, payload *pdm.PayloadModel) (stri
 	if err != nil {
 		return "", fmt.Errorf("formatting payload: %s", err)
 	}
-	return strings.Join([]string{hdr, pld}, "."), nil
+	return fmt.Sprintf("%s.%s", hdr, pld), nil
 }
 
 func FormatHeader(header *hdm.HeaderModel) (string, error) {
@@ -29,7 +28,7 @@ func FormatHeader(header *hdm.HeaderModel) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("dag-json encoding header: %s", err)
 	}
-	return base64.URLEncoding.EncodeToString(bytes), nil
+	return base64.RawURLEncoding.EncodeToString(bytes), nil
 }
 
 func FormatPayload(payload *pdm.PayloadModel) (string, error) {
@@ -37,9 +36,9 @@ func FormatPayload(payload *pdm.PayloadModel) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("dag-json encoding payload: %s", err)
 	}
-	return base64.URLEncoding.EncodeToString(bytes), nil
+	return base64.RawURLEncoding.EncodeToString(bytes), nil
 }
 
 func FormatSignature(s signature.Signature) (string, error) {
-	return base64.URLEncoding.EncodeToString(s.Raw()), nil
+	return base64.RawURLEncoding.EncodeToString(s.Raw()), nil
 }

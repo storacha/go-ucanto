@@ -2,6 +2,14 @@
 
 Ucanto UCAN RPC in Golang.
 
+## Install
+
+```console
+go get github.com/web3-storage/go-ucanto
+```
+
+## Usage
+
 ```go
 package main
 
@@ -89,7 +97,15 @@ reader, _ := receipt.NewReceiptReader[OkModel, ErrModel]([]byte(`
 // get the receipt link for the invocation from the response
 rcptlnk, _ := resp.Get(invocations[0].Link())
 // read the receipt for the invocation from the response
-rcpt := reader.Read(rcptlnk, res.Blocks())
+rcpt, _ := reader.Read(rcptlnk, res.Blocks())
 
-fmt.Println(rcpt.Out.Ok)
+fmt.Println(rcpt.Out().Ok())
 ```
+
+## Contributing
+
+Feel free to join in. All welcome. Please [open an issue](https://github.com/web3-storage/go-ucanto/issues)!
+
+## License
+
+Dual-licensed under [MIT + Apache 2.0](LICENSE.md)

@@ -142,8 +142,12 @@ func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBu
 		Prf: prfstrs,
 		Exp: cfg.exp,
 		Fct: fctsmdl,
-		Nnc: &cfg.nnc,
-		Nbf: &cfg.nbf,
+	}
+	if cfg.nnc != "" {
+		payload.Nnc = &cfg.nnc
+	}
+	if cfg.nbf != 0 {
+		payload.Nbf = &cfg.nbf
 	}
 	bytes, err := encodeSignaturePayload(&header, &payload)
 	if err != nil {
@@ -152,15 +156,19 @@ func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBu
 
 	model := udm.UCANModel{
 		V:   version,
+		S:   issuer.Sign(bytes).Bytes(),
 		Iss: issuer.DID().Bytes(),
 		Aud: audience.DID().Bytes(),
-		S:   issuer.Sign(bytes).Bytes(),
 		Att: capsmdl,
 		Prf: cfg.prf,
 		Exp: cfg.exp,
 		Fct: fctsmdl,
-		Nnc: &cfg.nnc,
-		Nbf: &cfg.nbf,
+	}
+	if cfg.nnc != "" {
+		model.Nnc = &cfg.nnc
+	}
+	if cfg.nbf != 0 {
+		model.Nbf = &cfg.nbf
 	}
 	return NewUCANView(&model)
 }
