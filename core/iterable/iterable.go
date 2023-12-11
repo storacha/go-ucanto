@@ -26,8 +26,9 @@ func From[T any](slice []T) Iterator[T] {
 	i := 0
 	return NewIterator(func() (T, error) {
 		if i < len(slice) {
+			item := slice[i]
 			i++
-			return slice[i], nil
+			return item, nil
 		}
 		var undef T
 		return undef, io.EOF
