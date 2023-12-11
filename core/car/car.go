@@ -22,7 +22,7 @@ const ContentType = "application/vnd.ipld.car"
 func Encode(roots []ipld.Link, blocks iterable.Iterator[ipld.Block]) io.Reader {
 	reader, writer := io.Pipe()
 	go func() {
-		var cids []cid.Cid
+		cids := []cid.Cid{}
 		for _, r := range roots {
 			_, cid, err := cid.CidFromBytes([]byte(r.Binary()))
 			if err != nil {
