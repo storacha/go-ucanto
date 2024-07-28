@@ -7,3 +7,4 @@ import (
 
 type Link = ipld.Link
 type Block = block.Block
+type Node = ipld.Node

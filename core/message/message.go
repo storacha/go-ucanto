@@ -15,7 +15,7 @@ import (
 )
 
 type AgentMessage interface {
-	ipld.IPLDView
+	ipld.View
 	// Invocations is a list of links to the root block of invocations than can
 	// be found in the message.
 	Invocations() []ipld.Link

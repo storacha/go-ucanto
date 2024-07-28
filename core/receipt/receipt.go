@@ -3,6 +3,8 @@ package receipt
 import (
 	"fmt"
 
+	"github.com/ipld/go-ipld-prime/datamodel"
+	"github.com/ipld/go-ipld-prime/node/bindnode"
 	"github.com/ipld/go-ipld-prime/schema"
 	"github.com/web3-storage/go-ucanto/core/dag/blockstore"
 	"github.com/web3-storage/go-ucanto/core/delegation"
@@ -28,13 +30,13 @@ type Effects interface {
 // an ergonomic API and allows you to reference linked IPLD objects of they are
 // included in the source DAG.
 type Receipt[O, X any] interface {
-	ipld.IPLDView
+	ipld.View
 	Ran() invocation.Invocation
 	Out() result.Result[O, X]
 	Fx() Effects
 	Meta() map[string]any
 	Issuer() ucan.Principal
-	Proofs() []delegation.Delegation
+	Proofs() delegation.Proofs
 	Signature() signature.SignatureView
 }
 
@@ -42,12 +44,20 @@ type results[O, X any] struct {
 	model *rdm.ResultModel[O, X]
 }
 
-func (r results[O, X]) Error() X {
-	return r.model.Err
+func (r results[O, X]) Error() (X, bool) {
+	if r.model.Err != nil {
+		return *r.model.Err, true
+	}
+	var x X
+	return x, false
 }
 
-func (r results[O, X]) Ok() O {
-	return r.model.Ok
+func (r results[O, X]) Ok() (O, bool) {
+	if r.model.Ok != nil {
+		return *r.model.Ok, true
+	}
+	var o O
+	return o, false
 }
 
 type effects struct {
@@ -75,7 +85,9 @@ func (r *receipt[O, X]) Blocks() iterable.Iterator[block.Block] {
 	iterators = append(iterators, r.Ran().Blocks())
 
 	for _, prf := range r.Proofs() {
-		iterators = append(iterators, prf.Blocks())
+		if delegation, ok := prf.Delegation(); ok {
+			iterators = append(iterators, delegation.Blocks())
+		}
 	}
 
 	iterators = append(iterators, iterable.From([]block.Block{r.Root()}))
@@ -98,17 +110,8 @@ func (r *receipt[O, X]) Issuer() ucan.Principal {
 	return principal
 }
 
-func (r *receipt[O, X]) Proofs() []delegation.Delegation {
-	var proofs []delegation.Delegation
-	for _, link := range r.data.Ocm.Prf {
-		prf, err := delegation.NewDelegationView(link, r.blks)
-		if err != nil {
-			fmt.Printf("Error: creating delegation view: %s\n", err)
-			continue
-		}
-		proofs = append(proofs, prf)
-	}
-	return proofs
+func (r *receipt[O, X]) Proofs() delegation.Proofs {
+	return delegation.NewProofsView(r.data.Ocm.Prf, r.blks)
 }
 
 // Map values are datamodel.Node
@@ -186,4 +189,168 @@ func NewReceiptReader[O, X any](resultschema []byte) (ReceiptReader[O, X], error
 		return nil, fmt.Errorf("loading receipt data model: %s", err)
 	}
 	return &receiptReader[O, X]{typ}, nil
+}
+
+type UniversalReceipt Receipt[datamodel.Node, datamodel.Node]
+
+var (
+	universalReceiptTs *schema.TypeSystem
+)
+
+func init() {
+	ts, err := rdm.NewReceiptModelType(
+		[]byte(`type Result union {
+	  | any "ok"
+	  | any "error"
+	} representation keyed
+	`))
+	if err != nil {
+		panic(fmt.Errorf("failed to load IPLD schema: %s", err))
+	}
+	universalReceiptTs = ts.TypeSystem()
+}
+
+// Option is an option configuring a UCAN delegation.
+type Option func(cfg *receiptConfig) error
+
+type receiptConfig struct {
+	meta  map[string]any
+	prf   delegation.Proofs
+	forks []ipld.Link
+	join  ipld.Link
+}
+
+// WithProofs configures the proofs for the receipt. If the `issuer` of this
+// `Receipt` is not the resource owner / service provider, for the delegated
+// capabilities, the `proofs` must contain valid `Proof`s containing
+// delegations to the `issuer`.
+func WithProofs(prf delegation.Proofs) Option {
+	return func(cfg *receiptConfig) error {
+		cfg.prf = prf
+		return nil
+	}
+}
+
+// WithMeta configures the metadata for the receipt.
+func WithMeta(meta map[string]any) Option {
+	return func(cfg *receiptConfig) error {
+		cfg.meta = meta
+		return nil
+	}
+}
+
+// WithForks configures the forks for the receipt.
+func WithForks(forks []ipld.Link) Option {
+	return func(cfg *receiptConfig) error {
+		cfg.forks = forks
+		return nil
+	}
+}
+
+// WithJoin configures the join for the receipt.
+func WithJoin(join ipld.Link) Option {
+	return func(cfg *receiptConfig) error {
+		cfg.join = join
+		return nil
+	}
+}
+
+func wrapOrFail(value interface{}) (nd schema.TypedNode, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+	}()
+	nd = bindnode.Wrap(value, nil)
+	return
+}
+
+func Issue(issuer ucan.Signer, result result.UniversalResult, ran invocation.Ran, opts ...Option) (UniversalReceipt, error) {
+	cfg := receiptConfig{}
+	for _, opt := range opts {
+		if err := opt(&cfg); err != nil {
+			return nil, err
+		}
+	}
+
+	bs, err := blockstore.NewBlockStore()
+	if err != nil {
+		return nil, err
+	}
+
+	// copy invocation blocks into the store
+	invocationLink, err := ran.Encode(bs)
+	if err != nil {
+		return nil, err
+	}
+
+	// copy proof blocks into store
+	prooflinks, err := cfg.prf.Encode(bs)
+	if err != nil {
+		return nil, err
+	}
+
+	effectsModel := rdm.EffectsModel{
+		Fork: cfg.forks,
+		Join: cfg.join,
+	}
+
+	metaModel := rdm.MetaModel{}
+	// attempt to convert meta into IPLD format if present.
+	if cfg.meta != nil {
+		metaModel.Values = make(map[string]datamodel.Node, len(cfg.meta))
+		for k, v := range cfg.meta {
+			nd, err := wrapOrFail(v)
+			if err != nil {
+				return nil, err
+			}
+			metaModel.Keys = append(metaModel.Keys, k)
+			metaModel.Values[k] = nd
+		}
+	}
+
+	resultModel := rdm.ResultModel[datamodel.Node, datamodel.Node]{}
+	if success, ok := result.Ok(); ok {
+		resultModel.Ok = &success
+	}
+	if err, ok := result.Error(); ok {
+		resultModel.Err = &err
+	}
+
+	issString := issuer.DID().String()
+	outcomeModel := rdm.OutcomeModel[datamodel.Node, datamodel.Node]{
+		Ran:  invocationLink,
+		Out:  resultModel,
+		Fx:   effectsModel,
+		Iss:  &issString,
+		Meta: metaModel,
+		Prf:  prooflinks,
+	}
+
+	outcomeBytes, err := cbor.Encode(outcomeModel, universalReceiptTs.TypeByName("Outcome"))
+	if err != nil {
+		return nil, err
+	}
+	signature := issuer.Sign(outcomeBytes).Bytes()
+
+	receiptModel := rdm.ReceiptModel[datamodel.Node, datamodel.Node]{
+		Ocm: outcomeModel,
+		Sig: signature,
+	}
+
+	rt, err := block.Encode(receiptModel, universalReceiptTs.TypeByName("Receipt"), cbor.Codec, sha256.Hasher)
+	if err != nil {
+		return nil, fmt.Errorf("encoding UCAN: %s", err)
+	}
+
+	err = bs.Put(rt)
+	if err != nil {
+		return nil, fmt.Errorf("adding delegation root to store: %s", err)
+	}
+
+	return &receipt[datamodel.Node, datamodel.Node]{
+		rt:   rt,
+		blks: bs,
+		data: &receiptModel,
+	}, nil
 }
