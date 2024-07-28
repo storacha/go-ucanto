@@ -80,7 +80,7 @@ type ExecutionResponse interface {
 }
 
 func Execute(invocations []invocation.Invocation, conn Connection) (ExecutionResponse, error) {
-	input, err := message.Build(invocations)
+	input, err := message.Build(invocations, nil)
 	if err != nil {
 		return nil, fmt.Errorf("building message: %s", err)
 	}
