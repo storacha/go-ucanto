@@ -83,7 +83,7 @@ func Delegate(issuer ucan.Signer, audience ucan.Principal, capabilities []ucan.C
 		return nil, err
 	}
 
-	links, err := cfg.prf.Encode(bs)
+	links, err := cfg.prf.WriteInto(bs)
 	if err != nil {
 		return nil, err
 	}

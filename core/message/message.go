@@ -73,7 +73,7 @@ func (m *message) Get(link ipld.Link) (ipld.Link, bool) {
 	return rcpt, true
 }
 
-func Build(invocations []invocation.Invocation, receipts []receipt.UniversalReceipt) (AgentMessage, error) {
+func Build(invocations []invocation.Invocation, receipts []receipt.AnyReceipt) (AgentMessage, error) {
 	bs, err := blockstore.NewBlockStore()
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func Build(invocations []invocation.Invocation, receipts []receipt.UniversalRece
 	for _, inv := range invocations {
 		ex = append(ex, inv.Link())
 
-		err := blockstore.Encode(inv, bs)
+		err := blockstore.WriteInto(inv, bs)
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +96,7 @@ func Build(invocations []invocation.Invocation, receipts []receipt.UniversalRece
 			Values: make(map[string]ipld.Link, len(receipts)),
 		}
 		for _, receipt := range receipts {
-			err := blockstore.Encode(receipt, bs)
+			err := blockstore.WriteInto(receipt, bs)
 			if err != nil {
 				return nil, err
 			}

@@ -60,9 +60,9 @@ func FromLink(link ucan.Link) Ran {
 	return Ran{nil, link}
 }
 
-func (r Ran) Encode(bs blockstore.BlockWriter) (ipld.Link, error) {
+func (r Ran) WriteInto(bs blockstore.BlockWriter) (ipld.Link, error) {
 	if invocation, ok := r.Invocation(); ok {
-		return r.Link(), blockstore.Encode(invocation, bs)
+		return r.Link(), blockstore.WriteInto(invocation, bs)
 	}
 	return r.Link(), nil
 }

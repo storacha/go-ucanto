@@ -195,7 +195,7 @@ func NewBlockReader(options ...Option) (BlockReader, error) {
 	return &blockreader{keys, blks}, nil
 }
 
-func Encode(view ipld.View, bs BlockWriter) error {
+func WriteInto(view ipld.View, bs BlockWriter) error {
 	blks := view.Blocks()
 	for {
 		b, err := blks.Next()

@@ -16,33 +16,33 @@ type Result[O any, X any] interface {
 	Error() (X, bool)
 }
 
-type UniversalResult Result[ipld.Node, ipld.Node]
+type AnyResult Result[ipld.Node, ipld.Node]
 
-type universalResult struct {
+type anyResult struct {
 	ok  *ipld.Node
 	err *ipld.Node
 }
 
-func (ur universalResult) Ok() (ipld.Node, bool) {
-	if ur.ok != nil {
-		return *ur.ok, true
+func (ar anyResult) Ok() (ipld.Node, bool) {
+	if ar.ok != nil {
+		return *ar.ok, true
 	}
 	return nil, false
 }
 
-func (ur universalResult) Error() (ipld.Node, bool) {
-	if ur.err != nil {
-		return *ur.err, true
+func (ar anyResult) Error() (ipld.Node, bool) {
+	if ar.err != nil {
+		return *ar.err, true
 	}
 	return nil, false
 }
 
-func Ok(value ipld.Node) UniversalResult {
-	return universalResult{&value, nil}
+func Ok(value ipld.Node) AnyResult {
+	return anyResult{&value, nil}
 }
 
-func Error(err ipld.Node) UniversalResult {
-	return universalResult{nil, &err}
+func Error(err ipld.Node) AnyResult {
+	return anyResult{nil, &err}
 }
 
 // Named is an error that you can read a name from
@@ -98,7 +98,7 @@ func NamedWithCurrentStackTrace(name string) NamedWithStackTrace {
 //  2. the golangs error message plus
 //     a. a name, if it is a named error
 //     b. a stack trace, if it has a stack trace
-func Failure(err error) UniversalResult {
+func Failure(err error) AnyResult {
 	if ipldConvertableError, ok := err.(IPLDConvertableError); ok {
 		return Error(ipldConvertableError.ToIPLD())
 	}

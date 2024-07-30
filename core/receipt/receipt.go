@@ -1,6 +1,8 @@
 package receipt
 
 import (
+	// for go:embed
+	_ "embed"
 	"fmt"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
@@ -191,23 +193,21 @@ func NewReceiptReader[O, X any](resultschema []byte) (ReceiptReader[O, X], error
 	return &receiptReader[O, X]{typ}, nil
 }
 
-type UniversalReceipt Receipt[datamodel.Node, datamodel.Node]
+type AnyReceipt Receipt[datamodel.Node, datamodel.Node]
 
 var (
-	universalReceiptTs *schema.TypeSystem
+	anyReceiptTs *schema.TypeSystem
 )
 
+//go:embed anyresult.ipldsch
+var anyResultSchema []byte
+
 func init() {
-	ts, err := rdm.NewReceiptModelType(
-		[]byte(`type Result union {
-	  | any "ok"
-	  | any "error"
-	} representation keyed
-	`))
+	ts, err := rdm.NewReceiptModelType(anyResultSchema)
 	if err != nil {
 		panic(fmt.Errorf("failed to load IPLD schema: %s", err))
 	}
-	universalReceiptTs = ts.TypeSystem()
+	anyReceiptTs = ts.TypeSystem()
 }
 
 // Option is an option configuring a UCAN delegation.
@@ -265,7 +265,7 @@ func wrapOrFail(value interface{}) (nd schema.TypedNode, err error) {
 	return
 }
 
-func Issue(issuer ucan.Signer, result result.UniversalResult, ran invocation.Ran, opts ...Option) (UniversalReceipt, error) {
+func Issue(issuer ucan.Signer, result result.AnyResult, ran invocation.Ran, opts ...Option) (AnyReceipt, error) {
 	cfg := receiptConfig{}
 	for _, opt := range opts {
 		if err := opt(&cfg); err != nil {
@@ -279,13 +279,13 @@ func Issue(issuer ucan.Signer, result result.UniversalResult, ran invocation.Ran
 	}
 
 	// copy invocation blocks into the store
-	invocationLink, err := ran.Encode(bs)
+	invocationLink, err := ran.WriteInto(bs)
 	if err != nil {
 		return nil, err
 	}
 
 	// copy proof blocks into store
-	prooflinks, err := cfg.prf.Encode(bs)
+	prooflinks, err := cfg.prf.WriteInto(bs)
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +327,7 @@ func Issue(issuer ucan.Signer, result result.UniversalResult, ran invocation.Ran
 		Prf:  prooflinks,
 	}
 
-	outcomeBytes, err := cbor.Encode(outcomeModel, universalReceiptTs.TypeByName("Outcome"))
+	outcomeBytes, err := cbor.Encode(outcomeModel, anyReceiptTs.TypeByName("Outcome"))
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +338,7 @@ func Issue(issuer ucan.Signer, result result.UniversalResult, ran invocation.Ran
 		Sig: signature,
 	}
 
-	rt, err := block.Encode(receiptModel, universalReceiptTs.TypeByName("Receipt"), cbor.Codec, sha256.Hasher)
+	rt, err := block.Encode(receiptModel, anyReceiptTs.TypeByName("Receipt"), cbor.Codec, sha256.Hasher)
 	if err != nil {
 		return nil, fmt.Errorf("encoding UCAN: %s", err)
 	}

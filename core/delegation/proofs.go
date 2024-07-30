@@ -44,13 +44,13 @@ func NewProofsView(links []ipld.Link, bs blockstore.BlockReader) Proofs {
 	return proofs
 }
 
-// Encode writes a set of proofs, some of which may be full delegations to a blockstore
-func (proofs Proofs) Encode(bs blockstore.BlockWriter) ([]ipld.Link, error) {
+// WriteInto writes a set of proofs, some of which may be full delegations to a blockstore
+func (proofs Proofs) WriteInto(bs blockstore.BlockWriter) ([]ipld.Link, error) {
 	links := make([]ucan.Link, 0, len(proofs))
 	for _, p := range proofs {
 		links = append(links, p.Link())
 		if delegation, isDelegation := p.Delegation(); isDelegation {
-			err := blockstore.Encode(delegation, bs)
+			err := blockstore.WriteInto(delegation, bs)
 			if err != nil {
 				return nil, err
 			}
