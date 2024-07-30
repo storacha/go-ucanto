@@ -1,6 +1,8 @@
 package ucan
 
 import (
+	"encoding/json"
+
 	"github.com/ipld/go-ipld-prime"
 	"github.com/storacha-network/go-ucanto/did"
 	"github.com/storacha-network/go-ucanto/ucan/crypto"
@@ -15,11 +17,17 @@ type Resource = string
 // It MUST have format `${string}/${string}` | "*"
 type Ability = string
 
+// UnknownCapability is a capability whose Nb type is unknown
+type UnknownCapability interface {
+	json.Marshaler
+	Can() Ability
+	With() Resource
+}
+
 // Capability represents an ability that a UCAN holder can perform with some
 // resource.
 type Capability[Caveats any] interface {
-	Can() Ability
-	With() Resource
+	UnknownCapability
 	Nb() Caveats
 }
 
@@ -35,7 +43,7 @@ type Link = ipld.Link
 // It MUST have format `${number}.${number}.${number}`
 type Version = string
 
-// UTCUnixTimestamp is a timestamp in seconds since the Unix epoch.
+// UTCUnixTimestamp is a timestamp in milliseconds since the Unix epoch.
 type UTCUnixTimestamp = uint64
 
 // https://github.com/ucan-wg/spec/#324-nonce

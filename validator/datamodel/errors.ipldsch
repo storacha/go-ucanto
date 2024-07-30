@@ -1,0 +1,25 @@
+type Delegation struct {
+	Audience String
+}
+
+type InvalidAudience struct {
+	Name       optional String
+	Audience   String
+	Delegation Delegation
+	Message    String
+	Stack      optional Sstring
+}
+
+type Expired struct {
+	Name      optional String
+	Message   String
+	ExpiredAt Integer
+	Stack     optional String
+}
+
+type NotValidBefore struct {
+	Name      optional String
+	Message   String
+	ValidAt   Integer
+	Stack     optional String
+}
