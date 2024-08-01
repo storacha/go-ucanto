@@ -1,0 +1,5 @@
+type Failure struct {
+  name optional String
+  message String
+  stack optional String
+}

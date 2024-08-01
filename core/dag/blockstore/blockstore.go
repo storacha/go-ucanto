@@ -194,3 +194,21 @@ func NewBlockReader(options ...Option) (BlockReader, error) {
 
 	return &blockreader{keys, blks}, nil
 }
+
+func WriteInto(view ipld.View, bs BlockWriter) error {
+	blks := view.Blocks()
+	for {
+		b, err := blks.Next()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return fmt.Errorf("reading proof blocks: %s", err)
+		}
+		err = bs.Put(b)
+		if err != nil {
+			return fmt.Errorf("putting proof block: %s", err)
+		}
+	}
+	return nil
+}

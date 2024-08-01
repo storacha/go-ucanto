@@ -39,10 +39,10 @@ func TestEncodeDecode(t *testing.T) {
 	}
 
 	l := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
-	r0 := rdm.ReceiptModel[*resultOk, *resultErr]{
-		Ocm: rdm.OutcomeModel[*resultOk, *resultErr]{
+	r0 := rdm.ReceiptModel[resultOk, resultErr]{
+		Ocm: rdm.OutcomeModel[resultOk, resultErr]{
 			Ran: l,
-			Out: rdm.ResultModel[*resultOk, *resultErr]{
+			Out: rdm.ResultModel[resultOk, resultErr]{
 				Ok: &resultOk{Status: "done"},
 			},
 		},
@@ -51,7 +51,7 @@ func TestEncodeDecode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encoding receipt: %s", err)
 	}
-	r1 := rdm.ReceiptModel[*resultOk, *resultErr]{}
+	r1 := rdm.ReceiptModel[resultOk, resultErr]{}
 	err = block.Decode(b0, &r1, typ, cbor.Codec, sha256.Hasher)
 	if err != nil {
 		t.Fatalf("decoding receipt: %s", err)
@@ -63,10 +63,10 @@ func TestEncodeDecode(t *testing.T) {
 		t.Fatalf("status was not done")
 	}
 
-	r2 := rdm.ReceiptModel[*resultOk, *resultErr]{
-		Ocm: rdm.OutcomeModel[*resultOk, *resultErr]{
+	r2 := rdm.ReceiptModel[resultOk, resultErr]{
+		Ocm: rdm.OutcomeModel[resultOk, resultErr]{
 			Ran: l,
-			Out: rdm.ResultModel[*resultOk, *resultErr]{
+			Out: rdm.ResultModel[resultOk, resultErr]{
 				Err: &resultErr{Message: "boom"},
 			},
 		},
@@ -75,7 +75,7 @@ func TestEncodeDecode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encoding receipt: %s", err)
 	}
-	r3 := rdm.ReceiptModel[*resultOk, *resultErr]{}
+	r3 := rdm.ReceiptModel[resultOk, resultErr]{}
 	err = block.Decode(b1, &r3, typ, cbor.Codec, sha256.Hasher)
 	if err != nil {
 		t.Fatalf("decoding receipt: %s", err)

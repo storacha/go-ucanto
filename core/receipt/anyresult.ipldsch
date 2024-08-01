@@ -1,0 +1,4 @@
+type Result union {
+	  | any "ok"
+	  | any "error"
+} representation keyed

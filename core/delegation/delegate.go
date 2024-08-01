@@ -2,7 +2,6 @@ package delegation
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/web3-storage/go-ucanto/core/dag/blockstore"
 	"github.com/web3-storage/go-ucanto/core/ipld/block"
@@ -20,7 +19,7 @@ type delegationConfig struct {
 	nbf uint64
 	nnc string
 	fct []ucan.FactBuilder
-	prf []Delegation
+	prf Proofs
 }
 
 // WithExpiration configures the expiration time in UTC seconds since Unix
@@ -61,7 +60,7 @@ func WithFacts(fct []ucan.FactBuilder) Option {
 // `Delegation` is not the resource owner / service provider, for the delegated
 // capabilities, the `proofs` must contain valid `Proof`s containing
 // delegations to the `issuer`.
-func WithProofs(prf []Delegation) Option {
+func WithProofs(prf Proofs) Option {
 	return func(cfg *delegationConfig) error {
 		cfg.prf = prf
 		return nil
@@ -79,28 +78,14 @@ func Delegate(issuer ucan.Signer, audience ucan.Principal, capabilities []ucan.C
 		}
 	}
 
-	var links []ucan.Link
 	bs, err := blockstore.NewBlockStore()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, p := range cfg.prf {
-		links = append(links, p.Link())
-		blks := p.Blocks()
-		for {
-			b, err := blks.Next()
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				return nil, fmt.Errorf("reading proof blocks: %s", err)
-			}
-			err = bs.Put(b)
-			if err != nil {
-				return nil, fmt.Errorf("putting proof block: %s", err)
-			}
-		}
+	links, err := cfg.prf.WriteInto(bs)
+	if err != nil {
+		return nil, err
 	}
 
 	data, err := ucan.Issue(

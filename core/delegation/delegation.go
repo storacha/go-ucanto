@@ -22,7 +22,7 @@ import (
 // Delagation is a materialized view of a UCAN delegation, which can be encoded
 // into a UCAN token and used as proof for an invocation or further delegations.
 type Delegation interface {
-	ipld.IPLDView
+	ipld.View
 	// Link returns the IPLD link of the root block of the delegation.
 	Link() ucan.Link
 	// Archive writes the delegation to a Content Addressed aRchive (CAR).

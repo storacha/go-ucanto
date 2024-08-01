@@ -37,8 +37,8 @@ type MetaModel struct {
 }
 
 type ResultModel[O any, X any] struct {
-	Ok  O
-	Err X
+	Ok  *O
+	Err *X
 }
 
 // NewReceiptModelType creates a new schema.Type for a Receipt. You must
