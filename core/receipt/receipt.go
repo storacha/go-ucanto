@@ -194,22 +194,7 @@ func NewReceiptReader[O, X any](resultschema []byte) (ReceiptReader[O, X], error
 	return &receiptReader[O, X]{typ}, nil
 }
 
-type AnyReceipt Receipt[datamodel.Node, datamodel.Node]
-
-var (
-	anyReceiptTs *schema.TypeSystem
-)
-
-//go:embed anyresult.ipldsch
-var anyResultSchema []byte
-
-func init() {
-	ts, err := rdm.NewReceiptModelType(anyResultSchema)
-	if err != nil {
-		panic(fmt.Errorf("failed to load IPLD schema: %s", err))
-	}
-	anyReceiptTs = ts.TypeSystem()
-}
+type AnyReceipt Receipt[ipld.Node, ipld.Node]
 
 // Option is an option configuring a UCAN delegation.
 type Option func(cfg *receiptConfig) error
@@ -266,7 +251,7 @@ func wrapOrFail(value interface{}) (nd schema.TypedNode, err error) {
 	return
 }
 
-func Issue[O, X ipld.Node](issuer ucan.Signer, result result.Result[O, X], ran ran.Ran, opts ...Option) (Receipt[O, X], error) {
+func Issue[O, X ipld.Builder](issuer ucan.Signer, result result.Result[O, X], ran ran.Ran, opts ...Option) (AnyReceipt, error) {
 	cfg := receiptConfig{}
 	for _, opt := range opts {
 		if err := opt(&cfg); err != nil {
@@ -310,20 +295,24 @@ func Issue[O, X ipld.Node](issuer ucan.Signer, result result.Result[O, X], ran r
 		}
 	}
 
-	resultModel := rdm.ResultModel[O, X]{}
+	resultModel := rdm.ResultModel[ipld.Node, ipld.Node]{}
 	if success, ok := result.Ok(); ok {
-		resultModel.Ok = &success
-		fmt.Println("success kind:")
-		fmt.Println(success.Kind().String())
+		nd, err := success.Build()
+		if err != nil {
+			return nil, err
+		}
+		resultModel.Ok = &nd
 	}
 	if err, ok := result.Error(); ok {
-		resultModel.Err = &err
-		fmt.Println("error kind:")
-		fmt.Println(err.Kind().String())
+		nd, err := err.Build()
+		if err != nil {
+			return nil, err
+		}
+		resultModel.Err = &nd
 	}
 
 	issString := issuer.DID().String()
-	outcomeModel := rdm.OutcomeModel[O, X]{
+	outcomeModel := rdm.OutcomeModel[ipld.Node, ipld.Node]{
 		Ran:  invocationLink,
 		Out:  resultModel,
 		Fx:   effectsModel,
@@ -332,18 +321,18 @@ func Issue[O, X ipld.Node](issuer ucan.Signer, result result.Result[O, X], ran r
 		Prf:  prooflinks,
 	}
 
-	outcomeBytes, err := cbor.Encode(&outcomeModel, anyReceiptTs.TypeByName("Outcome"))
+	outcomeBytes, err := cbor.Encode(&outcomeModel, rdm.TypeSystem().TypeByName("Outcome"))
 	if err != nil {
 		return nil, err
 	}
 	signature := issuer.Sign(outcomeBytes).Bytes()
 
-	receiptModel := rdm.ReceiptModel[O, X]{
+	receiptModel := rdm.ReceiptModel[ipld.Node, ipld.Node]{
 		Ocm: outcomeModel,
 		Sig: signature,
 	}
 
-	rt, err := block.Encode(receiptModel, anyReceiptTs.TypeByName("Receipt"), cbor.Codec, sha256.Hasher)
+	rt, err := block.Encode(&receiptModel, rdm.TypeSystem().TypeByName("Receipt"), cbor.Codec, sha256.Hasher)
 	if err != nil {
 		return nil, fmt.Errorf("encoding receipt: %s", err)
 	}
@@ -353,7 +342,7 @@ func Issue[O, X ipld.Node](issuer ucan.Signer, result result.Result[O, X], ran r
 		return nil, fmt.Errorf("adding receipt root to store: %s", err)
 	}
 
-	return &receipt[O, X]{
+	return &receipt[ipld.Node, ipld.Node]{
 		rt:   rt,
 		blks: bs,
 		data: &receiptModel,

@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/ipld/go-ipld-prime/node/bindnode"
 	"github.com/pkg/errors"
 	"github.com/web3-storage/go-ucanto/core/ipld"
-	"github.com/web3-storage/go-ucanto/core/result/datamodel"
 )
 
 // https://github.com/ucan-wg/invocation/#6-result
@@ -16,33 +14,33 @@ type Result[O any, X any] interface {
 	Error() (X, bool)
 }
 
-type AnyResult Result[ipld.Node, ipld.Node]
-
-type anyResult struct {
-	ok  *ipld.Node
-	err *ipld.Node
+type result[O, X ipld.Builder] struct {
+	ok  *O
+	err *X
 }
 
-func (ar anyResult) Ok() (ipld.Node, bool) {
-	if ar.ok != nil {
-		return *ar.ok, true
+func (r *result[O, X]) Ok() (O, bool) {
+	if r.ok != nil {
+		return *r.ok, true
 	}
-	return nil, false
+	var o O
+	return o, false
 }
 
-func (ar anyResult) Error() (ipld.Node, bool) {
-	if ar.err != nil {
-		return *ar.err, true
+func (r *result[O, X]) Error() (X, bool) {
+	if r.err != nil {
+		return *r.err, true
 	}
-	return nil, false
+	var x X
+	return x, false
 }
 
-func Ok(value ipld.Node) AnyResult {
-	return anyResult{&value, nil}
+func Ok[O ipld.Builder](value O) Result[O, ipld.Builder] {
+	return &result[O, ipld.Builder]{&value, nil}
 }
 
-func Error(err ipld.Node) AnyResult {
-	return anyResult{nil, &err}
+func Error[X ipld.Builder](err X) Result[ipld.Builder, X] {
+	return &result[ipld.Builder, X]{nil, &err}
 }
 
 // Named is an error that you can read a name from
@@ -103,19 +101,19 @@ type Failure interface {
 //  2. the golangs error message plus
 //     a. a name, if it is a named error
 //     b. a stack trace, if it has a stack trace
-func NewFailure(err error) AnyResult {
-	if ipldConvertableError, ok := err.(IPLDConvertableError); ok {
-		return Error(ipldConvertableError.ToIPLD())
-	}
+// func NewFailure(err error) AnyResult {
+// 	if ipldConvertableError, ok := err.(IPLDConvertableError); ok {
+// 		return Error(ipldConvertableError.ToIPLD())
+// 	}
 
-	failure := datamodel.Failure{Message: err.Error()}
-	if named, ok := err.(Named); ok {
-		name := named.Name()
-		failure.Name = &name
-	}
-	if withStackTrace, ok := err.(WithStackTrace); ok {
-		stack := withStackTrace.Stack()
-		failure.Stack = &stack
-	}
-	return Error(bindnode.Wrap(&failure, datamodel.Type()))
-}
+// 	failure := datamodel.Failure{Message: err.Error()}
+// 	if named, ok := err.(Named); ok {
+// 		name := named.Name()
+// 		failure.Name = &name
+// 	}
+// 	if withStackTrace, ok := err.(WithStackTrace); ok {
+// 		stack := withStackTrace.Stack()
+// 		failure.Stack = &stack
+// 	}
+// 	return Error(bindnode.Wrap(&failure, datamodel.Type()))
+// }

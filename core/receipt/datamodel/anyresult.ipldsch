@@ -1,0 +1,4 @@
+type Result struct {
+	ok optional Any
+	error optional Any
+}

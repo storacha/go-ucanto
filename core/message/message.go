@@ -102,6 +102,7 @@ func Build(invocations []invocation.Invocation, receipts []receipt.AnyReceipt) (
 			}
 
 			key := receipt.Ran().Link().String()
+			report.Keys = append(report.Keys, key)
 			if _, ok := report.Values[key]; !ok {
 				report.Values[key] = receipt.Root().Link()
 			}

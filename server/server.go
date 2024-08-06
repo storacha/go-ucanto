@@ -50,17 +50,17 @@ type InvocationContext interface {
 
 // Transaction defines a result & effect pair, used by provider that wishes to
 // return results that have effects.
-type Transaction[O, X ipld.Datamodeler] interface {
+type Transaction[O, X ipld.Builder] interface {
 	Out() result.Result[O, X]
 	Fx() receipt.Effects
 }
 
 // ServiceMethod is an invocation handler.
-type ServiceMethod[I invocation.Invocation, O, X ipld.Datamodeler] func(input I, context InvocationContext) (Transaction[O, X], error)
+type ServiceMethod[I invocation.Invocation, O, X ipld.Builder] func(input I, context InvocationContext) (Transaction[O, X], error)
 
 // ServiceDefinition is a mapping of service names to handlers, used to define a
 // service implementation.
-type ServiceDefinition = map[string]ServiceMethod[invocation.Invocation, ipld.Datamodeler, ipld.Datamodeler]
+type ServiceDefinition = map[string]ServiceMethod[invocation.Invocation, ipld.Builder, ipld.Builder]
 
 type ServiceInvocation = invocation.IssuedInvocation
 
@@ -315,33 +315,22 @@ func Run(server Server, invocation ServiceInvocation) (receipt.AnyReceipt, error
 	caps := invocation.Capabilities()
 	// Invocation needs to have one single capability
 	if len(caps) != 1 {
-		res := result.Error(NewInvocationCapabilityError(invocation.Capabilities()).ToIPLD())
-		return receipt.Issue(server.ID(), res, ran.FromInvocation(invocation))
+		err := NewInvocationCapabilityError(invocation.Capabilities())
+		return receipt.Issue(server.ID(), result.Error(err), ran.FromInvocation(invocation))
 	}
 
 	cap := caps[0]
 	handle, ok := server.Service()[cap.Can()]
 	if !ok {
-		res := result.Error(NewHandlerNotFoundError(cap).ToIPLD())
-		return receipt.Issue(server.ID(), res, ran.FromInvocation(invocation))
+		err := NewHandlerNotFoundError(cap)
+		return receipt.Issue(server.ID(), result.Error(err), ran.FromInvocation(invocation))
 	}
 
 	outcome, err := handle(invocation, server.Context())
 	if err != nil {
 		herr := NewHandlerExecutionError(err, cap)
 		server.Catch(herr)
-
-		res := result.Error(herr.ToIPLD())
-		return receipt.Issue(server.ID(), res, ran.FromInvocation(invocation))
-	}
-
-	out := outcome.Out()
-	var res result.AnyResult
-	if value, ok := out.Ok(); ok {
-		res = result.Ok(value.ToIPLD())
-	}
-	if value, ok := out.Error(); ok {
-		res = result.Error(value.ToIPLD())
+		return receipt.Issue(server.ID(), result.Error(herr), ran.FromInvocation(invocation))
 	}
 
 	fx := outcome.Fx()
@@ -350,13 +339,11 @@ func Run(server Server, invocation ServiceInvocation) (receipt.AnyReceipt, error
 		opts = append(opts, receipt.WithJoin(fx.Join()), receipt.WithForks(fx.Fork()))
 	}
 
-	rcpt, err := receipt.Issue(server.ID(), res, ran.FromInvocation(invocation), opts...)
+	rcpt, err := receipt.Issue(server.ID(), outcome.Out(), ran.FromInvocation(invocation), opts...)
 	if err != nil {
 		herr := NewHandlerExecutionError(err, cap)
 		server.Catch(herr)
-
-		res := result.Error(herr.ToIPLD())
-		return receipt.Issue(server.ID(), res, ran.FromInvocation(invocation))
+		return receipt.Issue(server.ID(), result.Error(herr), ran.FromInvocation(invocation))
 	}
 
 	return rcpt, nil

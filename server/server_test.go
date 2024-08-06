@@ -1,7 +1,8 @@
 package server
 
 import (
-	"log"
+	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/ipfs/go-cid"
@@ -10,7 +11,10 @@ import (
 	"github.com/web3-storage/go-ucanto/client"
 	"github.com/web3-storage/go-ucanto/core/invocation"
 	"github.com/web3-storage/go-ucanto/core/ipld"
+	"github.com/web3-storage/go-ucanto/core/receipt"
+	"github.com/web3-storage/go-ucanto/principal"
 	"github.com/web3-storage/go-ucanto/principal/ed25519/signer"
+	sdm "github.com/web3-storage/go-ucanto/server/datamodel"
 	"github.com/web3-storage/go-ucanto/transport/car"
 	"github.com/web3-storage/go-ucanto/ucan"
 )
@@ -30,23 +34,35 @@ func (c *uploadAddCaveats) Build() (map[string]ipld.Node, error) {
 	return data, nil
 }
 
+type uploadAddSuccess struct {
+	Status string
+}
+
+func (ok *uploadAddSuccess) Build() (ipld.Node, error) {
+	np := basicnode.Prototype.Any
+	nb := np.NewBuilder()
+	ma, _ := nb.BeginMap(1)
+	ma.AssembleKey().AssignString("status")
+	ma.AssembleValue().AssignString(ok.Status)
+	ma.Finish()
+	return nb.Build(), nil
+}
+
+func generateSigner(t testing.TB) principal.Signer {
+	t.Helper()
+	signer, err := signer.Generate()
+	if err != nil {
+		t.Fatalf("generating key: %v", err)
+	}
+	return signer
+}
+
 func TestHandlerNotFound(t *testing.T) {
-	service, err := signer.Generate()
-	if err != nil {
-		t.Fatalf("generating service key: %v", err)
-	}
+	service := generateSigner(t)
+	alice := generateSigner(t)
+	space := generateSigner(t)
 
-	alice, err := signer.Generate()
-	if err != nil {
-		t.Fatalf("generating alice key: %v", err)
-	}
-
-	space, err := signer.Generate()
-	if err != nil {
-		t.Fatalf("generating space key: %v", err)
-	}
-
-	definition := map[string]ServiceMethod[invocation.Invocation, ipld.Datamodeler, ipld.Datamodeler]{}
+	definition := map[string]ServiceMethod[invocation.Invocation, ipld.Builder, ipld.Builder]{}
 
 	server, err := NewServer(service, definition)
 	if err != nil {
@@ -54,7 +70,10 @@ func TestHandlerNotFound(t *testing.T) {
 	}
 
 	codec := car.NewCAROutboundCodec()
-	conn, _ := client.NewConnection(service, codec, server)
+	conn, err := client.NewConnection(service, codec, server)
+	if err != nil {
+		t.Fatalf("creating connection: %v", err)
+	}
 
 	rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
 	capability := ucan.NewCapability(
@@ -64,7 +83,7 @@ func TestHandlerNotFound(t *testing.T) {
 	)
 
 	// create invocation(s) to perform a task with granted capabilities
-	inv, err := invocation.Invoke(alice, service, capability)
+	inv, _ := invocation.Invoke(alice, service, capability)
 	invs := []invocation.Invocation{inv}
 
 	// send the invocation(s) to the service
@@ -73,8 +92,112 @@ func TestHandlerNotFound(t *testing.T) {
 		t.Fatalf("requesting service: %v", err)
 	}
 
-	log.Printf("%+v", resp)
+	// get the receipt link for the invocation from the response
+	rcptlnk, ok := resp.Get(invs[0].Link())
+	if !ok {
+		t.Fatalf("missing receipt for invocation: %s", invs[0].Link())
+	}
+
+	rcptsch := bytes.Join([][]byte{sdm.Schema(), []byte(`
+		type Result union {
+			| Any "ok"
+			| HandlerNotFoundError "error"
+		} representation keyed
+	`)}, []byte("\n"))
+
+	reader, err := receipt.NewReceiptReader[ipld.Node, sdm.HandlerNotFoundErrorModel](rcptsch)
+	if err != nil {
+		t.Fatalf("creating reader: %v", err)
+	}
+
+	// read the receipt for the invocation from the response
+	rcpt, err := reader.Read(rcptlnk, resp.Blocks())
+	if err != nil {
+		t.Fatalf("reading receipt: %v", err)
+	}
+
+	rerr, ok := rcpt.Out().Error()
+	if !ok {
+		t.Fatalf("expected error: %s", invs[0].Link())
+	}
+	fmt.Println(rerr.Message)
 }
+
+// func TestSimpleHandler(t *testing.T) {
+// 	service := generateSigner(t)
+// 	alice := generateSigner(t)
+// 	space := generateSigner(t)
+
+// 	rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
+// 	nb := uploadAddCaveats{Root: rt}
+// 	// TODO: this should be a definition not an instance
+// 	cap := ucan.NewCapability("upload/add", space.DID().String(), nb)
+// 	hdlr := func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) Transaction[*uploadAddSuccess, ipld.Node] {
+
+// 		return NewTransaction()
+// 	}
+
+// 	definition := map[string]ServiceMethod[invocation.Invocation, ipld.Builder, ipld.Builder]{
+// 		"upload/add": hdlr,
+// 	}
+
+// 	server, err := NewServer(service, definition)
+// 	if err != nil {
+// 		t.Fatalf("creating service: %v", err)
+// 	}
+
+// 	codec := car.NewCAROutboundCodec()
+// 	conn, err := client.NewConnection(service, codec, server)
+// 	if err != nil {
+// 		t.Fatalf("creating connection: %v", err)
+// 	}
+
+// 	capability := ucan.NewCapability(
+// 		"upload/add",
+// 		space.DID().String(),
+// 		ucan.CaveatBuilder(&uploadAddCaveats{Root: rt}),
+// 	)
+
+// 	// create invocation(s) to perform a task with granted capabilities
+// 	inv, _ := invocation.Invoke(alice, service, capability)
+// 	invs := []invocation.Invocation{inv}
+
+// 	// send the invocation(s) to the service
+// 	resp, err := client.Execute(invs, conn)
+// 	if err != nil {
+// 		t.Fatalf("requesting service: %v", err)
+// 	}
+
+// 	// get the receipt link for the invocation from the response
+// 	rcptlnk, ok := resp.Get(invs[0].Link())
+// 	if !ok {
+// 		t.Fatalf("missing receipt for invocation: %s", invs[0].Link())
+// 	}
+
+// 	rcptsch := bytes.Join([][]byte{sdm.Schema(), []byte(`
+// 		type Result union {
+// 			| Any "ok"
+// 			| HandlerNotFoundError "error"
+// 		} representation keyed
+// 	`)}, []byte("\n"))
+
+// 	reader, err := receipt.NewReceiptReader[ipld.Node, sdm.HandlerNotFoundErrorModel](rcptsch)
+// 	if err != nil {
+// 		t.Fatalf("creating reader: %v", err)
+// 	}
+
+// 	// read the receipt for the invocation from the response
+// 	rcpt, err := reader.Read(rcptlnk, resp.Blocks())
+// 	if err != nil {
+// 		t.Fatalf("reading receipt: %v", err)
+// 	}
+
+// 	rerr, ok := rcpt.Out().Error()
+// 	if !ok {
+// 		t.Fatalf("expected error: %s", invs[0].Link())
+// 	}
+// 	fmt.Println(rerr.Message)
+// }
 
 // func TestHandlerExecutionError(t *testing.T) {
 // 	service, err := signer.Generate()

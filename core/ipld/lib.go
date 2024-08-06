@@ -9,7 +9,8 @@ type Link = ipld.Link
 type Block = block.Block
 type Node = ipld.Node
 
-// Datamodeler describes an object that can be modeled as IPLD data.
-type Datamodeler interface {
-	ToIPLD() Node
+// Builder can be modeled as an IPLD data and provides a `Build“ method to
+// build itself into a `datamodel.Node`.
+type Builder interface {
+	Build() (Node, error)
 }

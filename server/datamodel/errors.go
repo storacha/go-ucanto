@@ -24,6 +24,10 @@ func init() {
 	errorTypeSystem = ts
 }
 
+func Schema() []byte {
+	return errorsch
+}
+
 func HandlerExecutionErrorType() schema.Type {
 	return errorTypeSystem.TypeByName("HandlerExecutionError")
 }

@@ -3,6 +3,7 @@ package datamodel
 import (
 	"bytes"
 	_ "embed"
+	"fmt"
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/datamodel"
@@ -11,6 +12,23 @@ import (
 
 //go:embed receipt.ipldsch
 var receipt []byte
+
+//go:embed anyresult.ipldsch
+var anyResultSchema []byte
+
+var anyReceiptTs *schema.TypeSystem
+
+func init() {
+	ts, err := NewReceiptModelType(anyResultSchema)
+	if err != nil {
+		panic(fmt.Errorf("failed to load IPLD schema: %s", err))
+	}
+	anyReceiptTs = ts.TypeSystem()
+}
+
+func TypeSystem() *schema.TypeSystem {
+	return anyReceiptTs
+}
 
 type ReceiptModel[O any, X any] struct {
 	Ocm OutcomeModel[O, X]

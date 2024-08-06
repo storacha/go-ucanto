@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 
-	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/node/bindnode"
 	"github.com/web3-storage/go-ucanto/core/ipld"
 	"github.com/web3-storage/go-ucanto/core/result"
@@ -12,7 +11,6 @@ import (
 )
 
 type HandlerNotFoundError[Caveats any] interface {
-	ipld.Datamodeler
 	result.Failure
 	Capability() ucan.Capability[Caveats]
 }
@@ -33,7 +31,7 @@ func (h *handlerNotFoundError[C]) Name() string {
 	return "HandlerNotFoundError"
 }
 
-func (h *handlerNotFoundError[C]) ToIPLD() datamodel.Node {
+func (h *handlerNotFoundError[C]) Build() (ipld.Node, error) {
 	name := h.Name()
 
 	mdl := sdm.HandlerNotFoundErrorModel{
@@ -45,17 +43,17 @@ func (h *handlerNotFoundError[C]) ToIPLD() datamodel.Node {
 			With: h.capability.With(),
 		},
 	}
-	return bindnode.Wrap(&mdl, sdm.HandlerNotFoundErrorType())
+	return bindnode.Wrap(&mdl, sdm.HandlerNotFoundErrorType()), nil
 }
 
 var _ HandlerNotFoundError[any] = (*handlerNotFoundError[any])(nil)
+var _ ipld.Builder = (*handlerNotFoundError[any])(nil)
 
-func NewHandlerNotFoundError[Caveats any](capability ucan.Capability[Caveats]) HandlerNotFoundError[Caveats] {
+func NewHandlerNotFoundError[Caveats any](capability ucan.Capability[Caveats]) *handlerNotFoundError[Caveats] {
 	return &handlerNotFoundError[Caveats]{capability}
 }
 
 type HandlerExecutionError[Caveats any] interface {
-	ipld.Datamodeler
 	result.Failure
 	result.WithStackTrace
 	Cause() error
@@ -91,7 +89,7 @@ func (h *handlerExecutionError[C]) Stack() string {
 	return stack
 }
 
-func (h *handlerExecutionError[C]) ToIPLD() datamodel.Node {
+func (h *handlerExecutionError[C]) Build() (ipld.Node, error) {
 	name := h.Name()
 	stack := h.Stack()
 
@@ -116,17 +114,17 @@ func (h *handlerExecutionError[C]) ToIPLD() datamodel.Node {
 			Stack:   &cstack,
 		},
 	}
-	return bindnode.Wrap(&mdl, sdm.HandlerExecutionErrorType())
+	return bindnode.Wrap(&mdl, sdm.HandlerExecutionErrorType()), nil
 }
 
 var _ HandlerExecutionError[any] = (*handlerExecutionError[any])(nil)
+var _ ipld.Builder = (*handlerExecutionError[any])(nil)
 
-func NewHandlerExecutionError[Caveats any](cause error, capability ucan.Capability[Caveats]) HandlerExecutionError[Caveats] {
+func NewHandlerExecutionError[Caveats any](cause error, capability ucan.Capability[Caveats]) *handlerExecutionError[Caveats] {
 	return &handlerExecutionError[Caveats]{cause, capability}
 }
 
 type InvocationCapabilityError interface {
-	ipld.Datamodeler
 	result.Failure
 	Capabilities() []ucan.Capability[any]
 }
@@ -147,7 +145,7 @@ func (i *invocationCapabilityError) Name() string {
 	return "InvocationCapabilityError"
 }
 
-func (i *invocationCapabilityError) ToIPLD() datamodel.Node {
+func (i *invocationCapabilityError) Build() (ipld.Node, error) {
 	name := i.Name()
 	var capmdls []sdm.CapabilityModel
 	for _, cap := range i.Capabilities() {
@@ -163,11 +161,12 @@ func (i *invocationCapabilityError) ToIPLD() datamodel.Node {
 		Message:      i.Error(),
 		Capabilities: capmdls,
 	}
-	return bindnode.Wrap(&mdl, sdm.InvocationCapabilityErrorType())
+	return bindnode.Wrap(&mdl, sdm.InvocationCapabilityErrorType()), nil
 }
 
 var _ InvocationCapabilityError = (*invocationCapabilityError)(nil)
+var _ ipld.Builder = (*invocationCapabilityError)(nil)
 
-func NewInvocationCapabilityError(capabilities []ucan.Capability[any]) InvocationCapabilityError {
+func NewInvocationCapabilityError(capabilities []ucan.Capability[any]) *invocationCapabilityError {
 	return &invocationCapabilityError{capabilities}
 }
