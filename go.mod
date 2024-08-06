@@ -1,4 +1,4 @@
-module github.com/web3-storage/go-ucanto
+module github.com/storacha-network/go-ucanto
 
 go 1.21
 

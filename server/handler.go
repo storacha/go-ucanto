@@ -1,9 +1,9 @@
 package server
 
 import (
-	"github.com/web3-storage/go-ucanto/core/invocation"
-	"github.com/web3-storage/go-ucanto/core/ipld"
-	"github.com/web3-storage/go-ucanto/ucan"
+	"github.com/storacha-network/go-ucanto/core/invocation"
+	"github.com/storacha-network/go-ucanto/core/ipld"
+	"github.com/storacha-network/go-ucanto/ucan"
 )
 
 type HandlerFunc[N any, C ucan.Capability[N], I invocation.Invocation, O, X ipld.Builder] func(capability C, invocation I, context InvocationContext) (Transaction[O, X], error)

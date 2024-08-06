@@ -5,7 +5,7 @@ import (
 	"runtime"
 
 	"github.com/pkg/errors"
-	"github.com/web3-storage/go-ucanto/core/ipld"
+	"github.com/storacha-network/go-ucanto/core/ipld"
 )
 
 // https://github.com/ucan-wg/invocation/#6-result

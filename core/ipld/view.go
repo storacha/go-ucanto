@@ -1,7 +1,7 @@
 package ipld
 
 import (
-	"github.com/web3-storage/go-ucanto/core/iterable"
+	"github.com/storacha-network/go-ucanto/core/iterable"
 )
 
 // View represents a materialized IPLD DAG View, which provides a generic

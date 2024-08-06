@@ -8,7 +8,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
-	"github.com/web3-storage/go-ucanto/core/ipld"
+	"github.com/storacha-network/go-ucanto/core/ipld"
 )
 
 type fixture struct {

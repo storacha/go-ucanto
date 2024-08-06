@@ -4,7 +4,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/web3-storage/go-ucanto/core/result"
+	"github.com/storacha-network/go-ucanto/core/result"
 )
 
 type HTTPRequest interface {

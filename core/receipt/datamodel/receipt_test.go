@@ -5,10 +5,10 @@ import (
 
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
-	"github.com/web3-storage/go-ucanto/core/ipld/block"
-	"github.com/web3-storage/go-ucanto/core/ipld/codec/cbor"
-	"github.com/web3-storage/go-ucanto/core/ipld/hash/sha256"
-	rdm "github.com/web3-storage/go-ucanto/core/receipt/datamodel"
+	"github.com/storacha-network/go-ucanto/core/ipld/block"
+	"github.com/storacha-network/go-ucanto/core/ipld/codec/cbor"
+	"github.com/storacha-network/go-ucanto/core/ipld/hash/sha256"
+	rdm "github.com/storacha-network/go-ucanto/core/receipt/datamodel"
 )
 
 type resultOk struct {

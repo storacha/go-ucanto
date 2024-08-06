@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/web3-storage/go-ucanto/core/message"
-	"github.com/web3-storage/go-ucanto/transport"
-	"github.com/web3-storage/go-ucanto/transport/car/request"
-	"github.com/web3-storage/go-ucanto/transport/car/response"
-	thttp "github.com/web3-storage/go-ucanto/transport/http"
+	"github.com/storacha-network/go-ucanto/core/message"
+	"github.com/storacha-network/go-ucanto/transport"
+	"github.com/storacha-network/go-ucanto/transport/car/request"
+	"github.com/storacha-network/go-ucanto/transport/car/response"
+	thttp "github.com/storacha-network/go-ucanto/transport/http"
 )
 
 type carOutbound struct{}
