@@ -12,6 +12,7 @@ import (
 	"github.com/storacha-network/go-ucanto/core/invocation"
 	"github.com/storacha-network/go-ucanto/core/ipld"
 	"github.com/storacha-network/go-ucanto/core/receipt"
+	"github.com/storacha-network/go-ucanto/core/result"
 	"github.com/storacha-network/go-ucanto/principal"
 	"github.com/storacha-network/go-ucanto/principal/ed25519/signer"
 	sdm "github.com/storacha-network/go-ucanto/server/datamodel"
@@ -116,11 +117,12 @@ func TestHandlerNotFound(t *testing.T) {
 		t.Fatalf("reading receipt: %v", err)
 	}
 
-	rerr, ok := rcpt.Out().Error()
-	if !ok {
+	result.MatchResultR0(rcpt.Out(), func(ipld.Node) {
 		t.Fatalf("expected error: %s", invs[0].Link())
-	}
-	fmt.Println(rerr.Message)
+	}, func(rerr sdm.HandlerNotFoundErrorModel) {
+		fmt.Println(rerr.Message)
+	})
+
 }
 
 // func TestSimpleHandler(t *testing.T) {

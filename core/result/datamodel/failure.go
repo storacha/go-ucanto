@@ -4,10 +4,10 @@ import (
 	// to use go:embed
 	_ "embed"
 	"fmt"
-	"sync"
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/schema"
+	ucanipld "github.com/storacha-network/go-ucanto/core/ipld"
 )
 
 //go:embed failure.ipldsch
@@ -20,23 +20,18 @@ type Failure struct {
 	Stack   *string
 }
 
-var (
-	once sync.Once
-	ts   *schema.TypeSystem
-	err  error
-)
-
-func mustLoadSchema() *schema.TypeSystem {
-	once.Do(func() {
-		ts, err = ipld.LoadSchemaBytes(failureSchema)
-	})
-	if err != nil {
-		panic(fmt.Errorf("failed to load IPLD schema: %s", err))
-	}
-	return ts
+func (f *Failure) Build() (ipld.Node, error) {
+	return ucanipld.WrapWithRecovery(f, typ)
 }
 
-// returns the failure schematype
-func Type() schema.Type {
-	return mustLoadSchema().TypeByName("Failure")
+var (
+	typ schema.Type
+)
+
+func init() {
+	ts, err := ipld.LoadSchemaBytes(failureSchema)
+	if err != nil {
+		panic(fmt.Errorf("loading failure schema: %w", err))
+	}
+	typ = ts.TypeByName("Failure")
 }
