@@ -93,12 +93,17 @@ func NamedWithCurrentStackTrace(name string) NamedWithStackTrace {
 	return namedWithStackTrace{name, f}
 }
 
+type Failure interface {
+	error
+	Named
+}
+
 // Failure generates a Result from a golang error, using:
 //  1. a custom conversion to IPLD if present
 //  2. the golangs error message plus
 //     a. a name, if it is a named error
 //     b. a stack trace, if it has a stack trace
-func Failure(err error) AnyResult {
+func NewFailure(err error) AnyResult {
 	if ipldConvertableError, ok := err.(IPLDConvertableError); ok {
 		return Error(ipldConvertableError.ToIPLD())
 	}

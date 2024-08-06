@@ -8,3 +8,8 @@ import (
 type Link = ipld.Link
 type Block = block.Block
 type Node = ipld.Node
+
+// Datamodeler describes an object that can be modeled as IPLD data.
+type Datamodeler interface {
+	ToIPLD() Node
+}

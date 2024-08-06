@@ -35,34 +35,3 @@ type IssuedInvocation interface {
 func Invoke(issuer ucan.Signer, audience ucan.Principal, capability ucan.Capability[ucan.CaveatBuilder], options ...delegation.Option) (IssuedInvocation, error) {
 	return delegation.Delegate(issuer, audience, []ucan.Capability[ucan.CaveatBuilder]{capability}, options...)
 }
-
-type Ran struct {
-	invocation Invocation
-	link       ucan.Link
-}
-
-func (r Ran) Invocation() (Invocation, bool) {
-	return r.invocation, r.invocation != nil
-}
-
-func (r Ran) Link() ucan.Link {
-	if r.invocation != nil {
-		return r.invocation.Link()
-	}
-	return r.link
-}
-
-func FromInvocation(invocation Invocation) Ran {
-	return Ran{invocation, nil}
-}
-
-func FromLink(link ucan.Link) Ran {
-	return Ran{nil, link}
-}
-
-func (r Ran) WriteInto(bs blockstore.BlockWriter) (ipld.Link, error) {
-	if invocation, ok := r.Invocation(); ok {
-		return r.Link(), blockstore.WriteInto(invocation, bs)
-	}
-	return r.Link(), nil
-}

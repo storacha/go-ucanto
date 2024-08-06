@@ -11,6 +11,7 @@ import (
 	"github.com/web3-storage/go-ucanto/core/dag/blockstore"
 	"github.com/web3-storage/go-ucanto/core/delegation"
 	"github.com/web3-storage/go-ucanto/core/invocation"
+	"github.com/web3-storage/go-ucanto/core/invocation/ran"
 	"github.com/web3-storage/go-ucanto/core/ipld"
 	"github.com/web3-storage/go-ucanto/core/ipld/block"
 	"github.com/web3-storage/go-ucanto/core/ipld/codec/cbor"
@@ -29,7 +30,7 @@ type Effects interface {
 }
 
 // Receipt represents a view of the invocation receipt. This interface provides
-// an ergonomic API and allows you to reference linked IPLD objects of they are
+// an ergonomic API and allows you to reference linked IPLD objects if they are
 // included in the source DAG.
 type Receipt[O, X any] interface {
 	ipld.View
@@ -265,7 +266,7 @@ func wrapOrFail(value interface{}) (nd schema.TypedNode, err error) {
 	return
 }
 
-func Issue(issuer ucan.Signer, result result.AnyResult, ran invocation.Ran, opts ...Option) (AnyReceipt, error) {
+func Issue[O, X ipld.Node](issuer ucan.Signer, result result.Result[O, X], ran ran.Ran, opts ...Option) (Receipt[O, X], error) {
 	cfg := receiptConfig{}
 	for _, opt := range opts {
 		if err := opt(&cfg); err != nil {
@@ -309,16 +310,20 @@ func Issue(issuer ucan.Signer, result result.AnyResult, ran invocation.Ran, opts
 		}
 	}
 
-	resultModel := rdm.ResultModel[datamodel.Node, datamodel.Node]{}
+	resultModel := rdm.ResultModel[O, X]{}
 	if success, ok := result.Ok(); ok {
 		resultModel.Ok = &success
+		fmt.Println("success kind:")
+		fmt.Println(success.Kind().String())
 	}
 	if err, ok := result.Error(); ok {
 		resultModel.Err = &err
+		fmt.Println("error kind:")
+		fmt.Println(err.Kind().String())
 	}
 
 	issString := issuer.DID().String()
-	outcomeModel := rdm.OutcomeModel[datamodel.Node, datamodel.Node]{
+	outcomeModel := rdm.OutcomeModel[O, X]{
 		Ran:  invocationLink,
 		Out:  resultModel,
 		Fx:   effectsModel,
@@ -327,28 +332,28 @@ func Issue(issuer ucan.Signer, result result.AnyResult, ran invocation.Ran, opts
 		Prf:  prooflinks,
 	}
 
-	outcomeBytes, err := cbor.Encode(outcomeModel, anyReceiptTs.TypeByName("Outcome"))
+	outcomeBytes, err := cbor.Encode(&outcomeModel, anyReceiptTs.TypeByName("Outcome"))
 	if err != nil {
 		return nil, err
 	}
 	signature := issuer.Sign(outcomeBytes).Bytes()
 
-	receiptModel := rdm.ReceiptModel[datamodel.Node, datamodel.Node]{
+	receiptModel := rdm.ReceiptModel[O, X]{
 		Ocm: outcomeModel,
 		Sig: signature,
 	}
 
 	rt, err := block.Encode(receiptModel, anyReceiptTs.TypeByName("Receipt"), cbor.Codec, sha256.Hasher)
 	if err != nil {
-		return nil, fmt.Errorf("encoding UCAN: %s", err)
+		return nil, fmt.Errorf("encoding receipt: %s", err)
 	}
 
 	err = bs.Put(rt)
 	if err != nil {
-		return nil, fmt.Errorf("adding delegation root to store: %s", err)
+		return nil, fmt.Errorf("adding receipt root to store: %s", err)
 	}
 
-	return &receipt[datamodel.Node, datamodel.Node]{
+	return &receipt[O, X]{
 		rt:   rt,
 		blks: bs,
 		data: &receiptModel,

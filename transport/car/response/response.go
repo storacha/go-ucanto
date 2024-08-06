@@ -2,19 +2,29 @@ package response
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/web3-storage/go-ucanto/core/car"
 	"github.com/web3-storage/go-ucanto/core/dag/blockstore"
+	"github.com/web3-storage/go-ucanto/core/ipld"
 	"github.com/web3-storage/go-ucanto/core/message"
 	"github.com/web3-storage/go-ucanto/transport"
+	uhttp "github.com/web3-storage/go-ucanto/transport/http"
 )
 
 const ContentType = car.ContentType
 
+func Encode(msg message.AgentMessage) (transport.HTTPResponse, error) {
+	headers := http.Header{}
+	headers.Add("Content-Type", car.ContentType)
+	reader := car.Encode([]ipld.Link{msg.Root().Link()}, msg.Blocks())
+	return uhttp.NewHTTPResponse(http.StatusOK, reader, headers), nil
+}
+
 func Decode(response transport.HTTPResponse) (message.AgentMessage, error) {
 	roots, blocks, err := car.Decode(response.Body())
 	if err != nil {
-		return nil, fmt.Errorf("decoding response: %s", err)
+		return nil, fmt.Errorf("decoding CAR: %s", err)
 	}
 	bstore, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(blocks))
 	if err != nil {

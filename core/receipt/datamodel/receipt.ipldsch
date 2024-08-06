@@ -9,7 +9,8 @@ type Receipt struct {
 
 type Outcome struct {
   ran  Link
-  out  Result
+  # out  Result
+  out  Any
   fx   Effects
   meta {String:Any}
   iss  optional String

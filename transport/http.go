@@ -3,6 +3,8 @@ package transport
 import (
 	"io"
 	"net/http"
+
+	"github.com/web3-storage/go-ucanto/core/result"
 )
 
 type HTTPRequest interface {
@@ -11,5 +13,13 @@ type HTTPRequest interface {
 }
 
 type HTTPResponse interface {
-	HTTPRequest
+	Status() int
+	Headers() http.Header
+	Body() io.Reader
+}
+
+type HTTPError interface {
+	result.Failure
+	Status() int
+	Headers() http.Header
 }
