@@ -3,7 +3,7 @@ package server
 import (
 	"fmt"
 
-	"github.com/ipld/go-ipld-prime/node/bindnode"
+
 	"github.com/storacha-network/go-ucanto/core/ipld"
 	"github.com/storacha-network/go-ucanto/core/result"
 	sdm "github.com/storacha-network/go-ucanto/server/datamodel"
@@ -43,7 +43,7 @@ func (h *handlerNotFoundError[C]) Build() (ipld.Node, error) {
 			With: h.capability.With(),
 		},
 	}
-	return bindnode.Wrap(&mdl, sdm.HandlerNotFoundErrorType()), nil
+	return ipld.WrapWithRecovery(&mdl, sdm.HandlerNotFoundErrorType())
 }
 
 var _ HandlerNotFoundError[any] = (*handlerNotFoundError[any])(nil)
@@ -114,7 +114,7 @@ func (h *handlerExecutionError[C]) Build() (ipld.Node, error) {
 			Stack:   &cstack,
 		},
 	}
-	return bindnode.Wrap(&mdl, sdm.HandlerExecutionErrorType()), nil
+	return ipld.WrapWithRecovery(&mdl, sdm.HandlerExecutionErrorType())
 }
 
 var _ HandlerExecutionError[any] = (*handlerExecutionError[any])(nil)
@@ -161,7 +161,7 @@ func (i *invocationCapabilityError) Build() (ipld.Node, error) {
 		Message:      i.Error(),
 		Capabilities: capmdls,
 	}
-	return bindnode.Wrap(&mdl, sdm.InvocationCapabilityErrorType()), nil
+	return ipld.WrapWithRecovery(&mdl, sdm.InvocationCapabilityErrorType())
 }
 
 var _ InvocationCapabilityError = (*invocationCapabilityError)(nil)

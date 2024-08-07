@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
-	"github.com/ipld/go-ipld-prime/node/bindnode"
 	"github.com/ipld/go-ipld-prime/schema"
 	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
 	"github.com/storacha-network/go-ucanto/core/delegation"
@@ -43,24 +42,19 @@ type Receipt[O, X any] interface {
 	Signature() signature.SignatureView
 }
 
-type results[O, X any] struct {
-	model *rdm.ResultModel[O, X]
+func toResultModel[O, X any](res result.Result[O, X]) rdm.ResultModel[O, X] {
+	return result.MatchResultR1(res, func(ok O) rdm.ResultModel[O, X] {
+		return rdm.ResultModel[O, X]{&ok, nil}
+	}, func(err X) rdm.ResultModel[O, X] {
+		return rdm.ResultModel[O, X]{nil, &err}
+	})
 }
 
-func (r results[O, X]) Error() (X, bool) {
-	if r.model.Err != nil {
-		return *r.model.Err, true
+func fromResultModel[O, X any](resultModel rdm.ResultModel[O, X]) result.Result[O, X] {
+	if resultModel.Ok != nil {
+		return result.Ok[O, X](*resultModel.Ok)
 	}
-	var x X
-	return x, false
-}
-
-func (r results[O, X]) Ok() (O, bool) {
-	if r.model.Ok != nil {
-		return *r.model.Ok, true
-	}
-	var o O
-	return o, false
+	return result.Error[O, X](*resultModel.Err)
 }
 
 type effects struct {
@@ -127,7 +121,7 @@ func (r *receipt[O, X]) Meta() map[string]any {
 }
 
 func (r *receipt[O, X]) Out() result.Result[O, X] {
-	return results[O, X]{&r.data.Ocm.Out}
+	return fromResultModel(r.data.Ocm.Out)
 }
 
 func (r *receipt[O, X]) Ran() invocation.Invocation {
@@ -241,17 +235,7 @@ func WithJoin(join ipld.Link) Option {
 	}
 }
 
-func wrapOrFail(value interface{}) (nd schema.TypedNode, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
-		}
-	}()
-	nd = bindnode.Wrap(value, nil)
-	return
-}
-
-func Issue[O, X ipld.Builder](issuer ucan.Signer, result result.Result[O, X], ran ran.Ran, opts ...Option) (AnyReceipt, error) {
+func Issue[O, X ipld.Builder](issuer ucan.Signer, out result.Result[O, X], ran ran.Ran, opts ...Option) (AnyReceipt, error) {
 	cfg := receiptConfig{}
 	for _, opt := range opts {
 		if err := opt(&cfg); err != nil {
@@ -286,7 +270,7 @@ func Issue[O, X ipld.Builder](issuer ucan.Signer, result result.Result[O, X], ra
 	if cfg.meta != nil {
 		metaModel.Values = make(map[string]datamodel.Node, len(cfg.meta))
 		for k, v := range cfg.meta {
-			nd, err := wrapOrFail(v)
+			nd, err := ipld.WrapWithRecovery(v, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -295,22 +279,15 @@ func Issue[O, X ipld.Builder](issuer ucan.Signer, result result.Result[O, X], ra
 		}
 	}
 
-	resultModel := rdm.ResultModel[ipld.Node, ipld.Node]{}
-	if success, ok := result.Ok(); ok {
-		nd, err := success.Build()
-		if err != nil {
-			return nil, err
-		}
-		resultModel.Ok = &nd
+	nodeResult, err := result.MapResultR1(out, func(b O) (ipld.Node, error) {
+		return b.Build()
+	}, func(b X) (ipld.Node, error) {
+		return b.Build()
+	})
+	if err != nil {
+		return nil, err
 	}
-	if err, ok := result.Error(); ok {
-		nd, err := err.Build()
-		if err != nil {
-			return nil, err
-		}
-		resultModel.Err = &nd
-	}
-
+	resultModel := toResultModel(nodeResult)
 	issString := issuer.DID().String()
 	outcomeModel := rdm.OutcomeModel[ipld.Node, ipld.Node]{
 		Ran:  invocationLink,

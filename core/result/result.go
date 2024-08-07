@@ -6,41 +6,118 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/storacha-network/go-ucanto/core/ipld"
+	"github.com/storacha-network/go-ucanto/core/result/datamodel"
 )
 
 // https://github.com/ucan-wg/invocation/#6-result
+
 type Result[O any, X any] interface {
-	Ok() (O, bool)
-	Error() (X, bool)
+	isResult(ok O, err X)
 }
 
-type result[O, X ipld.Builder] struct {
-	ok  *O
-	err *X
+type okResult[O any, X any] struct {
+	value O
+}
+type errResult[O any, X any] struct {
+	value X
 }
 
-func (r *result[O, X]) Ok() (O, bool) {
-	if r.ok != nil {
-		return *r.ok, true
+func (o *okResult[O, X]) isResult(ok O, err X) {}
+
+func (e *errResult[O, X]) isResult(ok O, err X) {}
+
+func MatchResultR3[O any, X any, R0, R1, R2 any](
+	result Result[O, X],
+	onOk func(ok O) (R0, R1, R2),
+	onError func(err X) (R0, R1, R2),
+) (R0, R1, R2) {
+	switch v := result.(type) {
+	case *okResult[O, X]:
+		return onOk(v.value)
+	case *errResult[O, X]:
+		return onError(v.value)
+	default:
+		panic("unexpected result type")
 	}
-	var o O
-	return o, false
 }
 
-func (r *result[O, X]) Error() (X, bool) {
-	if r.err != nil {
-		return *r.err, true
+func MatchResultR2[O any, X any, R0, R1 any](
+	result Result[O, X],
+	onOk func(ok O) (R0, R1),
+	onError func(err X) (R0, R1),
+) (R0, R1) {
+	switch v := result.(type) {
+	case *okResult[O, X]:
+		return onOk(v.value)
+	case *errResult[O, X]:
+		return onError(v.value)
+	default:
+		panic("unexpected result type")
 	}
-	var x X
-	return x, false
 }
 
-func Ok[O ipld.Builder](value O) Result[O, ipld.Builder] {
-	return &result[O, ipld.Builder]{&value, nil}
+func MatchResultR1[O any, X any, T0 any](
+	result Result[O, X],
+	onOk func(ok O) T0,
+	onError func(err X) T0,
+) T0 {
+	switch v := result.(type) {
+	case *okResult[O, X]:
+		return onOk(v.value)
+	case *errResult[O, X]:
+		return onError(v.value)
+	default:
+		panic("unexpected result type")
+	}
 }
 
-func Error[X ipld.Builder](err X) Result[ipld.Builder, X] {
-	return &result[ipld.Builder, X]{nil, &err}
+func MatchResultR0[O any, X any](
+	result Result[O, X],
+	onOk func(ok O),
+	onError func(err X),
+) {
+	switch v := result.(type) {
+	case *okResult[O, X]:
+		onOk(v.value)
+	case *errResult[O, X]:
+		onError(v.value)
+	default:
+		panic("unexpected result type")
+	}
+}
+
+func Ok[O, X any](value O) Result[O, X] {
+	return &okResult[O, X]{value}
+}
+
+func Error[O, X any](value X) Result[O, X] {
+	return &errResult[O, X]{value}
+}
+
+func MapOk[O, X, O2 any](result Result[O, X], mapFn func(O) O2) Result[O2, X] {
+	return MapResultR0(result, mapFn, func(err X) X { return err })
+}
+
+func MapError[O, X, X2 any](result Result[O, X], mapFn func(X) X2) Result[O, X2] {
+	return MapResultR0(result, func(ok O) O { return ok }, mapFn)
+}
+
+func MapResultR0[O, X, O2, X2 any](result Result[O, X], mapOkFn func(O) O2, mapErrFn func(X) X2) Result[O2, X2] {
+	return MatchResultR1(result, func(ok O) Result[O2, X2] {
+		return Ok[O2, X2](mapOkFn(ok))
+	}, func(err X) Result[O2, X2] {
+		return Error[O2, X2](mapErrFn(err))
+	})
+}
+
+func MapResultR1[O, X, O2, X2, R1 any](result Result[O, X], mapOkFn func(O) (O2, R1), mapErrFn func(X) (X2, R1)) (Result[O2, X2], R1) {
+	return MatchResultR2(result, func(ok O) (Result[O2, X2], R1) {
+		ok2, r1 := mapOkFn(ok)
+		return Ok[O2, X2](ok2), r1
+	}, func(err X) (Result[O2, X2], R1) {
+		err2, r1 := mapErrFn(err)
+		return Error[O2, X2](err2), r1
+	})
 }
 
 // Named is an error that you can read a name from
@@ -56,7 +133,12 @@ type WithStackTrace interface {
 // IPLDConvertableError is an error with a custom method to convert to an IPLD Node
 type IPLDConvertableError interface {
 	error
-	ToIPLD() ipld.Node
+	ipld.Builder
+}
+
+type Failure interface {
+	error
+	Named
 }
 
 type NamedWithStackTrace interface {
@@ -91,29 +173,19 @@ func NamedWithCurrentStackTrace(name string) NamedWithStackTrace {
 	return namedWithStackTrace{name, f}
 }
 
-type Failure interface {
-	error
-	Named
+func NewFailure(err error) Result[ipld.Builder, ipld.Builder] {
+	if ipldConvertableError, ok := err.(IPLDConvertableError); ok {
+		return Error[ipld.Builder, ipld.Builder](ipldConvertableError)
+	}
+
+	failure := datamodel.Failure{Message: err.Error()}
+	if named, ok := err.(Named); ok {
+		name := named.Name()
+		failure.Name = &name
+	}
+	if withStackTrace, ok := err.(WithStackTrace); ok {
+		stack := withStackTrace.Stack()
+		failure.Stack = &stack
+	}
+	return Error[ipld.Builder, ipld.Builder](&failure)
 }
-
-// Failure generates a Result from a golang error, using:
-//  1. a custom conversion to IPLD if present
-//  2. the golangs error message plus
-//     a. a name, if it is a named error
-//     b. a stack trace, if it has a stack trace
-// func NewFailure(err error) AnyResult {
-// 	if ipldConvertableError, ok := err.(IPLDConvertableError); ok {
-// 		return Error(ipldConvertableError.ToIPLD())
-// 	}
-
-// 	failure := datamodel.Failure{Message: err.Error()}
-// 	if named, ok := err.(Named); ok {
-// 		name := named.Name()
-// 		failure.Name = &name
-// 	}
-// 	if withStackTrace, ok := err.(WithStackTrace); ok {
-// 		stack := withStackTrace.Stack()
-// 		failure.Stack = &stack
-// 	}
-// 	return Error(bindnode.Wrap(&failure, datamodel.Type()))
-// }

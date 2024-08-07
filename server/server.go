@@ -316,21 +316,21 @@ func Run(server Server, invocation ServiceInvocation) (receipt.AnyReceipt, error
 	// Invocation needs to have one single capability
 	if len(caps) != 1 {
 		err := NewInvocationCapabilityError(invocation.Capabilities())
-		return receipt.Issue(server.ID(), result.Error(err), ran.FromInvocation(invocation))
+		return receipt.Issue(server.ID(), result.NewFailure(err), ran.FromInvocation(invocation))
 	}
 
 	cap := caps[0]
 	handle, ok := server.Service()[cap.Can()]
 	if !ok {
 		err := NewHandlerNotFoundError(cap)
-		return receipt.Issue(server.ID(), result.Error(err), ran.FromInvocation(invocation))
+		return receipt.Issue(server.ID(), result.NewFailure(err), ran.FromInvocation(invocation))
 	}
 
 	outcome, err := handle(invocation, server.Context())
 	if err != nil {
 		herr := NewHandlerExecutionError(err, cap)
 		server.Catch(herr)
-		return receipt.Issue(server.ID(), result.Error(herr), ran.FromInvocation(invocation))
+		return receipt.Issue(server.ID(), result.NewFailure(herr), ran.FromInvocation(invocation))
 	}
 
 	fx := outcome.Fx()
@@ -343,7 +343,7 @@ func Run(server Server, invocation ServiceInvocation) (receipt.AnyReceipt, error
 	if err != nil {
 		herr := NewHandlerExecutionError(err, cap)
 		server.Catch(herr)
-		return receipt.Issue(server.ID(), result.Error(herr), ran.FromInvocation(invocation))
+		return receipt.Issue(server.ID(), result.NewFailure(herr), ran.FromInvocation(invocation))
 	}
 
 	return rcpt, nil
