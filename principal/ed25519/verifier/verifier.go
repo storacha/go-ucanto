@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/multiformats/go-varint"
-	"github.com/web3-storage/go-ucanto/did"
-	"github.com/web3-storage/go-ucanto/principal"
-	"github.com/web3-storage/go-ucanto/ucan/crypto/signature"
+	"github.com/storacha-network/go-ucanto/did"
+	"github.com/storacha-network/go-ucanto/principal"
+	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
 )
 
 const Code = 0xed

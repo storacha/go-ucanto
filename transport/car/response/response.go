@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/web3-storage/go-ucanto/core/car"
-	"github.com/web3-storage/go-ucanto/core/dag/blockstore"
-	"github.com/web3-storage/go-ucanto/core/ipld"
-	"github.com/web3-storage/go-ucanto/core/message"
-	"github.com/web3-storage/go-ucanto/transport"
-	uhttp "github.com/web3-storage/go-ucanto/transport/http"
+	"github.com/storacha-network/go-ucanto/core/car"
+	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
+	"github.com/storacha-network/go-ucanto/core/ipld"
+	"github.com/storacha-network/go-ucanto/core/message"
+	"github.com/storacha-network/go-ucanto/transport"
+	uhttp "github.com/storacha-network/go-ucanto/transport/http"
 )
 
 const ContentType = car.ContentType

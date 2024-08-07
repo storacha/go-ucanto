@@ -1,7 +1,7 @@
 package principal
 
 import (
-	"github.com/web3-storage/go-ucanto/ucan"
+	"github.com/storacha-network/go-ucanto/ucan"
 )
 
 type Signer interface {

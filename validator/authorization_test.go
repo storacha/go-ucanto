@@ -3,8 +3,8 @@ package validator
 import (
 	"testing"
 
-	"github.com/web3-storage/go-ucanto/principal/ed25519/signer"
-	"github.com/web3-storage/go-ucanto/ucan"
+	"github.com/storacha-network/go-ucanto/principal/ed25519/signer"
+	"github.com/storacha-network/go-ucanto/ucan"
 )
 
 func TestIsSelfIssued(t *testing.T) {

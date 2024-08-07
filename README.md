@@ -5,7 +5,7 @@ Ucanto UCAN RPC in Golang.
 ## Install
 
 ```console
-go get github.com/web3-storage/go-ucanto
+go get github.com/storacha-network/go-ucanto
 ```
 
 ## Usage
@@ -17,14 +17,14 @@ import (
   "net/url"
   "ioutil"
 
-  "github.com/web3-storage/go-ucanto/client"
-  "github.com/web3-storage/go-ucanto/did"
-  ed25519 "github.com/web3-storage/go-ucanto/principal/ed25519/signer"
-  "github.com/web3-storage/go-ucanto/transport/car"
-  "github.com/web3-storage/go-ucanto/transport/http"
-  "github.com/web3-storage/go-ucanto/core/delegation"
-  "github.com/web3-storage/go-ucanto/core/invocation"
-  "github.com/web3-storage/go-ucanto/core/receipt"
+  "github.com/storacha-network/go-ucanto/client"
+  "github.com/storacha-network/go-ucanto/did"
+  ed25519 "github.com/storacha-network/go-ucanto/principal/ed25519/signer"
+  "github.com/storacha-network/go-ucanto/transport/car"
+  "github.com/storacha-network/go-ucanto/transport/http"
+  "github.com/storacha-network/go-ucanto/core/delegation"
+  "github.com/storacha-network/go-ucanto/core/invocation"
+  "github.com/storacha-network/go-ucanto/core/receipt"
 )
 
 // service URL & DID
@@ -104,15 +104,15 @@ fmt.Println(rcpt.Out().Ok())
 
 ## API
 
-[pkg.go.dev Reference](https://pkg.go.dev/github.com/web3-storage/go-ucanto)
+[pkg.go.dev Reference](https://pkg.go.dev/github.com/storacha-network/go-ucanto)
 
 ## Related
 
-* [Ucanto in Javascript](https://github.com/web3-storage/ucanto)
+* [Ucanto in Javascript](https://github.com/storacha-network/ucanto)
 
 ## Contributing
 
-Feel free to join in. All welcome. Please [open an issue](https://github.com/web3-storage/go-ucanto/issues)!
+Feel free to join in. All welcome. Please [open an issue](https://github.com/storacha-network/go-ucanto/issues)!
 
 ## License
 

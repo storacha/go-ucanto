@@ -1,9 +1,9 @@
 package delegation
 
 import (
-	"github.com/web3-storage/go-ucanto/core/dag/blockstore"
-	"github.com/web3-storage/go-ucanto/core/ipld"
-	"github.com/web3-storage/go-ucanto/ucan"
+	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
+	"github.com/storacha-network/go-ucanto/core/ipld"
+	"github.com/storacha-network/go-ucanto/ucan"
 )
 
 type Proof struct {

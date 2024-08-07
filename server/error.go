@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/ipld/go-ipld-prime/node/bindnode"
-	"github.com/web3-storage/go-ucanto/core/ipld"
-	"github.com/web3-storage/go-ucanto/core/result"
-	sdm "github.com/web3-storage/go-ucanto/server/datamodel"
-	"github.com/web3-storage/go-ucanto/ucan"
+	"github.com/storacha-network/go-ucanto/core/ipld"
+	"github.com/storacha-network/go-ucanto/core/result"
+	sdm "github.com/storacha-network/go-ucanto/server/datamodel"
+	"github.com/storacha-network/go-ucanto/ucan"
 )
 
 type HandlerNotFoundError[Caveats any] interface {

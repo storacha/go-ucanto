@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"hash"
 
-	"github.com/web3-storage/go-ucanto/core/invocation"
-	"github.com/web3-storage/go-ucanto/core/ipld/block"
-	"github.com/web3-storage/go-ucanto/core/iterable"
-	"github.com/web3-storage/go-ucanto/core/message"
-	"github.com/web3-storage/go-ucanto/transport"
-	"github.com/web3-storage/go-ucanto/ucan"
+	"github.com/storacha-network/go-ucanto/core/invocation"
+	"github.com/storacha-network/go-ucanto/core/ipld/block"
+	"github.com/storacha-network/go-ucanto/core/iterable"
+	"github.com/storacha-network/go-ucanto/core/message"
+	"github.com/storacha-network/go-ucanto/transport"
+	"github.com/storacha-network/go-ucanto/ucan"
 )
 
 type Connection interface {
