@@ -48,8 +48,8 @@ type HandlerExecutionErrorModel struct {
 	Name       *string
 	Message    string
 	Stack      *string
-	Capability CapabilityModel
 	Cause      FailureModel
+	Capability CapabilityModel
 }
 
 func InvocationCapabilityErrorType() schema.Type {

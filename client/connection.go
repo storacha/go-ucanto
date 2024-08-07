@@ -10,6 +10,7 @@ import (
 	"github.com/storacha-network/go-ucanto/core/iterable"
 	"github.com/storacha-network/go-ucanto/core/message"
 	"github.com/storacha-network/go-ucanto/transport"
+	"github.com/storacha-network/go-ucanto/transport/car"
 	"github.com/storacha-network/go-ucanto/ucan"
 )
 
@@ -25,6 +26,7 @@ type Option func(cfg *connConfig) error
 
 type connConfig struct {
 	hasher func() hash.Hash
+	codec  transport.OutboundCodec
 }
 
 // WithHasher configures the hasher factory.
@@ -35,14 +37,34 @@ func WithHasher(hasher func() hash.Hash) Option {
 	}
 }
 
-func NewConnection(id ucan.Principal, codec transport.OutboundCodec, channel transport.Channel, options ...Option) (Connection, error) {
-	cfg := connConfig{sha256.New}
+// WithOutboundCodec configures the codec used to encode requests and decode
+// responses.
+func WithOutboundCodec(codec transport.OutboundCodec) Option {
+	return func(cfg *connConfig) error {
+		cfg.codec = codec
+		return nil
+	}
+}
+
+func NewConnection(id ucan.Principal, channel transport.Channel, options ...Option) (Connection, error) {
+	cfg := connConfig{hasher: sha256.New}
 	for _, opt := range options {
 		if err := opt(&cfg); err != nil {
 			return nil, err
 		}
 	}
-	c := conn{id, codec, channel, cfg.hasher}
+
+	hasher := cfg.hasher
+	if hasher == nil {
+		hasher = sha256.New
+	}
+
+	codec := cfg.codec
+	if codec == nil {
+		codec = car.NewCAROutboundCodec()
+	}
+
+	c := conn{id, codec, channel, hasher}
 	return &c, nil
 }
 

@@ -108,7 +108,7 @@ func NewServer(id principal.Signer, options ...Option) (ServerView, error) {
 	catch := cfg.catch
 	if catch == nil {
 		catch = func(err HandlerExecutionError[any]) {
-			fmt.Fprintf(os.Stderr, "Error: %s", err.Error())
+			fmt.Fprintf(os.Stderr, "error: %s\n", err.Error())
 		}
 	}
 
@@ -120,7 +120,7 @@ func NewServer(id principal.Signer, options ...Option) (ServerView, error) {
 	}
 
 	ctx := &context{id: id, canIssue: canIssue, principal: &principalParser{}}
-	svr := &server{id: id, service: cfg.service, context: ctx, codec: codec}
+	svr := &server{id: id, service: cfg.service, context: ctx, codec: codec, catch: catch}
 	return svr, nil
 }
 

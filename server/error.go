@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 
-
 	"github.com/storacha-network/go-ucanto/core/ipld"
 	"github.com/storacha-network/go-ucanto/core/result"
 	sdm "github.com/storacha-network/go-ucanto/server/datamodel"
@@ -112,6 +111,10 @@ func (h *handlerExecutionError[C]) Build() (ipld.Node, error) {
 			Name:    &cname,
 			Message: h.cause.Error(),
 			Stack:   &cstack,
+		},
+		Capability: sdm.CapabilityModel{
+			Can:  h.capability.Can(),
+			With: h.capability.With(),
 		},
 	}
 	return ipld.WrapWithRecovery(&mdl, sdm.HandlerExecutionErrorType())

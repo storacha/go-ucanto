@@ -1,10 +1,10 @@
 type HandlerExecutionError struct {
+  error Bool
 	name optional String
 	message String
 	stack optional String
-  error Bool
-  capability Capability
   cause Failure
+  capability Capability
 }
 
 type Capability struct {

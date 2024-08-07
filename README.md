@@ -62,9 +62,8 @@ capability := ucan.NewCapability(
 )
 
 // create invocation(s) to perform a task with granted capabilities
-invocations := []invocation.Invocation{
-  invocation.Invoke(signer, audience, capability, delegation.WithProofs(...))
-}
+inv, _ := invocation.Invoke(signer, audience, capability, delegation.WithProofs(...))
+invocations := []invocation.Invocation{inv}
 
 // send the invocation(s) to the service
 resp, _ := client.Execute(invocations, conn)

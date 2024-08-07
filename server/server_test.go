@@ -13,11 +13,10 @@ import (
 	"github.com/storacha-network/go-ucanto/core/ipld"
 	"github.com/storacha-network/go-ucanto/core/receipt"
 	"github.com/storacha-network/go-ucanto/core/result"
-	"github.com/storacha-network/go-ucanto/principal"
 	"github.com/storacha-network/go-ucanto/principal/ed25519/signer"
 	sdm "github.com/storacha-network/go-ucanto/server/datamodel"
 	"github.com/storacha-network/go-ucanto/server/transaction"
-	"github.com/storacha-network/go-ucanto/transport/car"
+	"github.com/storacha-network/go-ucanto/testing/helpers"
 	"github.com/storacha-network/go-ucanto/ucan"
 )
 
@@ -50,30 +49,13 @@ func (ok *uploadAddSuccess) Build() (ipld.Node, error) {
 	return nb.Build(), nil
 }
 
-func generateSigner(t testing.TB) principal.Signer {
-	t.Helper()
-	signer, err := signer.Generate()
-	if err != nil {
-		t.Fatalf("generating key: %v", err)
-	}
-	return signer
-}
-
 func TestHandlerNotFound(t *testing.T) {
-	service := generateSigner(t)
-	alice := generateSigner(t)
-	space := generateSigner(t)
+	service := helpers.Must(signer.Generate())
+	alice := helpers.Must(signer.Generate())
+	space := helpers.Must(signer.Generate())
 
-	server, err := NewServer(service)
-	if err != nil {
-		t.Fatalf("creating service: %v", err)
-	}
-
-	codec := car.NewCAROutboundCodec()
-	conn, err := client.NewConnection(service, codec, server)
-	if err != nil {
-		t.Fatalf("creating connection: %v", err)
-	}
+	server := helpers.Must(NewServer(service))
+	conn := helpers.Must(client.NewConnection(service, server))
 
 	rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
 	capability := ucan.NewCapability(
@@ -82,17 +64,8 @@ func TestHandlerNotFound(t *testing.T) {
 		ucan.CaveatBuilder(&uploadAddCaveats{Root: rt}),
 	)
 
-	// create invocation(s) to perform a task with granted capabilities
-	inv, _ := invocation.Invoke(alice, service, capability)
-	invs := []invocation.Invocation{inv}
-
-	// send the invocation(s) to the service
-	resp, err := client.Execute(invs, conn)
-	if err != nil {
-		t.Fatalf("requesting service: %v", err)
-	}
-
-	// get the receipt link for the invocation from the response
+	invs := []invocation.Invocation{helpers.Must(invocation.Invoke(alice, service, capability))}
+	resp := helpers.Must(client.Execute(invs, conn))
 	rcptlnk, ok := resp.Get(invs[0].Link())
 	if !ok {
 		t.Fatalf("missing receipt for invocation: %s", invs[0].Link())
@@ -105,16 +78,8 @@ func TestHandlerNotFound(t *testing.T) {
 		} representation keyed
 	`)}, []byte("\n"))
 
-	reader, err := receipt.NewReceiptReader[ipld.Node, sdm.HandlerNotFoundErrorModel](rcptsch)
-	if err != nil {
-		t.Fatalf("creating reader: %v", err)
-	}
-
-	// read the receipt for the invocation from the response
-	rcpt, err := reader.Read(rcptlnk, resp.Blocks())
-	if err != nil {
-		t.Fatalf("reading receipt: %v", err)
-	}
+	reader := helpers.Must(receipt.NewReceiptReader[ipld.Node, sdm.HandlerNotFoundErrorModel](rcptsch))
+	rcpt := helpers.Must(reader.Read(rcptlnk, resp.Blocks()))
 
 	result.MatchResultR0(rcpt.Out(), func(ipld.Node) {
 		t.Fatalf("expected error: %s", invs[0].Link())
@@ -124,40 +89,26 @@ func TestHandlerNotFound(t *testing.T) {
 }
 
 func TestSimpleHandler(t *testing.T) {
-	service := generateSigner(t)
-	alice := generateSigner(t)
-	space := generateSigner(t)
+	service := helpers.Must(signer.Generate())
+	alice := helpers.Must(signer.Generate())
+	space := helpers.Must(signer.Generate())
 
 	rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
 	nb := uploadAddCaveats{Root: rt}
-	// TODO: this should be a definition not an instance
-	cap := ucan.NewCapability("upload/add", space.DID().String(), ucan.CaveatBuilder(&nb))
+	// TODO: this should be a descriptor not an instance
+	cap := ucan.NewCapability("upload/add", space.DID().String(), &nb)
 
-	server, err := NewServer(
+	server := helpers.Must(NewServer(
 		service,
-		WithServiceMethod("upload/add", Provide(cap, func(cap ucan.Capability[ucan.CaveatBuilder], inv invocation.Invocation, ctx InvocationContext) (transaction.Transaction[*uploadAddSuccess, ipld.Builder], error) {
-			return transaction.NewTransaction(result.Ok[*uploadAddSuccess, ipld.Builder](&uploadAddSuccess{Status: "done"})), nil
+		WithServiceMethod("upload/add", Provide(cap, func(cap ucan.Capability[*uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (transaction.Transaction[*uploadAddSuccess, ipld.Builder], error) {
+			r := result.Ok[*uploadAddSuccess, ipld.Builder](&uploadAddSuccess{Status: "done"})
+			return transaction.NewTransaction(r), nil
 		})),
-	)
-	if err != nil {
-		t.Fatalf("creating service: %v", err)
-	}
+	))
 
-	codec := car.NewCAROutboundCodec()
-	conn, err := client.NewConnection(service, codec, server)
-	if err != nil {
-		t.Fatalf("creating connection: %v", err)
-	}
-
-	// create invocation(s) to perform a task with granted capabilities
-	inv, _ := invocation.Invoke(alice, service, cap)
-	invs := []invocation.Invocation{inv}
-
-	// send the invocation(s) to the service
-	resp, err := client.Execute(invs, conn)
-	if err != nil {
-		t.Fatalf("requesting service: %v", err)
-	}
+	conn := helpers.Must(client.NewConnection(service, server))
+	invs := []invocation.Invocation{helpers.Must(invocation.Invoke(alice, service, cap))}
+	resp := helpers.Must(client.Execute(invs, conn))
 
 	// get the receipt link for the invocation from the response
 	rcptlnk, ok := resp.Get(invs[0].Link())
@@ -176,16 +127,8 @@ func TestSimpleHandler(t *testing.T) {
 		}
 	`)}, []byte("\n"))
 
-	reader, err := receipt.NewReceiptReader[*uploadAddSuccess, ipld.Node](rcptsch)
-	if err != nil {
-		t.Fatalf("creating reader: %v", err)
-	}
-
-	// read the receipt for the invocation from the response
-	rcpt, err := reader.Read(rcptlnk, resp.Blocks())
-	if err != nil {
-		t.Fatalf("reading receipt: %v", err)
-	}
+	reader := helpers.Must(receipt.NewReceiptReader[*uploadAddSuccess, ipld.Node](rcptsch))
+	rcpt := helpers.Must(reader.Read(rcptlnk, resp.Blocks()))
 
 	result.MatchResultR0(rcpt.Out(), func(ok *uploadAddSuccess) {
 		fmt.Printf("%+v\n", ok)
@@ -197,30 +140,44 @@ func TestSimpleHandler(t *testing.T) {
 	})
 }
 
-// func TestHandlerExecutionError(t *testing.T) {
-// 	service, err := signer.Generate()
-// 	if err != nil {
-// 		t.Fatalf("generating service key: %v", err)
-// 	}
+func TestHandlerExecutionError(t *testing.T) {
+	service := helpers.Must(signer.Generate())
+	alice := helpers.Must(signer.Generate())
+	space := helpers.Must(signer.Generate())
 
-// 	space, err := signer.Generate()
-// 	if err != nil {
-// 		t.Fatalf("generating space key: %v", err)
-// 	}
+	rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
+	nb := uploadAddCaveats{Root: rt}
+	// TODO: this should be a descriptor not an instance
+	cap := ucan.NewCapability("upload/add", space.DID().String(), &nb)
 
-// 	rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
-// 	nb := uploadAddCaveats{root: rt}
-// 	cap := ucan.NewCapability("upload/add", space.DID().String(), nb)
-// 	hdlr := func(capability ucan.Capability[uploadAddCaveats], invocation invocation.Invocation, context InvocationContext) () {
+	server := helpers.Must(NewServer(
+		service,
+		WithServiceMethod("upload/add", Provide(cap, func(cap ucan.Capability[*uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (transaction.Transaction[*uploadAddSuccess, ipld.Builder], error) {
+			return nil, fmt.Errorf("test error")
+		})),
+	))
+	conn := helpers.Must(client.NewConnection(service, server))
 
-// 	}
+	invs := []invocation.Invocation{helpers.Must(invocation.Invoke(alice, service, cap))}
+	resp := helpers.Must(client.Execute(invs, conn))
+	rcptlnk, ok := resp.Get(invs[0].Link())
+	if !ok {
+		t.Fatalf("missing receipt for invocation: %s", invs[0].Link())
+	}
 
-// 	definition := map[string]ServiceMethod[invocation.Invocation, ipld.Datamodeler, ipld.Datamodeler]{
-// 		"upload/add": Provide(cap, hdlr),
-// 	}
+	rcptsch := bytes.Join([][]byte{sdm.Schema(), []byte(`
+		type Result union {
+			| Any "ok"
+			| HandlerExecutionError "error"
+		} representation keyed
+	`)}, []byte("\n"))
 
-// 	svr, err := NewServer(service)
-// 	if err != nil {
-// 		t.Fatalf("creating service: %v", err)
-// 	}
-// }
+	reader := helpers.Must(receipt.NewReceiptReader[ipld.Node, sdm.HandlerExecutionErrorModel](rcptsch))
+	rcpt := helpers.Must(reader.Read(rcptlnk, resp.Blocks()))
+
+	result.MatchResultR0(rcpt.Out(), func(ipld.Node) {
+		t.Fatalf("expected error: %s", invs[0].Link())
+	}, func(rerr sdm.HandlerExecutionErrorModel) {
+		fmt.Printf("%+v\n", rerr)
+	})
+}
