@@ -17,6 +17,7 @@ import (
 	"github.com/storacha-network/go-ucanto/did"
 	"github.com/storacha-network/go-ucanto/principal"
 	"github.com/storacha-network/go-ucanto/principal/ed25519/verifier"
+	"github.com/storacha-network/go-ucanto/server/transaction"
 	"github.com/storacha-network/go-ucanto/transport"
 	"github.com/storacha-network/go-ucanto/transport/car"
 	thttp "github.com/storacha-network/go-ucanto/transport/http"
@@ -48,19 +49,12 @@ type InvocationContext interface {
 	ValidateAuthorization(auth validator.Authorization) result.Failure
 }
 
-// Transaction defines a result & effect pair, used by provider that wishes to
-// return results that have effects.
-type Transaction[O, X ipld.Builder] interface {
-	Out() result.Result[O, X]
-	Fx() receipt.Effects
-}
-
 // ServiceMethod is an invocation handler.
-type ServiceMethod[I invocation.Invocation, O, X ipld.Builder] func(input I, context InvocationContext) (Transaction[O, X], error)
+type ServiceMethod[O, X ipld.Builder] func(input invocation.Invocation, context InvocationContext) (transaction.Transaction[O, X], error)
 
-// ServiceDefinition is a mapping of service names to handlers, used to define a
+// Service is a mapping of service names to handlers, used to define a
 // service implementation.
-type ServiceDefinition = map[string]ServiceMethod[invocation.Invocation, ipld.Builder, ipld.Builder]
+type Service = map[string]ServiceMethod[ipld.Builder, ipld.Builder]
 
 type ServiceInvocation = invocation.IssuedInvocation
 
@@ -71,7 +65,7 @@ type Server interface {
 	Codec() transport.InboundCodec
 	Context() InvocationContext
 	// Service is the actual service providing capability handlers.
-	Service() ServiceDefinition
+	Service() Service
 	Catch(err HandlerExecutionError[any])
 }
 
@@ -93,55 +87,8 @@ type AuthorizationValidatorFunc func(auth validator.Authorization) result.Failur
 // to be logged.
 type ErrorHandlerFunc func(err HandlerExecutionError[any])
 
-// Option is an option configuring a ucanto server.
-type Option func(cfg *srvConfig) error
-
-type srvConfig struct {
-	codec                 transport.InboundCodec
-	validateAuthorization AuthorizationValidatorFunc
-	canIssue              CanIssueFunc
-	catch                 ErrorHandlerFunc
-}
-
-// WithInboundCodec configures the codec used to decode requests and encode
-// responses.
-func WithInboundCodec(codec transport.InboundCodec) Option {
-	return func(cfg *srvConfig) error {
-		cfg.codec = codec
-		return nil
-	}
-}
-
-// WithAuthValidator configures the authorization validator function. The
-// primary purpose of the validator is to allow checking UCANs for revocation.
-func WithAuthValidator(fn AuthorizationValidatorFunc) Option {
-	return func(cfg *srvConfig) error {
-		cfg.validateAuthorization = fn
-		return nil
-	}
-}
-
-// WithErrorHandler configures a function to be called when errors occur during
-// execution of a handler.
-func WithErrorHandler(fn ErrorHandlerFunc) Option {
-	return func(cfg *srvConfig) error {
-		cfg.catch = fn
-		return nil
-	}
-}
-
-// WithCanIssue configures a function that determines whether a given capability
-// can be issued by a given DID or whether it needs to be delegated to the
-// issuer.
-func WithCanIssue(fn CanIssueFunc) Option {
-	return func(cfg *srvConfig) error {
-		cfg.canIssue = fn
-		return nil
-	}
-}
-
-func NewServer(id principal.Signer, service ServiceDefinition, options ...Option) (ServerView, error) {
-	cfg := srvConfig{}
+func NewServer(id principal.Signer, options ...Option) (ServerView, error) {
+	cfg := srvConfig{service: Service{}}
 	for _, opt := range options {
 		if err := opt(&cfg); err != nil {
 			return nil, err
@@ -173,7 +120,7 @@ func NewServer(id principal.Signer, service ServiceDefinition, options ...Option
 	}
 
 	ctx := &context{id: id, canIssue: canIssue, principal: &principalParser{}}
-	svr := &server{id: id, service: service, context: ctx, codec: codec}
+	svr := &server{id: id, service: cfg.service, context: ctx, codec: codec}
 	return svr, nil
 }
 
@@ -212,7 +159,7 @@ var _ InvocationContext = (*context)(nil)
 
 type server struct {
 	id      principal.Signer
-	service ServiceDefinition
+	service Service
 	context InvocationContext
 	codec   transport.InboundCodec
 	catch   ErrorHandlerFunc
@@ -222,7 +169,7 @@ func (srv *server) ID() principal.Signer {
 	return srv.id
 }
 
-func (srv *server) Service() ServiceDefinition {
+func (srv *server) Service() Service {
 	return srv.service
 }
 

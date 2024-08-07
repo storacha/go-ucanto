@@ -44,9 +44,9 @@ type Receipt[O, X any] interface {
 
 func toResultModel[O, X any](res result.Result[O, X]) rdm.ResultModel[O, X] {
 	return result.MatchResultR1(res, func(ok O) rdm.ResultModel[O, X] {
-		return rdm.ResultModel[O, X]{&ok, nil}
+		return rdm.ResultModel[O, X]{Ok: &ok, Err: nil}
 	}, func(err X) rdm.ResultModel[O, X] {
-		return rdm.ResultModel[O, X]{nil, &err}
+		return rdm.ResultModel[O, X]{Ok: nil, Err: &err}
 	})
 }
 
