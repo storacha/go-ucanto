@@ -1,19 +1,19 @@
 type HandlerExecutionError struct {
-  error Bool
+	error Bool
 	name optional String
 	message String
 	stack optional String
-  cause Failure
-  capability Capability
+	cause Failure
+	capability Capability
 }
 
 type Capability struct {
-  can String
-  with String
+	can String
+	with String
 }
 
 type Failure struct {
-  name optional String
+	name optional String
 	message String
 	stack optional String
 }
@@ -21,13 +21,13 @@ type Failure struct {
 type InvocationCapabilityError struct {
 	name optional String
 	message String
-  error Bool
-  capabilities [Capability]
+	error Bool
+	capabilities [Capability]
 }
 
 type HandlerNotFoundError struct {
-  error Bool
+	error Bool
 	name optional String
 	message String
-  capability Capability
+	capability Capability
 }
