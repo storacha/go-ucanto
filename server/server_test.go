@@ -84,7 +84,10 @@ func TestHandlerNotFound(t *testing.T) {
 	result.MatchResultR0(rcpt.Out(), func(ipld.Node) {
 		t.Fatalf("expected error: %s", invs[0].Link())
 	}, func(rerr sdm.HandlerNotFoundErrorModel) {
-		fmt.Printf("%+v\n", rerr)
+		fmt.Printf("%s %+v\n", *rerr.Name, rerr)
+		if *rerr.Name != "HandlerNotFoundError" {
+			t.Fatalf("unexpected error name: %s", *rerr.Name)
+		}
 	})
 }
 
@@ -178,6 +181,9 @@ func TestHandlerExecutionError(t *testing.T) {
 	result.MatchResultR0(rcpt.Out(), func(ipld.Node) {
 		t.Fatalf("expected error: %s", invs[0].Link())
 	}, func(rerr sdm.HandlerExecutionErrorModel) {
-		fmt.Printf("%+v\n", rerr)
+		fmt.Printf("%s %+v\n", *rerr.Name, rerr)
+		if *rerr.Name != "HandlerExecutionError" {
+			t.Fatalf("unexpected error name: %s", *rerr.Name)
+		}
 	})
 }
