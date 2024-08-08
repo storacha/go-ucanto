@@ -49,6 +49,10 @@ func Parse(str string) (principal.Signer, error) {
 	return Decode(bytes)
 }
 
+func Format(signer principal.Signer) (string, error) {
+	return multibase.Encode(multibase.Base64pad, signer.Encode())
+}
+
 func Decode(b []byte) (principal.Signer, error) {
 	if len(b) != size {
 		return nil, fmt.Errorf("invalid length: %d wanted: %d", len(b), size)
