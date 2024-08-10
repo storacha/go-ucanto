@@ -163,6 +163,18 @@ func OrElse[O, X, X2 any](result Result[O, X], elseFunc func(X) Result[O, X2]) R
 	})
 }
 
+// Wrap wraps a traditional golang pattern for two value functions with the
+// second being an error where the zero value indicates absence, converting
+// it to a result
+func Wrap[O any, X comparable](inner func() (O, X)) Result[O, X] {
+	o, err := inner()
+	var nilErr X
+	if err != nilErr {
+		return Error[O, X](err)
+	}
+	return Ok[O, X](o)
+}
+
 // Named is an error that you can read a name from
 type Named interface {
 	Name() string
