@@ -4,29 +4,19 @@ import (
 	"github.com/storacha-network/go-ucanto/core/invocation"
 	"github.com/storacha-network/go-ucanto/core/ipld"
 	"github.com/storacha-network/go-ucanto/core/result"
-	"github.com/storacha-network/go-ucanto/did"
 	"github.com/storacha-network/go-ucanto/server/transaction"
 	"github.com/storacha-network/go-ucanto/transport"
-	"github.com/storacha-network/go-ucanto/ucan"
 	"github.com/storacha-network/go-ucanto/validator"
 )
 
 // Option is an option configuring a ucanto server.
 type Option func(cfg *srvConfig) error
 
-// CanIssue informs validator whether given capability can be issued by a
-// given DID or whether it needs to be delegated to the issuer.
-type CanIssueFunc func(capability ucan.Capability[any], issuer did.DID) bool
-
-// RevocationCheckerFunc validates the passed authorization and returns
-// a result indicating validity.
-type RevocationCheckerFunc func(auth validator.Authorization[any]) result.Failure
-
 type srvConfig struct {
 	codec                 transport.InboundCodec
 	service               map[string]ServiceMethod[ipld.Builder, ipld.Builder]
-	validateAuthorization RevocationCheckerFunc
-	canIssue              CanIssueFunc
+	validateAuthorization validator.RevocationCheckerFunc[any]
+	canIssue              validator.CanIssueFunc[any]
 	catch                 ErrorHandlerFunc
 }
 
@@ -63,7 +53,7 @@ func WithInboundCodec(codec transport.InboundCodec) Option {
 
 // WithRevocationChecker configures the function used to check UCANs for
 // revocation.
-func WithRevocationChecker(fn RevocationCheckerFunc) Option {
+func WithRevocationChecker(fn validator.RevocationCheckerFunc[any]) Option {
 	return func(cfg *srvConfig) error {
 		cfg.validateAuthorization = fn
 		return nil
@@ -82,7 +72,7 @@ func WithErrorHandler(fn ErrorHandlerFunc) Option {
 // WithCanIssue configures a function that determines whether a given capability
 // can be issued by a given DID or whether it needs to be delegated to the
 // issuer.
-func WithCanIssue(fn CanIssueFunc) Option {
+func WithCanIssue(fn validator.CanIssueFunc[any]) Option {
 	return func(cfg *srvConfig) error {
 		cfg.canIssue = fn
 		return nil

@@ -13,11 +13,13 @@ import (
 	"github.com/storacha-network/go-ucanto/core/ipld"
 	"github.com/storacha-network/go-ucanto/core/receipt"
 	"github.com/storacha-network/go-ucanto/core/result"
+	"github.com/storacha-network/go-ucanto/core/schema"
 	"github.com/storacha-network/go-ucanto/principal/ed25519/signer"
 	sdm "github.com/storacha-network/go-ucanto/server/datamodel"
 	"github.com/storacha-network/go-ucanto/server/transaction"
 	"github.com/storacha-network/go-ucanto/testing/helpers"
 	"github.com/storacha-network/go-ucanto/ucan"
+	"github.com/storacha-network/go-ucanto/validator"
 )
 
 type uploadAddCaveats struct {
@@ -96,20 +98,23 @@ func TestSimpleHandler(t *testing.T) {
 	alice := helpers.Must(signer.Generate())
 	space := helpers.Must(signer.Generate())
 
-	rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
-	nb := uploadAddCaveats{Root: rt}
-	// TODO: this should be a descriptor not an instance
-	cap := ucan.NewCapability("upload/add", space.DID().String(), &nb)
+	uploadadd := validator.NewCapability(
+		"upload/add",
+		schema.DID(),
+		schema.Struct(&uploadAddCaveats{}, typ),
+	)
 
 	server := helpers.Must(NewServer(
 		service,
-		WithServiceMethod("upload/add", Provide(cap, func(cap ucan.Capability[*uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (transaction.Transaction[*uploadAddSuccess, ipld.Builder], error) {
+		WithServiceMethod("upload/add", Provide(uploadadd, func(cap ucan.Capability[*uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (transaction.Transaction[*uploadAddSuccess, ipld.Builder], error) {
 			r := result.Ok[*uploadAddSuccess, ipld.Builder](&uploadAddSuccess{Status: "done"})
 			return transaction.NewTransaction(r), nil
 		})),
 	))
 
 	conn := helpers.Must(client.NewConnection(service, server))
+	rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
+	cap := uploadadd.New(space.DID().String(), &uploadAddCaveats{Root: rt})
 	invs := []invocation.Invocation{helpers.Must(invocation.Invoke(alice, service, cap))}
 	resp := helpers.Must(client.Execute(invs, conn))
 

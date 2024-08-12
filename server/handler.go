@@ -17,11 +17,22 @@ type HandlerFunc[C any, O, X ipld.Builder] func(capability ucan.Capability[C], i
 // Provide is used to define given capability provider. It decorates the passed
 // handler and takes care of UCAN validation. It only calls the handler
 // when validation succeeds.
-func Provide[C any, O, X ipld.Builder](capability ucan.Capability[C], handler HandlerFunc[C, O, X]) ServiceMethod[O, X] {
+func Provide[C any, O, X ipld.Builder](capability validator.CapabilityParser[C], handler HandlerFunc[C, O, X]) ServiceMethod[O, X] {
 	return func(invocation invocation.Invocation, context InvocationContext) (transaction.Transaction[O, X], error) {
-		vctx := validationContext[C]{capability: capability, invctx: context}
+		canIssue := func(capability ucan.Capability[C], issuer did.DID) bool {
+			anycap := ucan.NewCapability(capability.Can(), capability.With(), any(capability.Nb()))
+			return context.CanIssue(anycap, issuer)
+		}
 
-		authorization, err := validator.Access(invocation, &vctx)
+		validateAuthorization := func(auth validator.Authorization[C]) result.Failure {
+			anycap := ucan.NewCapability(auth.Capability().Can(), auth.Capability().With(), any(auth.Capability().Nb()))
+			anyauth := validator.NewAuthorization(anycap)
+			return context.ValidateAuthorization(anyauth)
+		}
+
+		vctx := validator.NewValidationContext(capability, canIssue, validateAuthorization)
+
+		authorization, err := validator.Access[C](invocation, vctx)
 		if err != nil {
 			return nil, err
 		}
@@ -36,18 +47,3 @@ func Provide[C any, O, X ipld.Builder](capability ucan.Capability[C], handler Ha
 		})
 	}
 }
-
-type validationContext[Caveats any] struct {
-	capability ucan.Capability[Caveats]
-	invctx     InvocationContext
-}
-
-func (ctx *validationContext[Caveats]) CanIssue(capability ucan.Capability[Caveats], issuer did.DID) bool {
-	return true
-}
-
-func (ctx *validationContext[Caveats]) ValidateAuthorization(auth validator.Authorization[Caveats]) result.Failure {
-	return nil
-}
-
-var _ validator.ValidationContext[any] = (*validationContext[any])(nil)

@@ -115,9 +115,9 @@ var _ validator.PrincipalParser = (*principalParser)(nil)
 
 type context struct {
 	id                    principal.Signer
-	canIssue              CanIssueFunc
+	canIssue              validator.CanIssueFunc[any]
 	principal             validator.PrincipalParser
-	validateAuthorization RevocationCheckerFunc
+	validateAuthorization validator.RevocationCheckerFunc[any]
 }
 
 func (ctx *context) ID() principal.Signer {
