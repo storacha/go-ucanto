@@ -22,7 +22,7 @@ func NewIterator[T any](next func() (T, error)) Iterator[T] {
 	return &iterator[T]{next}
 }
 
-func From[T any](slice []T) Iterator[T] {
+func From[Slice ~[]T, T any](slice Slice) Iterator[T] {
 	i := 0
 	return NewIterator(func() (T, error) {
 		if i < len(slice) {
