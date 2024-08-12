@@ -4,17 +4,28 @@ import (
 	"github.com/storacha-network/go-ucanto/core/invocation"
 	"github.com/storacha-network/go-ucanto/core/ipld"
 	"github.com/storacha-network/go-ucanto/core/result"
+	"github.com/storacha-network/go-ucanto/did"
 	"github.com/storacha-network/go-ucanto/server/transaction"
 	"github.com/storacha-network/go-ucanto/transport"
+	"github.com/storacha-network/go-ucanto/ucan"
+	"github.com/storacha-network/go-ucanto/validator"
 )
 
 // Option is an option configuring a ucanto server.
 type Option func(cfg *srvConfig) error
 
+// CanIssue informs validator whether given capability can be issued by a
+// given DID or whether it needs to be delegated to the issuer.
+type CanIssueFunc func(capability ucan.Capability[any], issuer did.DID) bool
+
+// RevocationCheckerFunc validates the passed authorization and returns
+// a result indicating validity.
+type RevocationCheckerFunc func(auth validator.Authorization[any]) result.Failure
+
 type srvConfig struct {
 	codec                 transport.InboundCodec
 	service               map[string]ServiceMethod[ipld.Builder, ipld.Builder]
-	validateAuthorization AuthorizationValidatorFunc
+	validateAuthorization RevocationCheckerFunc
 	canIssue              CanIssueFunc
 	catch                 ErrorHandlerFunc
 }
@@ -50,9 +61,9 @@ func WithInboundCodec(codec transport.InboundCodec) Option {
 	}
 }
 
-// WithAuthValidator configures the authorization validator function. The
-// primary purpose of the validator is to allow checking UCANs for revocation.
-func WithAuthValidator(fn AuthorizationValidatorFunc) Option {
+// WithRevocationChecker configures the function used to check UCANs for
+// revocation.
+func WithRevocationChecker(fn RevocationCheckerFunc) Option {
 	return func(cfg *srvConfig) error {
 		cfg.validateAuthorization = fn
 		return nil

@@ -25,28 +25,13 @@ import (
 	"github.com/storacha-network/go-ucanto/validator"
 )
 
-// PrincipalParser provides verifier instances that can validate UCANs issued
-// by a given principal.
-type PrincipalParser interface {
-	Parse(str string) (principal.Verifier, error)
-}
-
-// CanIssue informs validator whether given capability can be issued by a
-// given DID or whether it needs to be delegated to the issuer.
-type CanIssueFunc func(capability ucan.Capability[any], issuer did.DID) bool
-
 // InvocationContext is the context provided to service methods.
 type InvocationContext interface {
+	validator.RevocationChecker[any]
+	validator.CanIssuer[any]
 	// ID is the DID of the service the invocation was sent to.
 	ID() principal.Signer
-	Principal() PrincipalParser
-	// CanIssue informs validator whether given capability can be issued by a
-	// given DID or whether it needs to be delegated to the issuer.
-	CanIssue(capability ucan.Capability[any], issuer did.DID) bool
-	// ValidateAuthorization validates the passed authorization and returns
-	// a result indicating validity. The primary purpose is to check for
-	// revocation.
-	ValidateAuthorization(auth validator.Authorization) result.Failure
+	Principal() validator.PrincipalParser
 }
 
 // ServiceMethod is an invocation handler.
@@ -79,10 +64,6 @@ type ServerView interface {
 	Run(invocation ServiceInvocation) (receipt.AnyReceipt, error)
 }
 
-// AuthorizationValidatorFunc validates the passed authorization and returns
-// a result indicating validity. The primary purpose is to check for revocation.
-type AuthorizationValidatorFunc func(auth validator.Authorization) result.Failure
-
 // ErrorHandlerFunc allows non-result errors generated during handler execution
 // to be logged.
 type ErrorHandlerFunc func(err HandlerExecutionError[any])
@@ -114,7 +95,7 @@ func NewServer(id principal.Signer, options ...Option) (ServerView, error) {
 
 	validateAuthorization := cfg.validateAuthorization
 	if validateAuthorization == nil {
-		validateAuthorization = func(auth validator.Authorization) result.Failure {
+		validateAuthorization = func(auth validator.Authorization[any]) result.Failure {
 			return nil
 		}
 	}
@@ -130,13 +111,13 @@ func (p *principalParser) Parse(str string) (principal.Verifier, error) {
 	return verifier.Parse(str)
 }
 
-var _ PrincipalParser = (*principalParser)(nil)
+var _ validator.PrincipalParser = (*principalParser)(nil)
 
 type context struct {
 	id                    principal.Signer
 	canIssue              CanIssueFunc
-	principal             PrincipalParser
-	validateAuthorization AuthorizationValidatorFunc
+	principal             validator.PrincipalParser
+	validateAuthorization RevocationCheckerFunc
 }
 
 func (ctx *context) ID() principal.Signer {
@@ -147,11 +128,11 @@ func (ctx *context) CanIssue(capability ucan.Capability[any], issuer did.DID) bo
 	return ctx.canIssue(capability, issuer)
 }
 
-func (ctx *context) Principal() PrincipalParser {
+func (ctx *context) Principal() validator.PrincipalParser {
 	return ctx.principal
 }
 
-func (ctx *context) ValidateAuthorization(auth validator.Authorization) result.Failure {
+func (ctx *context) ValidateAuthorization(auth validator.Authorization[any]) result.Failure {
 	return ctx.validateAuthorization(auth)
 }
 
