@@ -1,6 +1,7 @@
 package ipld
 
 import (
+	"errors"
 	"reflect"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
@@ -9,7 +10,19 @@ import (
 )
 
 // Rebind takes a Node and binds it to the Go type according to the passed schema.
-func Rebind(nd datamodel.Node, ptrVal any, typ schema.Type) (datamodel.Node, error) {
+func Rebind(nd datamodel.Node, ptrVal any, typ schema.Type) (rnd datamodel.Node, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if asStr, ok := r.(string); ok {
+				err = errors.New(asStr)
+			} else if asErr, ok := r.(error); ok {
+				err = asErr
+			} else {
+				err = errors.New("unknown panic rebinding node")
+			}
+		}
+	}()
+
 	np := bindnode.Prototype(ptrVal, typ)
 	nb := np.Representation().NewBuilder()
 	nb.AssignNode(nd)
@@ -25,8 +38,8 @@ func Rebind(nd datamodel.Node, ptrVal any, typ schema.Type) (datamodel.Node, err
 	}
 	// ... and we also have to re-bind a new node to the 'bind' value,
 	// because probably the user will be surprised if mutating 'bind' doesn't affect the Node later.
-	nd = bindnode.Wrap(ptrVal, typ)
-	return nd, nil
+	rnd = bindnode.Wrap(ptrVal, typ)
+	return
 }
 
 // func doBind(nb datamodel.NodeAssembler, nd datamodel.Node) error {
