@@ -10,21 +10,13 @@ go get github.com/storacha-network/go-ucanto
 
 ## Usage
 
+### Client
+
 ```go
 package main
 
 import (
-  "net/url"
-  "ioutil"
-
-  "github.com/storacha-network/go-ucanto/client"
-  "github.com/storacha-network/go-ucanto/did"
-  ed25519 "github.com/storacha-network/go-ucanto/principal/ed25519/signer"
-  "github.com/storacha-network/go-ucanto/transport/car"
-  "github.com/storacha-network/go-ucanto/transport/http"
-  "github.com/storacha-network/go-ucanto/core/delegation"
-  "github.com/storacha-network/go-ucanto/core/invocation"
-  "github.com/storacha-network/go-ucanto/core/receipt"
+  "..."
 )
 
 // service URL & DID
@@ -33,9 +25,7 @@ servicePrincipal, _ := did.Parse("did:web:web3.storage")
 
 // HTTP transport and CAR encoding
 channel := http.NewHTTPChannel(serviceURL)
-codec := car.NewCAROutboundCodec()
-
-conn, _ := client.NewConnection(servicePrincipal, codec, channel)
+conn, _ := client.NewConnection(servicePrincipal, channel)
 
 // private key to sign UCANs with
 priv, _ := ioutil.ReadFile("path/to/private.key")
@@ -48,7 +38,7 @@ type StoreAddCaveats struct {
   Size uint64
 }
 
-func (c *StoreAddCaveats) Build() (map[string]datamodel.Node, error) {
+func (c *StoreAddCaveats) Build() (datamodel.Node, error) {
   n := bindnode.Wrap(c, typ)
   return n.Representation(), nil
 }
@@ -99,6 +89,85 @@ rcptlnk, _ := resp.Get(invocations[0].Link())
 rcpt, _ := reader.Read(rcptlnk, res.Blocks())
 
 fmt.Println(rcpt.Out().Ok())
+```
+
+### Server
+
+```go
+package main
+
+import (
+	"..."
+)
+
+type TestEcho struct {
+	Echo string
+}
+
+func (c *TestEcho) Build() (ipld.Node, error) {
+	np := basicnode.Prototype.Any
+	nb := np.NewBuilder()
+	ma, _ := nb.BeginMap(1)
+	ma.AssembleKey().AssignString("echo")
+	ma.AssembleValue().AssignString(c.Echo)
+	ma.Finish()
+	return nb.Build(), nil
+}
+
+func EchoType() ipldschema.Type {
+	ts, _ := ipldprime.LoadSchemaBytes([]byte(`
+	  type TestEcho struct {
+		  echo String
+		}
+	`))
+	return ts.TypeByName("TestEcho")
+}
+
+func createServer(signer principal.Signer) (server.ServerView, error) {
+  // Capability definition(s)
+	testecho := validator.NewCapability(
+		"test/echo",
+		schema.DIDString(),
+		schema.Struct[*TestEcho](EchoType()),
+	)
+
+	return server.NewServer(
+		signer,
+    // Handler definitions
+		server.WithServiceMethod(testecho.Can(), server.Provide(testecho, func(cap ucan.Capability[*TestEcho], inv invocation.Invocation, ctx server.InvocationContext) (transaction.Transaction[*TestEcho, ipld.Builder], error) {
+			r := result.Ok[*TestEcho, ipld.Builder](&TestEcho{Echo: cap.Nb().Echo})
+			return transaction.NewTransaction(r), nil
+		})),
+	)
+}
+
+func main() {
+	signer, _ := ed25519.Generate()
+	server, _ := createServer(signer)
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		res, _ := server.Request(uhttp.NewHTTPRequest(r.Body, r.Header))
+
+		for key, vals := range res.Headers() {
+			for _, v := range vals {
+				w.Header().Add(key, v)
+			}
+		}
+
+		if res.Status() != 0 {
+			w.WriteHeader(res.Status())
+		}
+
+		io.Copy(w, res.Body())
+	})
+
+	listener, _ := net.Listen("tcp", ":0")
+
+	port := listener.Addr().(*net.TCPAddr).Port
+	fmt.Printf("{\"id\":\"%s\",\"url\":\"http://127.0.0.1:%d\"}\n", signer.DID().String(), port)
+
+	http.Serve(listener, nil)
+}
 ```
 
 ## API
