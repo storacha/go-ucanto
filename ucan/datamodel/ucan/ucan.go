@@ -49,12 +49,7 @@ type UCANModel struct {
 type CapabilityModel struct {
 	With string
 	Can  string
-	Nb   NbModel
-}
-
-type NbModel struct {
-	Keys   []string
-	Values map[string]datamodel.Node
+	Nb   datamodel.Node
 }
 
 type FactModel struct {

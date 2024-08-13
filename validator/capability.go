@@ -13,7 +13,8 @@ type Source interface {
 }
 
 type CapabilityParser[Caveats any] interface {
-	// New instantiates a new capability from the passed options
+	Can() ucan.Ability
+	// New creates a new capability from the passed options.
 	New(with ucan.Resource, nb Caveats) ucan.Capability[Caveats]
 	Match(source Source) result.Result[ucan.Capability[Caveats], result.Failure]
 }
@@ -44,6 +45,10 @@ func (d *descriptor[C]) Nb() schema.Reader[any, C] {
 
 type capability[Caveats any] struct {
 	descriptor Descriptor[any, Caveats]
+}
+
+func (c *capability[C]) Can() ucan.Ability {
+	return c.descriptor.Can()
 }
 
 func (c *capability[Caveats]) Match(source Source) result.Result[ucan.Capability[Caveats], result.Failure] {

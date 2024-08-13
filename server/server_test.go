@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	"github.com/ipfs/go-cid"
+	ipldprime "github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipld/go-ipld-prime/node/basicnode"
+	ipldschema "github.com/ipld/go-ipld-prime/schema"
 	"github.com/storacha-network/go-ucanto/client"
 	"github.com/storacha-network/go-ucanto/core/invocation"
 	"github.com/storacha-network/go-ucanto/core/ipld"
@@ -26,25 +28,36 @@ type uploadAddCaveats struct {
 	Root ipld.Link
 }
 
-func (c *uploadAddCaveats) Build() (map[string]ipld.Node, error) {
-	data := map[string]ipld.Node{}
-	b := basicnode.Prototype.Link.NewBuilder()
-	err := b.AssignLink(c.Root)
-	if err != nil {
-		return nil, err
-	}
-	data["root"] = b.Build()
-	return data, nil
+func (c *uploadAddCaveats) Build() (ipld.Node, error) {
+	np := basicnode.Prototype.Any
+	nb := np.NewBuilder()
+	ma, _ := nb.BeginMap(2)
+	ma.AssembleKey().AssignString("root")
+	ma.AssembleValue().AssignLink(c.Root)
+	ma.Finish()
+	return nb.Build(), nil
+}
+
+func uploadAddCaveatsType() ipldschema.Type {
+	ts := helpers.Must(ipldprime.LoadSchemaBytes([]byte(`
+	  type UploadAddCaveats struct {
+		  root Link
+		}
+	`)))
+	return ts.TypeByName("UploadAddCaveats")
 }
 
 type uploadAddSuccess struct {
+	Root   ipldprime.Link
 	Status string
 }
 
 func (ok *uploadAddSuccess) Build() (ipld.Node, error) {
 	np := basicnode.Prototype.Any
 	nb := np.NewBuilder()
-	ma, _ := nb.BeginMap(1)
+	ma, _ := nb.BeginMap(2)
+	ma.AssembleKey().AssignString("root")
+	ma.AssembleValue().AssignLink(ok.Root)
 	ma.AssembleKey().AssignString("status")
 	ma.AssembleValue().AssignString(ok.Status)
 	ma.Finish()
@@ -63,7 +76,7 @@ func TestHandlerNotFound(t *testing.T) {
 	capability := ucan.NewCapability(
 		"upload/add",
 		space.DID().String(),
-		ucan.CaveatBuilder(&uploadAddCaveats{Root: rt}),
+		ipld.Builder(&uploadAddCaveats{Root: rt}),
 	)
 
 	invs := []invocation.Invocation{helpers.Must(invocation.Invoke(alice, service, capability))}
@@ -100,14 +113,14 @@ func TestSimpleHandler(t *testing.T) {
 
 	uploadadd := validator.NewCapability(
 		"upload/add",
-		schema.DID(),
-		schema.Struct(&uploadAddCaveats{}, typ),
+		schema.DIDString(),
+		schema.Struct[*uploadAddCaveats](uploadAddCaveatsType()),
 	)
 
 	server := helpers.Must(NewServer(
 		service,
-		WithServiceMethod("upload/add", Provide(uploadadd, func(cap ucan.Capability[*uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (transaction.Transaction[*uploadAddSuccess, ipld.Builder], error) {
-			r := result.Ok[*uploadAddSuccess, ipld.Builder](&uploadAddSuccess{Status: "done"})
+		WithServiceMethod(uploadadd.Can(), Provide(uploadadd, func(cap ucan.Capability[*uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (transaction.Transaction[*uploadAddSuccess, ipld.Builder], error) {
+			r := result.Ok[*uploadAddSuccess, ipld.Builder](&uploadAddSuccess{Root: cap.Nb().Root, Status: "done"})
 			return transaction.NewTransaction(r), nil
 		})),
 	))
@@ -131,6 +144,7 @@ func TestSimpleHandler(t *testing.T) {
 		} representation keyed
 
 		type UploadAddSuccess struct {
+		  root Link
 		  status String
 		}
 	`)}, []byte("\n"))
@@ -140,6 +154,9 @@ func TestSimpleHandler(t *testing.T) {
 
 	result.MatchResultR0(rcpt.Out(), func(ok *uploadAddSuccess) {
 		fmt.Printf("%+v\n", ok)
+		if ok.Root.String() != rt.String() {
+			t.Fatalf("unexpected root CID: %s", ok.Root)
+		}
 		if ok.Status != "done" {
 			t.Fatalf("unexpected status: %s", ok.Status)
 		}
@@ -153,19 +170,22 @@ func TestHandlerExecutionError(t *testing.T) {
 	alice := helpers.Must(signer.Generate())
 	space := helpers.Must(signer.Generate())
 
-	rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
-	nb := uploadAddCaveats{Root: rt}
-	// TODO: this should be a descriptor not an instance
-	cap := ucan.NewCapability("upload/add", space.DID().String(), &nb)
+	uploadadd := validator.NewCapability(
+		"upload/add",
+		schema.DIDString(),
+		schema.Struct[*uploadAddCaveats](uploadAddCaveatsType()),
+	)
 
 	server := helpers.Must(NewServer(
 		service,
-		WithServiceMethod("upload/add", Provide(cap, func(cap ucan.Capability[*uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (transaction.Transaction[*uploadAddSuccess, ipld.Builder], error) {
+		WithServiceMethod(uploadadd.Can(), Provide(uploadadd, func(cap ucan.Capability[*uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (transaction.Transaction[*uploadAddSuccess, ipld.Builder], error) {
 			return nil, fmt.Errorf("test error")
 		})),
 	))
-	conn := helpers.Must(client.NewConnection(service, server))
 
+	conn := helpers.Must(client.NewConnection(service, server))
+	rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
+	cap := uploadadd.New(space.DID().String(), &uploadAddCaveats{Root: rt})
 	invs := []invocation.Invocation{helpers.Must(invocation.Invoke(alice, service, cap))}
 	resp := helpers.Must(client.Execute(invs, conn))
 	rcptlnk, ok := resp.Get(invs[0].Link())

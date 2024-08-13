@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
+	"github.com/storacha-network/go-ucanto/core/ipld"
 	hdm "github.com/storacha-network/go-ucanto/ucan/datamodel/header"
 	pdm "github.com/storacha-network/go-ucanto/ucan/datamodel/payload"
 	udm "github.com/storacha-network/go-ucanto/ucan/datamodel/ucan"
@@ -71,12 +72,11 @@ type MapBuilder interface {
 	Build() (map[string]datamodel.Node, error)
 }
 
-type CaveatBuilder = MapBuilder
 type FactBuilder = MapBuilder
 
 // Issue creates a new signed token with a given issuer. If expiration is
 // not set it defaults to 30 seconds from now.
-func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBuilder], options ...Option) (UCANView, error) {
+func Issue(issuer Signer, audience Principal, capabilities []Capability[ipld.Builder], options ...Option) (UCANView, error) {
 	cfg := ucanConfig{}
 	for _, opt := range options {
 		if err := opt(&cfg); err != nil {
@@ -90,21 +90,14 @@ func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBu
 
 	var capsmdl []udm.CapabilityModel
 	for _, cap := range capabilities {
-		vals, err := cap.Nb().Build()
+		nb, err := cap.Nb().Build()
 		if err != nil {
 			return nil, fmt.Errorf("building caveats: %s", err)
-		}
-		var keys []string
-		for k := range vals {
-			keys = append(keys, k)
 		}
 		m := udm.CapabilityModel{
 			With: cap.With(),
 			Can:  cap.Can(),
-			Nb: udm.NbModel{
-				Keys:   keys,
-				Values: vals,
-			},
+			Nb:   nb,
 		}
 		capsmdl = append(capsmdl, m)
 	}

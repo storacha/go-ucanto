@@ -18,3 +18,16 @@ var didreader = reader[string, did.DID]{
 func DID() Reader[string, did.DID] {
 	return &didreader
 }
+
+// DIDString read a string that is in DID format.
+func DIDString() Reader[string, string] {
+	return &didstrreader
+}
+
+var didstrreader = reader[string, string]{
+	readFunc: func(input string) result.Result[string, result.Failure] {
+		return result.MapOk(DID().Read(input), func(id did.DID) string {
+			return id.String()
+		})
+	},
+}

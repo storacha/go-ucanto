@@ -22,7 +22,7 @@ type Capability struct {
   with String
   can String
   # Any additional domain specific details and/or restrictions of the capability
-  nb { String: Any }
+  nb Any
 }
 
 type Fact { String: Any }
