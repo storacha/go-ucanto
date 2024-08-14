@@ -31,8 +31,8 @@ func TestReadStruct(t *testing.T) {
 		ma.Finish()
 		nd := nb.Build()
 
-		res := Struct[*TestStruct](ts.TypeByName("TestStruct")).Read(nd)
-		result.MatchResultR0(res, func(ok *TestStruct) {
+		res := Struct[TestStruct](ts.TypeByName("TestStruct")).Read(nd)
+		result.MatchResultR0(res, func(ok TestStruct) {
 			fmt.Printf("%+v\n", ok)
 			require.Equal(t, ok.Name, "foo")
 		}, func(err result.Failure) {
