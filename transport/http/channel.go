@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/web3-storage/go-ucanto/transport"
+	"github.com/storacha-network/go-ucanto/transport"
 )
 
 type channel struct {
@@ -24,8 +24,11 @@ func (c *channel) Request(req transport.HTTPRequest) (transport.HTTPResponse, er
 	if err != nil {
 		return nil, fmt.Errorf("doing HTTP request: %s", err)
 	}
+	if res.StatusCode != http.StatusOK {
+		return nil, NewHTTPError(fmt.Sprintf("HTTP Request failed. %s %s → %d", hr.Method, c.url.String(), res.StatusCode), res.StatusCode, res.Header)
+	}
 
-	return NewHTTPResponse(res.Body, res.Header), nil
+	return NewHTTPResponse(res.StatusCode, res.Body, res.Header), nil
 }
 
 func NewHTTPChannel(url *url.URL) transport.Channel {

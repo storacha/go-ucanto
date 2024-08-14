@@ -6,17 +6,17 @@ import (
 	"io"
 	"sync"
 
-	"github.com/web3-storage/go-ucanto/core/car"
-	"github.com/web3-storage/go-ucanto/core/dag/blockstore"
-	adm "github.com/web3-storage/go-ucanto/core/delegation/datamodel"
-	"github.com/web3-storage/go-ucanto/core/ipld"
-	"github.com/web3-storage/go-ucanto/core/ipld/block"
-	"github.com/web3-storage/go-ucanto/core/ipld/codec/cbor"
-	"github.com/web3-storage/go-ucanto/core/ipld/hash/sha256"
-	"github.com/web3-storage/go-ucanto/core/iterable"
-	"github.com/web3-storage/go-ucanto/ucan"
-	"github.com/web3-storage/go-ucanto/ucan/crypto/signature"
-	udm "github.com/web3-storage/go-ucanto/ucan/datamodel/ucan"
+	"github.com/storacha-network/go-ucanto/core/car"
+	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
+	adm "github.com/storacha-network/go-ucanto/core/delegation/datamodel"
+	"github.com/storacha-network/go-ucanto/core/ipld"
+	"github.com/storacha-network/go-ucanto/core/ipld/block"
+	"github.com/storacha-network/go-ucanto/core/ipld/codec/cbor"
+	"github.com/storacha-network/go-ucanto/core/ipld/hash/sha256"
+	"github.com/storacha-network/go-ucanto/core/iterable"
+	"github.com/storacha-network/go-ucanto/ucan"
+	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
+	udm "github.com/storacha-network/go-ucanto/ucan/datamodel/ucan"
 )
 
 // Delagation is a materialized view of a UCAN delegation, which can be encoded

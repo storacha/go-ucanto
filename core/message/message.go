@@ -3,15 +3,15 @@ package message
 import (
 	"fmt"
 
-	"github.com/web3-storage/go-ucanto/core/dag/blockstore"
-	"github.com/web3-storage/go-ucanto/core/invocation"
-	"github.com/web3-storage/go-ucanto/core/ipld"
-	"github.com/web3-storage/go-ucanto/core/ipld/block"
-	"github.com/web3-storage/go-ucanto/core/ipld/codec/cbor"
-	"github.com/web3-storage/go-ucanto/core/ipld/hash/sha256"
-	"github.com/web3-storage/go-ucanto/core/iterable"
-	mdm "github.com/web3-storage/go-ucanto/core/message/datamodel"
-	"github.com/web3-storage/go-ucanto/core/receipt"
+	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
+	"github.com/storacha-network/go-ucanto/core/invocation"
+	"github.com/storacha-network/go-ucanto/core/ipld"
+	"github.com/storacha-network/go-ucanto/core/ipld/block"
+	"github.com/storacha-network/go-ucanto/core/ipld/codec/cbor"
+	"github.com/storacha-network/go-ucanto/core/ipld/hash/sha256"
+	"github.com/storacha-network/go-ucanto/core/iterable"
+	mdm "github.com/storacha-network/go-ucanto/core/message/datamodel"
+	"github.com/storacha-network/go-ucanto/core/receipt"
 )
 
 type AgentMessage interface {
@@ -102,6 +102,7 @@ func Build(invocations []invocation.Invocation, receipts []receipt.AnyReceipt) (
 			}
 
 			key := receipt.Ran().Link().String()
+			report.Keys = append(report.Keys, key)
 			if _, ok := report.Values[key]; !ok {
 				report.Values[key] = receipt.Root().Link()
 			}

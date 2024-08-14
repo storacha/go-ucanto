@@ -1,10 +1,10 @@
 package invocation
 
 import (
-	"github.com/web3-storage/go-ucanto/core/dag/blockstore"
-	"github.com/web3-storage/go-ucanto/core/delegation"
-	"github.com/web3-storage/go-ucanto/core/ipld"
-	"github.com/web3-storage/go-ucanto/ucan"
+	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
+	"github.com/storacha-network/go-ucanto/core/delegation"
+	"github.com/storacha-network/go-ucanto/core/ipld"
+	"github.com/storacha-network/go-ucanto/ucan"
 )
 
 // Invocation represents a UCAN that can be presented to a service provider to
@@ -32,37 +32,7 @@ type IssuedInvocation interface {
 	Invocation
 }
 
-func Invoke(issuer ucan.Signer, audience ucan.Principal, capability ucan.Capability[ucan.CaveatBuilder], options ...delegation.Option) (IssuedInvocation, error) {
-	return delegation.Delegate(issuer, audience, []ucan.Capability[ucan.CaveatBuilder]{capability}, options...)
-}
-
-type Ran struct {
-	invocation Invocation
-	link       ucan.Link
-}
-
-func (r Ran) Invocation() (Invocation, bool) {
-	return r.invocation, r.invocation != nil
-}
-
-func (r Ran) Link() ucan.Link {
-	if r.invocation != nil {
-		return r.invocation.Link()
-	}
-	return r.link
-}
-
-func FromInvocation(invocation Invocation) Ran {
-	return Ran{invocation, nil}
-}
-
-func FromLink(link ucan.Link) Ran {
-	return Ran{nil, link}
-}
-
-func (r Ran) WriteInto(bs blockstore.BlockWriter) (ipld.Link, error) {
-	if invocation, ok := r.Invocation(); ok {
-		return r.Link(), blockstore.WriteInto(invocation, bs)
-	}
-	return r.Link(), nil
+func Invoke[C ucan.CaveatBuilder](issuer ucan.Signer, audience ucan.Principal, capability ucan.Capability[C], options ...delegation.Option) (IssuedInvocation, error) {
+	bcap := ucan.NewCapability(capability.Can(), capability.With(), ucan.CaveatBuilder(capability.Nb()))
+	return delegation.Delegate(issuer, audience, []ucan.Capability[ucan.CaveatBuilder]{bcap}, options...)
 }

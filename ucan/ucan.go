@@ -2,9 +2,9 @@ package ucan
 
 import (
 	"github.com/ipld/go-ipld-prime"
-	"github.com/web3-storage/go-ucanto/did"
-	"github.com/web3-storage/go-ucanto/ucan/crypto"
-	"github.com/web3-storage/go-ucanto/ucan/crypto/signature"
+	"github.com/storacha-network/go-ucanto/did"
+	"github.com/storacha-network/go-ucanto/ucan/crypto"
+	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
 )
 
 // Resorce is a string that represents resource a UCAN holder can act upon.

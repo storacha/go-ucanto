@@ -8,10 +8,10 @@ import (
 
 	"github.com/multiformats/go-multibase"
 	"github.com/multiformats/go-varint"
-	"github.com/web3-storage/go-ucanto/did"
-	"github.com/web3-storage/go-ucanto/principal"
-	"github.com/web3-storage/go-ucanto/principal/ed25519/verifier"
-	"github.com/web3-storage/go-ucanto/ucan/crypto/signature"
+	"github.com/storacha-network/go-ucanto/did"
+	"github.com/storacha-network/go-ucanto/principal"
+	"github.com/storacha-network/go-ucanto/principal/ed25519/verifier"
+	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
 )
 
 const Code = 0x1300
@@ -47,6 +47,10 @@ func Parse(str string) (principal.Signer, error) {
 		return nil, fmt.Errorf("decoding multibase string: %s", err)
 	}
 	return Decode(bytes)
+}
+
+func Format(signer principal.Signer) (string, error) {
+	return multibase.Encode(multibase.Base64pad, signer.Encode())
 }
 
 func Decode(b []byte) (principal.Signer, error) {
