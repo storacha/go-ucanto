@@ -226,8 +226,8 @@ func Execute(server Server, msg message.AgentMessage) (message.AgentMessage, err
 			}
 
 			lock.Lock()
-			defer lock.Unlock()
 			rcpts = append(rcpts, rcpt)
+			lock.Unlock()
 		}(inv)
 	}
 	wg.Wait()

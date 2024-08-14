@@ -32,7 +32,7 @@ func Provide[C any, O, X ipld.Builder](capability validator.CapabilityParser[C],
 
 		vctx := validator.NewValidationContext(capability, canIssue, validateAuthorization)
 
-		authorization, err := validator.Access[C](invocation, vctx)
+		authorization, err := validator.Access(invocation, vctx)
 		if err != nil {
 			return nil, err
 		}
@@ -41,7 +41,7 @@ func Provide[C any, O, X ipld.Builder](capability validator.CapabilityParser[C],
 			return handler(ok.Capability(), invocation, context)
 		}, func(err result.Failure) (transaction.Transaction[O, X], error) {
 			if failure, ok := err.(X); ok {
-				return transaction.NewTransaction(result.Error[O, X](failure)), nil
+				return transaction.NewTransaction(result.Error[O](failure)), nil
 			}
 			return nil, fmt.Errorf("error was not an IPLD builder")
 		})

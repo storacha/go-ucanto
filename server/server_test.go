@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/ipfs/go-cid"
@@ -20,8 +21,12 @@ import (
 	sdm "github.com/storacha-network/go-ucanto/server/datamodel"
 	"github.com/storacha-network/go-ucanto/server/transaction"
 	"github.com/storacha-network/go-ucanto/testing/helpers"
+	"github.com/storacha-network/go-ucanto/transport/car/request"
+	"github.com/storacha-network/go-ucanto/transport/car/response"
+	thttp "github.com/storacha-network/go-ucanto/transport/http"
 	"github.com/storacha-network/go-ucanto/ucan"
 	"github.com/storacha-network/go-ucanto/validator"
+	"github.com/stretchr/testify/require"
 )
 
 type uploadAddCaveats struct {
@@ -82,9 +87,7 @@ func TestHandlerNotFound(t *testing.T) {
 	invs := []invocation.Invocation{helpers.Must(invocation.Invoke(alice, service, capability))}
 	resp := helpers.Must(client.Execute(invs, conn))
 	rcptlnk, ok := resp.Get(invs[0].Link())
-	if !ok {
-		t.Fatalf("missing receipt for invocation: %s", invs[0].Link())
-	}
+	require.True(t, ok, "missing receipt for invocation: %s", invs[0].Link())
 
 	rcptsch := bytes.Join([][]byte{sdm.Schema(), []byte(`
 		type Result union {
@@ -100,9 +103,7 @@ func TestHandlerNotFound(t *testing.T) {
 		t.Fatalf("expected error: %s", invs[0].Link())
 	}, func(rerr sdm.HandlerNotFoundErrorModel) {
 		fmt.Printf("%s %+v\n", *rerr.Name, rerr)
-		if *rerr.Name != "HandlerNotFoundError" {
-			t.Fatalf("unexpected error name: %s", *rerr.Name)
-		}
+		require.Equal(t, *rerr.Name, "HandlerNotFoundError")
 	})
 }
 
@@ -133,9 +134,7 @@ func TestSimpleHandler(t *testing.T) {
 
 	// get the receipt link for the invocation from the response
 	rcptlnk, ok := resp.Get(invs[0].Link())
-	if !ok {
-		t.Fatalf("missing receipt for invocation: %s", invs[0].Link())
-	}
+	require.True(t, ok, "missing receipt for invocation: %s", invs[0].Link())
 
 	rcptsch := bytes.Join([][]byte{sdm.Schema(), []byte(`
 		type Result union {
@@ -154,12 +153,8 @@ func TestSimpleHandler(t *testing.T) {
 
 	result.MatchResultR0(rcpt.Out(), func(ok *uploadAddSuccess) {
 		fmt.Printf("%+v\n", ok)
-		if ok.Root.String() != rt.String() {
-			t.Fatalf("unexpected root CID: %s", ok.Root)
-		}
-		if ok.Status != "done" {
-			t.Fatalf("unexpected status: %s", ok.Status)
-		}
+		require.Equal(t, ok.Root, rt)
+		require.Equal(t, ok.Status, "done")
 	}, func(rerr ipld.Node) {
 		t.Fatalf("unexpected error: %+v", rerr)
 	})
@@ -189,9 +184,7 @@ func TestHandlerExecutionError(t *testing.T) {
 	invs := []invocation.Invocation{helpers.Must(invocation.Invoke(alice, service, cap))}
 	resp := helpers.Must(client.Execute(invs, conn))
 	rcptlnk, ok := resp.Get(invs[0].Link())
-	if !ok {
-		t.Fatalf("missing receipt for invocation: %s", invs[0].Link())
-	}
+	require.True(t, ok, "missing receipt for invocation: %s", invs[0].Link())
 
 	rcptsch := bytes.Join([][]byte{sdm.Schema(), []byte(`
 		type Result union {
@@ -207,8 +200,46 @@ func TestHandlerExecutionError(t *testing.T) {
 		t.Fatalf("expected error: %s", invs[0].Link())
 	}, func(rerr sdm.HandlerExecutionErrorModel) {
 		fmt.Printf("%s %+v\n", *rerr.Name, rerr)
-		if *rerr.Name != "HandlerExecutionError" {
-			t.Fatalf("unexpected error name: %s", *rerr.Name)
-		}
+		require.Equal(t, *rerr.Name, "HandlerExecutionError")
 	})
+}
+
+func TestHandleContentTypeError(t *testing.T) {
+	service := helpers.Must(signer.Generate())
+	server := helpers.Must(NewServer(service))
+
+	hd := http.Header{}
+	hd.Set("Content-Type", "unsupported/media")
+	hd.Set("Accept", response.ContentType)
+
+	req := thttp.NewHTTPRequest(bytes.NewReader([]byte{}), hd)
+	res := helpers.Must(Handle(server, req))
+	require.Equal(t, res.Status(), http.StatusUnsupportedMediaType)
+}
+
+func TestHandleAcceptError(t *testing.T) {
+	service := helpers.Must(signer.Generate())
+	server := helpers.Must(NewServer(service))
+
+	hd := http.Header{}
+	hd.Set("Content-Type", request.ContentType)
+	hd.Set("Accept", "not/acceptable")
+
+	req := thttp.NewHTTPRequest(bytes.NewReader([]byte{}), hd)
+	res := helpers.Must(Handle(server, req))
+	require.Equal(t, res.Status(), http.StatusNotAcceptable)
+}
+
+func TestHandleDecodeError(t *testing.T) {
+	service := helpers.Must(signer.Generate())
+	server := helpers.Must(NewServer(service))
+
+	hd := http.Header{}
+	hd.Set("Content-Type", request.ContentType)
+	hd.Set("Accept", request.ContentType)
+
+	// request with invalid payload
+	req := thttp.NewHTTPRequest(bytes.NewReader([]byte{}), hd)
+	res := helpers.Must(Handle(server, req))
+	require.Equal(t, res.Status(), http.StatusBadRequest)
 }

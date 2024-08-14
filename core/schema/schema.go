@@ -33,7 +33,10 @@ func (se *schemaerr) Error() string {
 func (se *schemaerr) Build() (ipld.Node, error) {
 	np := basicnode.Prototype.Any
 	nb := np.NewBuilder()
-	ma, _ := nb.BeginMap(2)
+	ma, err := nb.BeginMap(2)
+	if err != nil {
+		return nil, err
+	}
 	ma.AssembleKey().AssignString("name")
 	ma.AssembleValue().AssignString(se.Name())
 	ma.AssembleKey().AssignString("message")
