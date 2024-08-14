@@ -109,8 +109,7 @@ func TestRebind(t *testing.T) {
 		t.Fatalf("decoding base: %s", err)
 	}
 
-	var sub Target
-	_, err = Rebind(bind.Value, &sub, ttyp)
+	sub, err := Rebind[Target](bind.Value, ttyp)
 	if err != nil {
 		t.Fatalf("binding subtype: %s", err)
 	}
@@ -171,8 +170,7 @@ func TestRebindNonCompatibleStruct(t *testing.T) {
 		t.Fatalf("decoding base: %s", err)
 	}
 
-	var sub TargetIncompatible
-	_, err = Rebind(bind.Value, &sub, ttyp)
+	_, err = Rebind[TargetIncompatible](bind.Value, ttyp)
 	if err == nil {
 		t.Fatalf("expected error rebinding")
 	}
@@ -225,8 +223,7 @@ func TestRebindNonCompatibleSchema(t *testing.T) {
 		t.Fatalf("decoding base: %s", err)
 	}
 
-	var sub Target
-	_, err = Rebind(bind.Value, &sub, ttyp)
+	_, err = Rebind[Target](bind.Value, ttyp)
 	if err == nil {
 		t.Fatalf("expected error rebinding")
 	}
