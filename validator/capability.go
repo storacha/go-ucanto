@@ -12,6 +12,18 @@ type Source interface {
 	Delegation() delegation.Delegation
 }
 
+type source struct {
+	capability ucan.Capability[any]
+}
+
+func (s source) Capability() ucan.Capability[any] {
+	return s.capability
+}
+
+func (s source) Delegation() delegation.Delegation {
+	return nil
+}
+
 type CapabilityParser[Caveats any] interface {
 	Can() ucan.Ability
 	// New creates a new capability from the passed options.

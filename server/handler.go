@@ -6,7 +6,6 @@ import (
 	"github.com/storacha-network/go-ucanto/core/invocation"
 	"github.com/storacha-network/go-ucanto/core/ipld"
 	"github.com/storacha-network/go-ucanto/core/result"
-	"github.com/storacha-network/go-ucanto/did"
 	"github.com/storacha-network/go-ucanto/server/transaction"
 	"github.com/storacha-network/go-ucanto/ucan"
 	"github.com/storacha-network/go-ucanto/validator"
@@ -19,18 +18,7 @@ type HandlerFunc[C any, O, X ipld.Builder] func(capability ucan.Capability[C], i
 // when validation succeeds.
 func Provide[C any, O, X ipld.Builder](capability validator.CapabilityParser[C], handler HandlerFunc[C, O, X]) ServiceMethod[O, X] {
 	return func(invocation invocation.Invocation, context InvocationContext) (transaction.Transaction[O, X], error) {
-		canIssue := func(capability ucan.Capability[C], issuer did.DID) bool {
-			anycap := ucan.NewCapability(capability.Can(), capability.With(), any(capability.Nb()))
-			return context.CanIssue(anycap, issuer)
-		}
-
-		validateAuthorization := func(auth validator.Authorization[C]) result.Failure {
-			anycap := ucan.NewCapability(auth.Capability().Can(), auth.Capability().With(), any(auth.Capability().Nb()))
-			anyauth := validator.NewAuthorization(anycap)
-			return context.ValidateAuthorization(anyauth)
-		}
-
-		vctx := validator.NewValidationContext(capability, canIssue, validateAuthorization)
+		vctx := validator.NewValidationContext(capability, context.CanIssue, context.ValidateAuthorization)
 
 		authorization, err := validator.Access(invocation, vctx)
 		if err != nil {
