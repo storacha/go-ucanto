@@ -34,21 +34,21 @@ signer, _ := ed25519.Parse(priv)
 audience := servicePrincipal
 
 type StoreAddCaveats struct {
-  Link ipld.Link
-  Size uint64
+	Link ipld.Link
+	Size uint64
 }
 
 func (c *StoreAddCaveats) Build() (datamodel.Node, error) {
-  n := bindnode.Wrap(c, typ)
-  return n.Representation(), nil
+	n := bindnode.Wrap(c, typ)
+	return n.Representation(), nil
 }
 
 capability := ucan.NewCapability(
-  "store/add",
-  did.Parse("did:key:z6MkwDuRThQcyWjqNsK54yKAmzfsiH6BTkASyiucThMtHt1T").String(),
-  &StoreAddCaveats{
-    // TODO
-  },
+	"store/add",
+	did.Parse("did:key:z6MkwDuRThQcyWjqNsK54yKAmzfsiH6BTkASyiucThMtHt1T").String(),
+	&StoreAddCaveats{
+		// TODO
+	},
 )
 
 // create invocation(s) to perform a task with granted capabilities
@@ -63,24 +63,24 @@ type OkModel struct {
   Status string
 }
 type ErrModel struct {
-  Message string
+	Message string
 }
 
 // create new receipt reader, passing the IPLD schema for the result and the
 // ok and error types
 reader, _ := receipt.NewReceiptReader[OkModel, ErrModel]([]byte(`
-  type Result union {
-    | Ok "ok"
-    | Err "error"
-  } representation keyed
+	type Result union {
+		| Ok "ok"
+		| Err "error"
+	} representation keyed
 
-  type Ok struct {
-    status String
-  }
+	type Ok struct {
+		status String
+	}
 
-  type Err struct {
-    message String
-  }
+	type Err struct {
+		message String
+	}
 `))
 
 // get the receipt link for the invocation from the response
@@ -116,15 +116,15 @@ func (c *TestEcho) Build() (ipld.Node, error) {
 
 func EchoType() ipldschema.Type {
 	ts, _ := ipldprime.LoadSchemaBytes([]byte(`
-	  type TestEcho struct {
-		  echo String
+		type TestEcho struct {
+			echo String
 		}
 	`))
 	return ts.TypeByName("TestEcho")
 }
 
 func createServer(signer principal.Signer) (server.ServerView, error) {
-  // Capability definition(s)
+	// Capability definition(s)
 	testecho := validator.NewCapability(
 		"test/echo",
 		schema.DIDString(),
@@ -133,7 +133,7 @@ func createServer(signer principal.Signer) (server.ServerView, error) {
 
 	return server.NewServer(
 		signer,
-    // Handler definitions
+		// Handler definitions
 		server.WithServiceMethod(testecho.Can(), server.Provide(testecho, func(cap ucan.Capability[*TestEcho], inv invocation.Invocation, ctx server.InvocationContext) (transaction.Transaction[*TestEcho, ipld.Builder], error) {
 			r := result.Ok[*TestEcho, ipld.Builder](&TestEcho{Echo: cap.Nb().Echo})
 			return transaction.NewTransaction(r), nil

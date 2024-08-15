@@ -49,8 +49,8 @@ func TestReadStruct(t *testing.T) {
 		ma.Finish()
 		nd := nb.Build()
 
-		res := Struct[*TestStruct](ts.TypeByName("TestStruct")).Read(nd)
-		result.MatchResultR0(res, func(ok *TestStruct) {
+		res := Struct[TestStruct](ts.TypeByName("TestStruct")).Read(nd)
+		result.MatchResultR0(res, func(ok TestStruct) {
 			t.Fatalf("unexpectedly read incompatible struct: %+v", ok)
 		}, func(err result.Failure) {
 			fmt.Printf("%+v\n", err)
