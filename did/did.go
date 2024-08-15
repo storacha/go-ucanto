@@ -13,6 +13,7 @@ const KeyPrefix = "did:key:"
 
 const DIDCore = 0x0d1d
 const Ed25519 = 0xed
+const RSA = 0x1205
 
 var MethodOffset = varint.UvarintSize(uint64(DIDCore))
 
@@ -54,7 +55,7 @@ func Decode(bytes []byte) (DID, error) {
 	if err != nil {
 		return Undef, err
 	}
-	if code == Ed25519 {
+	if code == Ed25519 || code == RSA {
 		return DID{str: string(bytes), key: true}, nil
 	} else if code == DIDCore {
 		return DID{str: string(bytes)}, nil
