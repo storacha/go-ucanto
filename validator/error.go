@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
-	"github.com/ipld/go-ipld-prime/node/bindnode"
-	"github.com/web3-storage/go-ucanto/core/delegation"
-	"github.com/web3-storage/go-ucanto/core/result"
-	"github.com/web3-storage/go-ucanto/did"
-	"github.com/web3-storage/go-ucanto/ucan"
-	vdm "github.com/web3-storage/go-ucanto/validator/datamodel"
+	"github.com/storacha-network/go-ucanto/core/delegation"
+	"github.com/storacha-network/go-ucanto/core/ipld"
+	"github.com/storacha-network/go-ucanto/core/result"
+	"github.com/storacha-network/go-ucanto/did"
+	"github.com/storacha-network/go-ucanto/ucan"
+	vdm "github.com/storacha-network/go-ucanto/validator/datamodel"
 )
 
 // go hack for union type -- unexported method cannot be implemented outside module limiting satisfying types
@@ -134,7 +134,7 @@ type UnavailableProofError struct {
 	cause error
 }
 
-func NewUnavailableProofError(link ucan.Link, cause error) error {
+func NewUnavailableProofError(link ucan.Link, cause error) UnavailableProofError {
 	return UnavailableProofError{result.NamedWithCurrentStackTrace("UnavailableProof"), link, cause}
 }
 
@@ -160,7 +160,7 @@ type DIDKeyResolutionError struct {
 	cause error
 }
 
-func NewDIDKeyResolutionError(did did.DID, cause error) error {
+func NewDIDKeyResolutionError(did did.DID, cause error) DIDKeyResolutionError {
 	return DIDKeyResolutionError{result.NamedWithCurrentStackTrace("DIDKeyResolutionError"), did, cause}
 }
 
@@ -180,7 +180,7 @@ type PrincipalAlignmentError struct {
 	delegation delegation.Delegation
 }
 
-func NewPrincipalAlignmentError(audience ucan.Principal, delegation delegation.Delegation) error {
+func NewPrincipalAlignmentError(audience ucan.Principal, delegation delegation.Delegation) PrincipalAlignmentError {
 	return PrincipalAlignmentError{result.NamedWithCurrentStackTrace("InvalidAudience"), audience, delegation}
 }
 
@@ -188,7 +188,7 @@ func (pae PrincipalAlignmentError) Error() string {
 	return fmt.Sprintf("Delegation audience is '%s' instead of '%s'", pae.delegation.Audience().DID(), pae.audience.DID())
 }
 
-func (pae PrincipalAlignmentError) ToIPLD() datamodel.Node {
+func (pae PrincipalAlignmentError) Build() (datamodel.Node, error) {
 	name := pae.Name()
 	stack := pae.Stack()
 	invalidAudienceModel := vdm.InvalidAudienceModel{
@@ -198,7 +198,7 @@ func (pae PrincipalAlignmentError) ToIPLD() datamodel.Node {
 		Message:    pae.Error(),
 		Stack:      &stack,
 	}
-	return bindnode.Wrap(&invalidAudienceModel, vdm.InvalidAudienceType())
+	return ipld.WrapWithRecovery(&invalidAudienceModel, vdm.InvalidAudienceType())
 }
 
 func (pae PrincipalAlignmentError) isInvalidProofError() {}
@@ -209,7 +209,7 @@ type MalformedCapabilityError[Caveats any] struct {
 	cause      error
 }
 
-func NewMalformedCapabilityError[Caveats any](capability ucan.Capability[Caveats], cause error) error {
+func NewMalformedCapabilityError[Caveats any](capability ucan.Capability[Caveats], cause error) MalformedCapabilityError[Caveats] {
 	return MalformedCapabilityError[Caveats]{result.NamedWithCurrentStackTrace("MalformedCapability"), capability, cause}
 }
 
@@ -253,7 +253,7 @@ func (ee ExpiredError) Error() string {
 		time.UnixMilli(int64(ee.delegation.Expiration())).Format(time.RFC3339))
 }
 
-func (ee ExpiredError) ToIPLD() datamodel.Node {
+func (ee ExpiredError) Build() (datamodel.Node, error) {
 	name := ee.Name()
 	stack := ee.Stack()
 	expiredModel := vdm.ExpiredModel{
@@ -262,7 +262,7 @@ func (ee ExpiredError) ToIPLD() datamodel.Node {
 		ExpiredAt: int64(ee.delegation.Expiration()),
 		Stack:     &stack,
 	}
-	return bindnode.Wrap(expiredModel, vdm.ExpiredType())
+	return ipld.WrapWithRecovery(expiredModel, vdm.ExpiredType())
 }
 
 func (ee ExpiredError) isInvalidProofError() {}
@@ -296,7 +296,7 @@ func (nvbe NotValidBeforeError) Error() string {
 		time.UnixMilli(int64(nvbe.delegation.NotBefore())).Format(time.RFC3339))
 }
 
-func (nvbe NotValidBeforeError) ToIPLD() datamodel.Node {
+func (nvbe NotValidBeforeError) Build() (datamodel.Node, error) {
 	name := nvbe.Name()
 	stack := nvbe.Stack()
 	notValidBeforeModel := vdm.NotValidBeforeModel{
@@ -305,7 +305,7 @@ func (nvbe NotValidBeforeError) ToIPLD() datamodel.Node {
 		ValidAt: int64(nvbe.delegation.NotBefore()),
 		Stack:   &stack,
 	}
-	return bindnode.Wrap(notValidBeforeModel, vdm.NotValidBeforeType())
+	return ipld.WrapWithRecovery(notValidBeforeModel, vdm.NotValidBeforeType())
 }
 
 func (nvbe NotValidBeforeError) isInvalidProofError() {}

@@ -18,7 +18,14 @@ type HandlerFunc[C any, O, X ipld.Builder] func(capability ucan.Capability[C], i
 // when validation succeeds.
 func Provide[C any, O, X ipld.Builder](capability validator.CapabilityParser[C], handler HandlerFunc[C, O, X]) ServiceMethod[O, X] {
 	return func(invocation invocation.Invocation, context InvocationContext) (transaction.Transaction[O, X], error) {
-		vctx := validator.NewValidationContext(capability, context.CanIssue, context.ValidateAuthorization)
+		vctx := validator.NewValidationContext(
+			capability,
+			context.CanIssue,
+			context.ValidateAuthorization,
+			context.ResolveProof,
+			context.ParsePrincipal,
+			context.ResolveDIDKey,
+		)
 
 		authorization, err := validator.Access(invocation, vctx)
 		if err != nil {
@@ -27,8 +34,8 @@ func Provide[C any, O, X ipld.Builder](capability validator.CapabilityParser[C],
 
 		return result.MatchResultR2(authorization, func(ok validator.Authorization[C]) (transaction.Transaction[O, X], error) {
 			return handler(ok.Capability(), invocation, context)
-		}, func(err result.Failure) (transaction.Transaction[O, X], error) {
-			if failure, ok := err.(X); ok {
+		}, func(err validator.UnauthorizedError[C]) (transaction.Transaction[O, X], error) {
+			if failure, ok := any(err).(X); ok {
 				return transaction.NewTransaction(result.Error[O](failure)), nil
 			}
 			return nil, fmt.Errorf("error was not an IPLD builder")

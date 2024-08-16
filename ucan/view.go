@@ -8,11 +8,7 @@ import (
 	udm "github.com/storacha-network/go-ucanto/ucan/datamodel/ucan"
 )
 
-// UCANView represents a decoded "view" of a UCAN that can be used in your
-// domain logic, etc.
-type UCANView interface {
-	// Model references the underlying IPLD datamodel instance.
-	Model() *udm.UCANModel
+type UCAN interface {
 	// Issuer is the signer of the UCAN.
 	Issuer() Principal
 	// Audience is the principal delegated to.
@@ -37,11 +33,19 @@ type UCANView interface {
 	Signature() signature.SignatureView
 }
 
+// View represents a decoded "view" of a UCAN that can be used in your
+// domain logic, etc.
+type View interface {
+	UCAN
+	// Model references the underlying IPLD datamodel instance.
+	Model() *udm.UCANModel
+}
+
 type ucanView struct {
 	model *udm.UCANModel
 }
 
-var _ UCANView = (*ucanView)(nil)
+var _ View = (*ucanView)(nil)
 
 func (v *ucanView) Audience() Principal {
 	did, err := did.Decode(v.model.Aud)
@@ -114,7 +118,7 @@ func (v *ucanView) Version() string {
 	return v.model.V
 }
 
-// NewUCANView creates a UCAN view from the underlying data model. Please note
+// NewUCAN creates a UCAN view from the underlying data model. Please note
 // that this function does no verification of the model and it is callers
 // responsibility to ensure that:
 //
@@ -124,6 +128,6 @@ func (v *ucanView) Version() string {
 //
 // In other words you should never use this function unless you've parsed or
 // decoded a valid UCAN and want to wrap it into a view.
-func NewUCANView(model *udm.UCANModel) (UCANView, error) {
+func NewUCAN(model *udm.UCANModel) (View, error) {
 	return &ucanView{model}, nil
 }

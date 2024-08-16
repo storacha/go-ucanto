@@ -76,7 +76,7 @@ type FactBuilder = MapBuilder
 
 // Issue creates a new signed token with a given issuer. If expiration is
 // not set it defaults to 30 seconds from now.
-func Issue(issuer Signer, audience Principal, capabilities []Capability[ipld.Builder], options ...Option) (UCANView, error) {
+func Issue(issuer Signer, audience Principal, capabilities []Capability[ipld.Builder], options ...Option) (View, error) {
 	cfg := ucanConfig{}
 	for _, opt := range options {
 		if err := opt(&cfg); err != nil {
@@ -163,7 +163,7 @@ func Issue(issuer Signer, audience Principal, capabilities []Capability[ipld.Bui
 	if cfg.nbf != 0 {
 		model.Nbf = &cfg.nbf
 	}
-	return NewUCANView(&model)
+	return NewUCAN(&model)
 }
 
 func encodeSignaturePayload(header *hdm.HeaderModel, payload *pdm.PayloadModel) ([]byte, error) {
@@ -175,12 +175,12 @@ func encodeSignaturePayload(header *hdm.HeaderModel, payload *pdm.PayloadModel) 
 }
 
 // IsExpired checks if a UCAN is expired.
-func IsExpired(ucan UCANView) bool {
+func IsExpired(ucan UCAN) bool {
 	return ucan.Expiration() <= Now()
 }
 
 // IsTooEarly checks if a UCAN is not active yet.
-func IsTooEarly(ucan UCANView) bool {
+func IsTooEarly(ucan UCAN) bool {
 	nbf := ucan.NotBefore()
 	return nbf != 0 && Now() <= nbf
 }

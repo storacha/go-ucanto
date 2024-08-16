@@ -17,6 +17,9 @@ type srvConfig struct {
 	service               map[string]ServiceMethod[ipld.Builder, ipld.Builder]
 	validateAuthorization validator.RevocationCheckerFunc[any]
 	canIssue              validator.CanIssueFunc[any]
+	resolveProof          validator.ProofResolverFunc
+	parsePrincipal        validator.PrincipalParserFunc
+	resolveDIDKey         validator.PrincipalResolverFunc
 	catch                 ErrorHandlerFunc
 }
 
@@ -75,6 +78,34 @@ func WithErrorHandler(fn ErrorHandlerFunc) Option {
 func WithCanIssue(fn validator.CanIssueFunc[any]) Option {
 	return func(cfg *srvConfig) error {
 		cfg.canIssue = fn
+		return nil
+	}
+}
+
+// WithProofResolver configures a function that finds delegations corresponding
+// to a given link. If a resolver is not provided the validator may not be able
+// to explore corresponding path within a proof chain.
+func WithProofResolver(fn validator.ProofResolverFunc) Option {
+	return func(cfg *srvConfig) error {
+		cfg.resolveProof = fn
+		return nil
+	}
+}
+
+// WithPrincipalParser configures a function that provides verifier instances
+// that can validate UCANs issued by a given principal.
+func WithPrincipalParser(fn validator.PrincipalParserFunc) Option {
+	return func(cfg *srvConfig) error {
+		cfg.parsePrincipal = fn
+		return nil
+	}
+}
+
+// WithPrincipalResolver configures a function that resolves the key of a
+// principal that is identified by DID different from did:key method.
+func WithPrincipalResolver(fn validator.PrincipalResolverFunc) Option {
+	return func(cfg *srvConfig) error {
+		cfg.resolveDIDKey = fn
 		return nil
 	}
 }

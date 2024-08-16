@@ -23,51 +23,30 @@ import (
 // into a UCAN token and used as proof for an invocation or further delegations.
 type Delegation interface {
 	ipld.View
+	ucan.UCAN
 	// Link returns the IPLD link of the root block of the delegation.
 	Link() ucan.Link
 	// Archive writes the delegation to a Content Addressed aRchive (CAR).
 	Archive() io.Reader
-	// Issuer is the signer of the UCAN.
-	Issuer() ucan.Principal
-	// Audience is the principal delegated to.
-	Audience() ucan.Principal
-	// Version is the spec version the UCAN conforms to.
-	Version() ucan.Version
-	// Capabilities are claimed abilities that can be performed on a resource.
-	Capabilities() []ucan.Capability[any]
-	// Expiration is the time in seconds since the Unix epoch that the UCAN
-	// becomes invalid.
-	Expiration() ucan.UTCUnixTimestamp
-	// NotBefore is the time in seconds since the Unix epoch that the UCAN
-	// becomes valid.
-	NotBefore() ucan.UTCUnixTimestamp
-	// Nonce is a randomly generated string to provide a unique UCAN.
-	Nonce() ucan.Nonce
-	// Facts are arbitrary facts and proofs of knowledge.
-	Facts() []ucan.Fact
-	// Proofs of delegation.
-	Proofs() []ucan.Link
-	// Signature of the UCAN issuer.
-	Signature() signature.SignatureView
 }
 
 type delegation struct {
 	rt   ipld.Block
 	blks blockstore.BlockReader
-	ucan ucan.UCANView
+	ucan ucan.View
 	once sync.Once
 }
 
 var _ Delegation = (*delegation)(nil)
 
-func (d *delegation) data() ucan.UCANView {
+func (d *delegation) data() ucan.View {
 	d.once.Do(func() {
 		data := udm.UCANModel{}
 		err := block.Decode(d.rt, &data, udm.Type(), cbor.Codec, sha256.Hasher)
 		if err != nil {
 			fmt.Printf("Error: decoding UCAN: %s\n", err)
 		}
-		d.ucan, err = ucan.NewUCANView(&data)
+		d.ucan, err = ucan.NewUCAN(&data)
 		if err != nil {
 			fmt.Printf("Error: constructing UCAN view: %s\n", err)
 		}
