@@ -7,6 +7,7 @@ import (
 )
 
 const EdDSA = 0xd0ed
+const RS256 = 0xd01205
 
 type Signature interface {
 	Code() uint64
