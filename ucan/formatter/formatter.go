@@ -11,8 +11,8 @@ import (
 	pdm "github.com/storacha-network/go-ucanto/ucan/datamodel/payload"
 )
 
-func FormatSignPayload(header *hdm.HeaderModel, payload *pdm.PayloadModel) (string, error) {
-	hdr, err := FormatHeader(header)
+func FormatSignPayload(payload pdm.PayloadModel, version string, algorithm string) (string, error) {
+	hdr, err := FormatHeader(version, algorithm)
 	if err != nil {
 		return "", fmt.Errorf("formatting header: %s", hdr)
 	}
@@ -23,7 +23,12 @@ func FormatSignPayload(header *hdm.HeaderModel, payload *pdm.PayloadModel) (stri
 	return fmt.Sprintf("%s.%s", hdr, pld), nil
 }
 
-func FormatHeader(header *hdm.HeaderModel) (string, error) {
+func FormatHeader(version string, algorithm string) (string, error) {
+	header := hdm.HeaderModel{
+		Alg: algorithm,
+		Ucv: version,
+		Typ: "JWT",
+	}
 	bytes, err := ipld.Marshal(dagjson.Encode, header, hdm.Type())
 	if err != nil {
 		return "", fmt.Errorf("dag-json encoding header: %s", err)
@@ -31,7 +36,7 @@ func FormatHeader(header *hdm.HeaderModel) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(bytes), nil
 }
 
-func FormatPayload(payload *pdm.PayloadModel) (string, error) {
+func FormatPayload(payload pdm.PayloadModel) (string, error) {
 	bytes, err := ipld.Marshal(dagjson.Encode, payload, pdm.Type())
 	if err != nil {
 		return "", fmt.Errorf("dag-json encoding payload: %s", err)

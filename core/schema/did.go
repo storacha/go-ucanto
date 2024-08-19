@@ -2,30 +2,31 @@ package schema
 
 import (
 	"github.com/storacha-network/go-ucanto/core/result"
+	"github.com/storacha-network/go-ucanto/core/result/failure"
 	"github.com/storacha-network/go-ucanto/did"
 )
 
 var didreader = reader[string, did.DID]{
-	readFunc: func(input string) result.Result[did.DID, result.Failure] {
+	readFunc: func(input string) result.Result[did.DID, failure.Failure] {
 		d, err := did.Parse(input)
 		if err != nil {
 			return result.Error[did.DID](NewSchemaError(err.Error()))
 		}
-		return result.Ok[did.DID, result.Failure](d)
+		return result.Ok[did.DID, failure.Failure](d)
 	},
 }
 
 func DID() Reader[string, did.DID] {
-	return &didreader
+	return didreader
 }
 
 // DIDString read a string that is in DID format.
 func DIDString() Reader[string, string] {
-	return &didstrreader
+	return didstrreader
 }
 
 var didstrreader = reader[string, string]{
-	readFunc: func(input string) result.Result[string, result.Failure] {
+	readFunc: func(input string) result.Result[string, failure.Failure] {
 		return result.MapOk(DID().Read(input), func(id did.DID) string {
 			return id.String()
 		})

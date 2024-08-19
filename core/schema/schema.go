@@ -4,17 +4,18 @@ import (
 	"github.com/ipld/go-ipld-prime/node/basicnode"
 	"github.com/storacha-network/go-ucanto/core/ipld"
 	"github.com/storacha-network/go-ucanto/core/result"
+	"github.com/storacha-network/go-ucanto/core/result/failure"
 )
 
 type Reader[I, O any] interface {
-	Read(input I) result.Result[O, result.Failure]
+	Read(input I) result.Result[O, failure.Failure]
 }
 
 type reader[I, O any] struct {
-	readFunc func(input I) result.Result[O, result.Failure]
+	readFunc func(input I) result.Result[O, failure.Failure]
 }
 
-func (r *reader[I, O]) Read(input I) result.Result[O, result.Failure] {
+func (r reader[I, O]) Read(input I) result.Result[O, failure.Failure] {
 	return r.readFunc(input)
 }
 
@@ -22,15 +23,15 @@ type schemaerr struct {
 	message string
 }
 
-func (se *schemaerr) Name() string {
+func (se schemaerr) Name() string {
 	return "SchemaError"
 }
 
-func (se *schemaerr) Error() string {
+func (se schemaerr) Error() string {
 	return se.message
 }
 
-func (se *schemaerr) Build() (ipld.Node, error) {
+func (se schemaerr) Build() (ipld.Node, error) {
 	np := basicnode.Prototype.Any
 	nb := np.NewBuilder()
 	ma, err := nb.BeginMap(2)
@@ -45,9 +46,6 @@ func (se *schemaerr) Build() (ipld.Node, error) {
 	return nb.Build(), nil
 }
 
-var _ result.Failure = (*schemaerr)(nil)
-var _ ipld.Builder = (*schemaerr)(nil)
-
-func NewSchemaError(message string) result.Failure {
-	return &schemaerr{message}
+func NewSchemaError(message string) failure.Failure {
+	return schemaerr{message}
 }

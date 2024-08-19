@@ -19,6 +19,7 @@ type HandlerFunc[C any, O, X ipld.Builder] func(capability ucan.Capability[C], i
 func Provide[C any, O, X ipld.Builder](capability validator.CapabilityParser[C], handler HandlerFunc[C, O, X]) ServiceMethod[O, X] {
 	return func(invocation invocation.Invocation, context InvocationContext) (transaction.Transaction[O, X], error) {
 		vctx := validator.NewValidationContext(
+			context.ID().Verifier(),
 			capability,
 			context.CanIssue,
 			context.ValidateAuthorization,

@@ -4,7 +4,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/storacha-network/go-ucanto/core/result"
+	"github.com/storacha-network/go-ucanto/core/result/failure"
 )
 
 type HTTPRequest interface {
@@ -19,7 +19,7 @@ type HTTPResponse interface {
 }
 
 type HTTPError interface {
-	result.Failure
+	failure.Failure
 	Status() int
 	Headers() http.Header
 }

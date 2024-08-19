@@ -4,13 +4,13 @@ import (
 	"fmt"
 
 	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/result"
+	"github.com/storacha-network/go-ucanto/core/result/failure"
 	sdm "github.com/storacha-network/go-ucanto/server/datamodel"
 	"github.com/storacha-network/go-ucanto/ucan"
 )
 
 type HandlerNotFoundError[Caveats any] interface {
-	result.Failure
+	failure.Failure
 	Capability() ucan.Capability[Caveats]
 }
 
@@ -18,19 +18,19 @@ type handlerNotFoundError[Caveats any] struct {
 	capability ucan.Capability[Caveats]
 }
 
-func (h *handlerNotFoundError[C]) Capability() ucan.Capability[C] {
+func (h handlerNotFoundError[C]) Capability() ucan.Capability[C] {
 	return h.capability
 }
 
-func (h *handlerNotFoundError[C]) Error() string {
+func (h handlerNotFoundError[C]) Error() string {
 	return fmt.Sprintf("service does not implement {can: \"%s\"} handler", h.capability.Can())
 }
 
-func (h *handlerNotFoundError[C]) Name() string {
+func (h handlerNotFoundError[C]) Name() string {
 	return "HandlerNotFoundError"
 }
 
-func (h *handlerNotFoundError[C]) Build() (ipld.Node, error) {
+func (h handlerNotFoundError[C]) Build() (ipld.Node, error) {
 	name := h.Name()
 
 	mdl := sdm.HandlerNotFoundErrorModel{
@@ -45,16 +45,13 @@ func (h *handlerNotFoundError[C]) Build() (ipld.Node, error) {
 	return ipld.WrapWithRecovery(&mdl, sdm.HandlerNotFoundErrorType())
 }
 
-var _ HandlerNotFoundError[any] = (*handlerNotFoundError[any])(nil)
-var _ ipld.Builder = (*handlerNotFoundError[any])(nil)
-
-func NewHandlerNotFoundError[Caveats any](capability ucan.Capability[Caveats]) *handlerNotFoundError[Caveats] {
-	return &handlerNotFoundError[Caveats]{capability}
+func NewHandlerNotFoundError[Caveats any](capability ucan.Capability[Caveats]) HandlerNotFoundError[Caveats] {
+	return handlerNotFoundError[Caveats]{capability}
 }
 
 type HandlerExecutionError[Caveats any] interface {
-	result.Failure
-	result.WithStackTrace
+	failure.Failure
+	failure.WithStackTrace
 	Cause() error
 	Capability() ucan.Capability[Caveats]
 }
@@ -64,41 +61,41 @@ type handlerExecutionError[Caveats any] struct {
 	capability ucan.Capability[Caveats]
 }
 
-func (h *handlerExecutionError[C]) Capability() ucan.Capability[C] {
+func (h handlerExecutionError[C]) Capability() ucan.Capability[C] {
 	return h.capability
 }
 
-func (h *handlerExecutionError[C]) Cause() error {
+func (h handlerExecutionError[C]) Cause() error {
 	return h.cause
 }
 
-func (h *handlerExecutionError[C]) Error() string {
+func (h handlerExecutionError[C]) Error() string {
 	return fmt.Sprintf("service handler {can: \"%s\"} error: %s", h.capability.Can(), h.cause.Error())
 }
 
-func (h *handlerExecutionError[C]) Name() string {
+func (h handlerExecutionError[C]) Name() string {
 	return "HandlerExecutionError"
 }
 
-func (h *handlerExecutionError[C]) Stack() string {
+func (h handlerExecutionError[C]) Stack() string {
 	var stack string
-	if serr, ok := h.cause.(result.WithStackTrace); ok {
+	if serr, ok := h.cause.(failure.WithStackTrace); ok {
 		stack = serr.Stack()
 	}
 	return stack
 }
 
-func (h *handlerExecutionError[C]) Build() (ipld.Node, error) {
+func (h handlerExecutionError[C]) Build() (ipld.Node, error) {
 	name := h.Name()
 	stack := h.Stack()
 
 	var cname string
-	if ncause, ok := h.cause.(result.Named); ok {
+	if ncause, ok := h.cause.(failure.Named); ok {
 		cname = ncause.Name()
 	}
 
 	var cstack string
-	if scause, ok := h.cause.(result.WithStackTrace); ok {
+	if scause, ok := h.cause.(failure.WithStackTrace); ok {
 		cstack = scause.Stack()
 	}
 
@@ -120,15 +117,12 @@ func (h *handlerExecutionError[C]) Build() (ipld.Node, error) {
 	return ipld.WrapWithRecovery(&mdl, sdm.HandlerExecutionErrorType())
 }
 
-var _ HandlerExecutionError[any] = (*handlerExecutionError[any])(nil)
-var _ ipld.Builder = (*handlerExecutionError[any])(nil)
-
-func NewHandlerExecutionError[Caveats any](cause error, capability ucan.Capability[Caveats]) *handlerExecutionError[Caveats] {
-	return &handlerExecutionError[Caveats]{cause, capability}
+func NewHandlerExecutionError[Caveats any](cause error, capability ucan.Capability[Caveats]) HandlerExecutionError[Caveats] {
+	return handlerExecutionError[Caveats]{cause, capability}
 }
 
 type InvocationCapabilityError interface {
-	result.Failure
+	failure.Failure
 	Capabilities() []ucan.Capability[any]
 }
 
@@ -136,19 +130,19 @@ type invocationCapabilityError struct {
 	capabilities []ucan.Capability[any]
 }
 
-func (i *invocationCapabilityError) Capabilities() []ucan.Capability[any] {
+func (i invocationCapabilityError) Capabilities() []ucan.Capability[any] {
 	return i.capabilities
 }
 
-func (i *invocationCapabilityError) Error() string {
+func (i invocationCapabilityError) Error() string {
 	return "Invocation is required to have a single capability."
 }
 
-func (i *invocationCapabilityError) Name() string {
+func (i invocationCapabilityError) Name() string {
 	return "InvocationCapabilityError"
 }
 
-func (i *invocationCapabilityError) Build() (ipld.Node, error) {
+func (i invocationCapabilityError) Build() (ipld.Node, error) {
 	name := i.Name()
 	var capmdls []sdm.CapabilityModel
 	for _, cap := range i.Capabilities() {
@@ -167,9 +161,6 @@ func (i *invocationCapabilityError) Build() (ipld.Node, error) {
 	return ipld.WrapWithRecovery(&mdl, sdm.InvocationCapabilityErrorType())
 }
 
-var _ InvocationCapabilityError = (*invocationCapabilityError)(nil)
-var _ ipld.Builder = (*invocationCapabilityError)(nil)
-
-func NewInvocationCapabilityError(capabilities []ucan.Capability[any]) *invocationCapabilityError {
-	return &invocationCapabilityError{capabilities}
+func NewInvocationCapabilityError(capabilities []ucan.Capability[any]) InvocationCapabilityError {
+	return invocationCapabilityError{capabilities}
 }

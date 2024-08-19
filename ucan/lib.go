@@ -5,8 +5,7 @@ import (
 	"time"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	hdm "github.com/storacha-network/go-ucanto/ucan/datamodel/header"
+	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
 	pdm "github.com/storacha-network/go-ucanto/ucan/datamodel/payload"
 	udm "github.com/storacha-network/go-ucanto/ucan/datamodel/ucan"
 	"github.com/storacha-network/go-ucanto/ucan/formatter"
@@ -74,9 +73,14 @@ type MapBuilder interface {
 
 type FactBuilder = MapBuilder
 
+// CaveatBuilder builds a datamodel.Node from the underlying data.
+type CaveatBuilder interface {
+	Build() (datamodel.Node, error)
+}
+
 // Issue creates a new signed token with a given issuer. If expiration is
 // not set it defaults to 30 seconds from now.
-func Issue(issuer Signer, audience Principal, capabilities []Capability[ipld.Builder], options ...Option) (View, error) {
+func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBuilder], options ...Option) (View, error) {
 	cfg := ucanConfig{}
 	for _, opt := range options {
 		if err := opt(&cfg); err != nil {
@@ -123,11 +127,6 @@ func Issue(issuer Signer, audience Principal, capabilities []Capability[ipld.Bui
 		})
 	}
 
-	header := hdm.HeaderModel{
-		Alg: issuer.SignatureAlgorithm(),
-		Ucv: version,
-		Typ: "JWT",
-	}
 	payload := pdm.PayloadModel{
 		Iss: issuer.DID().String(),
 		Aud: audience.DID().String(),
@@ -142,7 +141,7 @@ func Issue(issuer Signer, audience Principal, capabilities []Capability[ipld.Bui
 	if cfg.nbf != 0 {
 		payload.Nbf = &cfg.nbf
 	}
-	bytes, err := encodeSignaturePayload(&header, &payload)
+	bytes, err := encodeSignaturePayload(payload, version, issuer.SignatureAlgorithm())
 	if err != nil {
 		return nil, fmt.Errorf("encoding signature payload: %s", err)
 	}
@@ -166,12 +165,40 @@ func Issue(issuer Signer, audience Principal, capabilities []Capability[ipld.Bui
 	return NewUCAN(&model)
 }
 
-func encodeSignaturePayload(header *hdm.HeaderModel, payload *pdm.PayloadModel) ([]byte, error) {
-	str, err := formatter.FormatSignPayload(header, payload)
+func encodeSignaturePayload(payload pdm.PayloadModel, version string, algorithm string) ([]byte, error) {
+	str, err := formatter.FormatSignPayload(payload, version, algorithm)
 	if err != nil {
 		return nil, err
 	}
 	return []byte(str), nil
+}
+
+func VerifySignature(ucan View, verifier Verifier) (bool, error) {
+	alg, err := signature.CodeName(ucan.Signature().Code())
+	if err != nil {
+		return false, err
+	}
+
+	var prfstrs []string
+	for _, link := range ucan.Proofs() {
+		prfstrs = append(prfstrs, link.String())
+	}
+
+	payload := pdm.PayloadModel{
+		Iss: ucan.Issuer().DID().String(),
+		Aud: ucan.Audience().DID().String(),
+		Att: ucan.Model().Att,
+		Prf: prfstrs,
+		Exp: ucan.Expiration(),
+		Fct: ucan.Model().Fct,
+	}
+
+	msg, err := encodeSignaturePayload(payload, ucan.Version(), alg)
+	if err != nil {
+		return false, err
+	}
+
+	return ucan.Issuer().DID() == verifier.DID() && verifier.Verify(msg, ucan.Signature()), nil
 }
 
 // IsExpired checks if a UCAN is expired.

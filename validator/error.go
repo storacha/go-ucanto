@@ -11,7 +11,7 @@ import (
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/storacha-network/go-ucanto/core/delegation"
 	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/result"
+	"github.com/storacha-network/go-ucanto/core/result/failure"
 	"github.com/storacha-network/go-ucanto/did"
 	"github.com/storacha-network/go-ucanto/ucan"
 	vdm "github.com/storacha-network/go-ucanto/validator/datamodel"
@@ -29,14 +29,14 @@ type InvalidProofError interface {
 }
 
 type EscalatedCapabilityError[Caveats any] struct {
-	result.NamedWithStackTrace
+	failure.NamedWithStackTrace
 	claimed   ucan.Capability[Caveats]
 	delegated interface{}
 	cause     error
 }
 
 func NewEscalatedCapabilityError[Caveats any](claimed ucan.Capability[Caveats], delegated interface{}, cause error) error {
-	return EscalatedCapabilityError[Caveats]{result.NamedWithCurrentStackTrace("EscalatedCapability"), claimed, delegated, cause}
+	return EscalatedCapabilityError[Caveats]{failure.NamedWithCurrentStackTrace("EscalatedCapability"), claimed, delegated, cause}
 }
 
 func (ece EscalatedCapabilityError[Caveats]) Unwrap() error {
@@ -50,17 +50,14 @@ func (ece EscalatedCapabilityError[Caveats]) Error() string {
 func (ece EscalatedCapabilityError[Caveats]) isDelegationSubError() {
 }
 
-/**
- * @implements {API.DelegationError}
- */
 type DelegationError struct {
-	result.NamedWithStackTrace
+	failure.NamedWithStackTrace
 	causes  []DelegationSubError
 	context interface{}
 }
 
 func NewDelegationError(causes []DelegationSubError, context interface{}) error {
-	return DelegationError{result.NamedWithCurrentStackTrace("InvalidClaim"), causes, context}
+	return DelegationError{failure.NamedWithCurrentStackTrace("InvalidClaim"), causes, context}
 }
 
 func (de DelegationError) Error() string {
@@ -78,13 +75,13 @@ func (de DelegationError) Unwrap() []error {
 func (de DelegationError) isDelegationSubError() {}
 
 type SessionEscalationError struct {
-	result.NamedWithStackTrace
+	failure.NamedWithStackTrace
 	delegation delegation.Delegation
 	cause      error
 }
 
 func NewSessionEscalationError(delegation delegation.Delegation, cause error) error {
-	return SessionEscalationError{result.NamedWithCurrentStackTrace("SessionEscalation"), delegation, cause}
+	return SessionEscalationError{failure.NamedWithCurrentStackTrace("SessionEscalation"), delegation, cause}
 }
 
 func (see SessionEscalationError) Error() string {
@@ -98,13 +95,13 @@ func (see SessionEscalationError) Error() string {
 func (see SessionEscalationError) isInvalidProofError() {}
 
 type InvalidSignatureError struct {
-	result.NamedWithStackTrace
+	failure.NamedWithStackTrace
 	delegation delegation.Delegation
 	verifier   ucan.Verifier
 }
 
 func NewInvalidSignatureError(delegation delegation.Delegation, verifier ucan.Verifier) error {
-	return InvalidSignatureError{result.NamedWithCurrentStackTrace("InvalidSignature"), delegation, verifier}
+	return InvalidSignatureError{failure.NamedWithCurrentStackTrace("InvalidSignature"), delegation, verifier}
 }
 
 func (ise InvalidSignatureError) Issuer() ucan.Principal {
@@ -128,18 +125,27 @@ func (ise InvalidSignatureError) Error() string {
 
 func (ise InvalidSignatureError) isInvalidProofError() {}
 
+type UnavailableProof interface {
+	failure.Failure
+	Link() ucan.Link
+}
+
 type UnavailableProofError struct {
-	result.NamedWithStackTrace
+	failure.NamedWithStackTrace
 	link  ucan.Link
 	cause error
 }
 
-func NewUnavailableProofError(link ucan.Link, cause error) UnavailableProofError {
-	return UnavailableProofError{result.NamedWithCurrentStackTrace("UnavailableProof"), link, cause}
+func NewUnavailableProofError(link ucan.Link, cause error) UnavailableProof {
+	return UnavailableProofError{failure.NamedWithCurrentStackTrace("UnavailableProof"), link, cause}
 }
 
 func (upe UnavailableProofError) Unwrap() error {
 	return upe.cause
+}
+
+func (upe UnavailableProofError) Link() ucan.Link {
+	return upe.link
 }
 
 func (upe UnavailableProofError) Error() string {
@@ -154,18 +160,27 @@ func (upe UnavailableProofError) Error() string {
 
 func (upe UnavailableProofError) isInvalidProofError() {}
 
+type UnresolvedDID interface {
+	failure.Failure
+	DID() did.DID
+}
+
 type DIDKeyResolutionError struct {
-	result.NamedWithStackTrace
+	failure.NamedWithStackTrace
 	did   did.DID
 	cause error
 }
 
-func NewDIDKeyResolutionError(did did.DID, cause error) DIDKeyResolutionError {
-	return DIDKeyResolutionError{result.NamedWithCurrentStackTrace("DIDKeyResolutionError"), did, cause}
+func NewDIDKeyResolutionError(did did.DID, cause error) UnresolvedDID {
+	return DIDKeyResolutionError{failure.NamedWithCurrentStackTrace("DIDKeyResolutionError"), did, cause}
 }
 
 func (dkre DIDKeyResolutionError) Unwrap() error {
 	return dkre.cause
+}
+
+func (dkre DIDKeyResolutionError) DID() did.DID {
+	return dkre.did
 }
 
 func (dkre DIDKeyResolutionError) Error() string {
@@ -175,13 +190,13 @@ func (dkre DIDKeyResolutionError) Error() string {
 func (dkre DIDKeyResolutionError) isInvalidProofError() {}
 
 type PrincipalAlignmentError struct {
-	result.NamedWithStackTrace
+	failure.NamedWithStackTrace
 	audience   ucan.Principal
 	delegation delegation.Delegation
 }
 
-func NewPrincipalAlignmentError(audience ucan.Principal, delegation delegation.Delegation) PrincipalAlignmentError {
-	return PrincipalAlignmentError{result.NamedWithCurrentStackTrace("InvalidAudience"), audience, delegation}
+func NewPrincipalAlignmentError(audience ucan.Principal, delegation delegation.Delegation) error {
+	return PrincipalAlignmentError{failure.NamedWithCurrentStackTrace("InvalidAudience"), audience, delegation}
 }
 
 func (pae PrincipalAlignmentError) Error() string {
@@ -204,13 +219,13 @@ func (pae PrincipalAlignmentError) Build() (datamodel.Node, error) {
 func (pae PrincipalAlignmentError) isInvalidProofError() {}
 
 type MalformedCapabilityError[Caveats any] struct {
-	result.NamedWithStackTrace
+	failure.NamedWithStackTrace
 	capability ucan.Capability[Caveats]
 	cause      error
 }
 
-func NewMalformedCapabilityError[Caveats any](capability ucan.Capability[Caveats], cause error) MalformedCapabilityError[Caveats] {
-	return MalformedCapabilityError[Caveats]{result.NamedWithCurrentStackTrace("MalformedCapability"), capability, cause}
+func NewMalformedCapabilityError[Caveats any](capability ucan.Capability[Caveats], cause error) error {
+	return MalformedCapabilityError[Caveats]{failure.NamedWithCurrentStackTrace("MalformedCapability"), capability, cause}
 }
 
 func (mce MalformedCapabilityError[Caveats]) Error() string {
@@ -224,12 +239,12 @@ func (mce MalformedCapabilityError[Caveats]) Error() string {
 func (mce MalformedCapabilityError[Caveats]) isDelegationSubError() {}
 
 type UnknownCapabilityError[Caveats any] struct {
-	result.NamedWithStackTrace
+	failure.NamedWithStackTrace
 	capability ucan.Capability[Caveats]
 }
 
 func NewUnknownCapabilityError[Caveats any](capability ucan.Capability[Caveats]) error {
-	return UnknownCapabilityError[Caveats]{result.NamedWithCurrentStackTrace("UnknownCapability"), capability}
+	return UnknownCapabilityError[Caveats]{failure.NamedWithCurrentStackTrace("UnknownCapability"), capability}
 }
 
 func (uce UnknownCapabilityError[Caveats]) Error() string {
@@ -240,12 +255,12 @@ func (uce UnknownCapabilityError[Caveats]) Error() string {
 func (uce UnknownCapabilityError[Caveats]) isDelegationSubError() {}
 
 type ExpiredError struct {
-	result.NamedWithStackTrace
+	failure.NamedWithStackTrace
 	delegation delegation.Delegation
 }
 
 func NewExpiredError(delegation delegation.Delegation) error {
-	return ExpiredError{result.NamedWithCurrentStackTrace("Expired"), delegation}
+	return ExpiredError{failure.NamedWithCurrentStackTrace("Expired"), delegation}
 }
 
 func (ee ExpiredError) Error() string {
@@ -268,12 +283,12 @@ func (ee ExpiredError) Build() (datamodel.Node, error) {
 func (ee ExpiredError) isInvalidProofError() {}
 
 type RevokedError struct {
-	result.NamedWithStackTrace
+	failure.NamedWithStackTrace
 	delegation delegation.Delegation
 }
 
 func NewRevokedError(delegation delegation.Delegation) error {
-	return RevokedError{result.NamedWithCurrentStackTrace("Revoked"), delegation}
+	return RevokedError{failure.NamedWithCurrentStackTrace("Revoked"), delegation}
 }
 
 func (re RevokedError) Error() string {
@@ -283,12 +298,12 @@ func (re RevokedError) Error() string {
 func (re RevokedError) isInvalidProofError() {}
 
 type NotValidBeforeError struct {
-	result.NamedWithStackTrace
+	failure.NamedWithStackTrace
 	delegation delegation.Delegation
 }
 
-func NewNotValidBeforeERror(delegation delegation.Delegation) error {
-	return NotValidBeforeError{result.NamedWithCurrentStackTrace("NotValidBefore"), delegation}
+func NewNotValidBeforeError(delegation delegation.Delegation) error {
+	return NotValidBeforeError{failure.NamedWithCurrentStackTrace("NotValidBefore"), delegation}
 }
 
 func (nvbe NotValidBeforeError) Error() string {
@@ -313,14 +328,14 @@ func (nvbe NotValidBeforeError) isInvalidProofError() {}
 // TODO: this may just be the concrete type from the implementation once
 // the rest of the validator is done
 type InvalidClaim interface {
-	result.NamedWithStackTrace
+	failure.NamedWithStackTrace
 	error
 	Issuer() ucan.Principal
 	Delegation() delegation.Delegation
 }
 
 type UnauthorizedError[Caveats any] struct {
-	result.NamedWithStackTrace
+	failure.NamedWithStackTrace
 	capability       ucan.Capability[Caveats]
 	delegationErrors []DelegationError
 	// this is a hack... it will allow you to make an array of capabilities of different types
@@ -337,7 +352,7 @@ func NewUnauthorizedError[Caveats any](
 	failedProofs []InvalidClaim,
 ) error {
 	return UnauthorizedError[Caveats]{
-		result.NamedWithCurrentStackTrace("Unauthorized"),
+		failure.NamedWithCurrentStackTrace("Unauthorized"),
 		capability,
 		delegationErrors,
 		unknownCapabilities,

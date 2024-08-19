@@ -15,6 +15,7 @@ import (
 	"github.com/storacha-network/go-ucanto/core/message"
 	"github.com/storacha-network/go-ucanto/core/receipt"
 	"github.com/storacha-network/go-ucanto/core/result"
+	"github.com/storacha-network/go-ucanto/core/result/failure"
 	"github.com/storacha-network/go-ucanto/did"
 	"github.com/storacha-network/go-ucanto/principal"
 	"github.com/storacha-network/go-ucanto/principal/ed25519/verifier"
@@ -98,7 +99,7 @@ func NewServer(id principal.Signer, options ...Option) (ServerView, error) {
 
 	validateAuthorization := cfg.validateAuthorization
 	if validateAuthorization == nil {
-		validateAuthorization = func(auth validator.Authorization[any]) result.Failure {
+		validateAuthorization = func(auth validator.Authorization[any]) failure.Failure {
 			return nil
 		}
 	}
@@ -145,11 +146,11 @@ func (ctx context) CanIssue(capability ucan.Capability[any], issuer did.DID) boo
 	return ctx.canIssue(capability, issuer)
 }
 
-func (ctx context) ValidateAuthorization(auth validator.Authorization[any]) result.Failure {
+func (ctx context) ValidateAuthorization(auth validator.Authorization[any]) failure.Failure {
 	return ctx.validateAuthorization(auth)
 }
 
-func (ctx context) ResolveProof(proof ucan.Link) result.Result[delegation.Delegation, validator.UnavailableProofError] {
+func (ctx context) ResolveProof(proof ucan.Link) result.Result[delegation.Delegation, validator.UnavailableProof] {
 	return ctx.resolveProof(proof)
 }
 
@@ -157,7 +158,7 @@ func (ctx context) ParsePrincipal(str string) (principal.Verifier, error) {
 	return ctx.parsePrincipal(str)
 }
 
-func (ctx context) ResolveDIDKey(did did.DID) result.Result[did.DID, validator.DIDKeyResolutionError] {
+func (ctx context) ResolveDIDKey(did did.DID) result.Result[did.DID, validator.UnresolvedDID] {
 	return ctx.resolveDIDKey(did)
 }
 

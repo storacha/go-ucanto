@@ -24,6 +24,8 @@ import (
 type Delegation interface {
 	ipld.View
 	ucan.UCAN
+	// Data returns the UCAN view of the delegation.
+	Data() ucan.View
 	// Link returns the IPLD link of the root block of the delegation.
 	Link() ucan.Link
 	// Archive writes the delegation to a Content Addressed aRchive (CAR).
@@ -39,7 +41,7 @@ type delegation struct {
 
 var _ Delegation = (*delegation)(nil)
 
-func (d *delegation) data() ucan.View {
+func (d *delegation) Data() ucan.View {
 	d.once.Do(func() {
 		data := udm.UCANModel{}
 		err := block.Decode(d.rt, &data, udm.Type(), cbor.Codec, sha256.Hasher)
@@ -71,43 +73,43 @@ func (d *delegation) Archive() io.Reader {
 }
 
 func (d *delegation) Issuer() ucan.Principal {
-	return d.data().Issuer()
+	return d.Data().Issuer()
 }
 
 func (d *delegation) Audience() ucan.Principal {
-	return d.data().Audience()
+	return d.Data().Audience()
 }
 
 func (d *delegation) Version() ucan.Version {
-	return d.data().Version()
+	return d.Data().Version()
 }
 
 func (d *delegation) Capabilities() []ucan.Capability[any] {
-	return d.data().Capabilities()
+	return d.Data().Capabilities()
 }
 
 func (d *delegation) Expiration() ucan.UTCUnixTimestamp {
-	return d.data().Expiration()
+	return d.Data().Expiration()
 }
 
 func (d *delegation) NotBefore() ucan.UTCUnixTimestamp {
-	return d.data().NotBefore()
+	return d.Data().NotBefore()
 }
 
 func (d *delegation) Nonce() ucan.Nonce {
-	return d.data().Nonce()
+	return d.Data().Nonce()
 }
 
 func (d *delegation) Facts() []ucan.Fact {
-	return d.data().Facts()
+	return d.Data().Facts()
 }
 
 func (d *delegation) Proofs() []ucan.Link {
-	return d.data().Proofs()
+	return d.Data().Proofs()
 }
 
 func (d *delegation) Signature() signature.SignatureView {
-	return d.data().Signature()
+	return d.Data().Signature()
 }
 
 func NewDelegation(root ipld.Block, bs blockstore.BlockReader) Delegation {
