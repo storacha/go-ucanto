@@ -20,10 +20,7 @@ func (s strukt[T]) Read(input any) result.Result[T, failure.Failure] {
 	}
 
 	if s.policy != nil {
-		ok, err := policy.Match(s.policy, node)
-		if err != nil {
-			return result.Error[T](NewSchemaError(err.Error()))
-		}
+		ok := policy.Match(s.policy, node)
 		if !ok {
 			return result.Error[T](NewSchemaError("input did not match policy"))
 		}
