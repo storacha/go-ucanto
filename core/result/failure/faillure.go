@@ -64,6 +64,7 @@ func NamedWithCurrentStackTrace(name string) NamedWithStackTrace {
 
 type failure struct {
 	model datamodel.Failure
+	build func() (ipld.Node, error)
 }
 
 func (f failure) Name() string {
@@ -83,6 +84,9 @@ func (f failure) Stack() string {
 }
 
 func (f failure) Build() (ipld.Node, error) {
+	if f.build != nil {
+		return f.build()
+	}
 	return f.model.Build()
 }
 
@@ -96,5 +100,9 @@ func FromError(err error) Failure {
 		stack := withStackTrace.Stack()
 		model.Stack = &stack
 	}
-	return failure{model}
+	fail := failure{model: model}
+	if builder, ok := err.(ipld.Builder); ok {
+		fail.build = builder.Build
+	}
+	return fail
 }
