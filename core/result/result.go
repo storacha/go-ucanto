@@ -189,3 +189,6 @@ func NewFailure(err error) Result[ipld.Builder, ipld.Builder] {
 	}
 	return Error[ipld.Builder, ipld.Builder](&model)
 }
+
+// https://en.wikipedia.org/wiki/Unit_type
+type Unit interface{}
