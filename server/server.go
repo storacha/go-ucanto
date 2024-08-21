@@ -15,7 +15,6 @@ import (
 	"github.com/storacha-network/go-ucanto/core/message"
 	"github.com/storacha-network/go-ucanto/core/receipt"
 	"github.com/storacha-network/go-ucanto/core/result"
-	"github.com/storacha-network/go-ucanto/core/result/failure"
 	"github.com/storacha-network/go-ucanto/did"
 	"github.com/storacha-network/go-ucanto/principal"
 	"github.com/storacha-network/go-ucanto/principal/ed25519/verifier"
@@ -99,8 +98,8 @@ func NewServer(id principal.Signer, options ...Option) (ServerView, error) {
 
 	validateAuthorization := cfg.validateAuthorization
 	if validateAuthorization == nil {
-		validateAuthorization = func(auth validator.Authorization[any]) failure.Failure {
-			return nil
+		validateAuthorization = func(auth validator.Authorization[any]) result.Result[result.Unit, validator.Revoked] {
+			return result.Ok[result.Unit, validator.Revoked](nil)
 		}
 	}
 
@@ -146,7 +145,7 @@ func (ctx context) CanIssue(capability ucan.Capability[any], issuer did.DID) boo
 	return ctx.canIssue(capability, issuer)
 }
 
-func (ctx context) ValidateAuthorization(auth validator.Authorization[any]) failure.Failure {
+func (ctx context) ValidateAuthorization(auth validator.Authorization[any]) result.Result[result.Unit, validator.Revoked] {
 	return ctx.validateAuthorization(auth)
 }
 

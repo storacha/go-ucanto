@@ -227,7 +227,7 @@ func Claim[Caveats any](capability CapabilityParser[Caveats], proofs []delegatio
 		if selector == nil {
 			authorization := NewAuthorization(matched, nil)
 			revoked := result.MatchResultR1(
-				context.ValidateAuthorization(authorization),
+				context.ValidateAuthorization(ConvertUnknownAuthorization(authorization)),
 				func(o result.Unit) Revoked { return nil },
 				func(x Revoked) Revoked { return x },
 			)
@@ -393,7 +393,8 @@ func verifySession(dlg delegation.Delegation, prfs []delegation.Delegation, ctx 
 	return Claim(attestation, aprfs, ctx)
 }
 
-// authorize verifies whether any of the delegated proofs grant give capability.
+// authorize verifies whether any of the delegated proofs grant capability.
 func authorize[Caveats any](match Match[Caveats], context ClaimContext) (result.Result[Authorization[Caveats], InvalidClaim], error) {
-
+	// load proofs from all delegations
+	sources, errors, err := resolveMatch(match, config)
 }

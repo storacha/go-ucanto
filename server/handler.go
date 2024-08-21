@@ -35,7 +35,7 @@ func Provide[C any, O, X ipld.Builder](capability validator.CapabilityParser[C],
 
 		return result.MatchResultR2(authorization, func(ok validator.Authorization[C]) (transaction.Transaction[O, X], error) {
 			return handler(ok.Capability(), invocation, context)
-		}, func(err validator.UnauthorizedError[C]) (transaction.Transaction[O, X], error) {
+		}, func(err validator.Unauthorized) (transaction.Transaction[O, X], error) {
 			if failure, ok := any(err).(X); ok {
 				return transaction.NewTransaction(result.Error[O](failure)), nil
 			}

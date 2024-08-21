@@ -108,7 +108,7 @@ type capability[Caveats any] struct {
 	descriptor Descriptor[any, Caveats]
 }
 
-func (c *capability[C]) Can() ucan.Ability {
+func (c *capability[Caveats]) Can() ucan.Ability {
 	return c.descriptor.Can()
 }
 
@@ -125,7 +125,7 @@ func (c *capability[Caveats]) Match(source Source) result.Result[Match[Caveats],
 	)
 }
 
-func (c *capability[C]) String() string {
+func (c *capability[Caveats]) String() string {
 	return fmt.Sprintf(`{can:"%s"}`, c.Can())
 }
 

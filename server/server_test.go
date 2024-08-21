@@ -115,7 +115,7 @@ func TestSimpleHandler(t *testing.T) {
 	uploadadd := validator.NewCapability(
 		"upload/add",
 		schema.DIDString(),
-		schema.Struct[uploadAddCaveats](uploadAddCaveatsType()),
+		schema.Struct[uploadAddCaveats](uploadAddCaveatsType(), nil),
 	)
 
 	server := helpers.Must(NewServer(
@@ -168,7 +168,7 @@ func TestHandlerExecutionError(t *testing.T) {
 	uploadadd := validator.NewCapability(
 		"upload/add",
 		schema.DIDString(),
-		schema.Struct[uploadAddCaveats](uploadAddCaveatsType()),
+		schema.Struct[uploadAddCaveats](uploadAddCaveatsType(), nil),
 	)
 
 	server := helpers.Must(NewServer(
