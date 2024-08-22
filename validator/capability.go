@@ -2,6 +2,7 @@ package validator
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/storacha-network/go-ucanto/core/delegation"
 	"github.com/storacha-network/go-ucanto/core/result"
@@ -28,6 +29,10 @@ func (s source) Delegation() delegation.Delegation {
 	return s.delegation
 }
 
+func NewSource(capability ucan.Capability[any], delegation delegation.Delegation) Source {
+	return source{capability, delegation}
+}
+
 type Matcher[Caveats any] interface {
 	Match(source Source) result.Result[Match[Caveats], InvalidCapability]
 }
@@ -37,6 +42,7 @@ type Selector[Caveats any] interface {
 }
 
 type Match[Caveats any] interface {
+	Selector[Caveats]
 	Source() []Source
 	Value() ucan.Capability[Caveats]
 	Proofs() []delegation.Delegation
@@ -68,6 +74,14 @@ func (m match[Caveats]) Value() ucan.Capability[Caveats] {
 	return m.value
 }
 
+func (m match[Caveats]) Select(sources []Source) (matches []Match[Caveats], errors []DelegationError, unknowns []ucan.Capability[any], err error) {
+	for _, cap := range sources {
+		result := ResolveCapability(m.descriptor, m.value, cap)
+	}
+	// TODODODO
+	return
+}
+
 func NewMatch[Caveats any](source Source, capability ucan.Capability[Caveats], descriptor Descriptor[any, Caveats]) Match[Caveats] {
 	return match[Caveats]{[]Source{source}, capability, descriptor}
 }
@@ -87,20 +101,21 @@ type Descriptor[I, O any] interface {
 }
 
 type descriptor[Caveats any] struct {
-	can  ucan.Ability
-	with schema.Reader[string, ucan.Resource]
-	nb   schema.Reader[any, Caveats]
+	can     ucan.Ability
+	with    schema.Reader[string, ucan.Resource]
+	nb      schema.Reader[any, Caveats]
+	derives DerivesFunc[Caveats]
 }
 
-func (d *descriptor[C]) Can() ucan.Ability {
+func (d descriptor[C]) Can() ucan.Ability {
 	return d.can
 }
 
-func (d *descriptor[C]) With() schema.Reader[string, ucan.Resource] {
+func (d descriptor[C]) With() schema.Reader[string, ucan.Resource] {
 	return d.with
 }
 
-func (d *descriptor[C]) Nb() schema.Reader[any, C] {
+func (d descriptor[C]) Nb() schema.Reader[any, C] {
 	return d.nb
 }
 
@@ -108,37 +123,44 @@ type capability[Caveats any] struct {
 	descriptor Descriptor[any, Caveats]
 }
 
-func (c *capability[Caveats]) Can() ucan.Ability {
+func (c capability[Caveats]) Can() ucan.Ability {
 	return c.descriptor.Can()
 }
 
-func (c *capability[Caveats]) Select(capabilities []Source) ([]Match[Caveats], []DelegationError, []ucan.Capability[any], error) {
+func (c capability[Caveats]) Select(capabilities []Source) ([]Match[Caveats], []DelegationError, []ucan.Capability[any], error) {
 	return Select(c, capabilities)
 }
 
-func (c *capability[Caveats]) Match(source Source) result.Result[Match[Caveats], InvalidCapability] {
+func (c capability[Caveats]) Match(source Source) result.Result[Match[Caveats], InvalidCapability] {
 	return result.MapOk(
-		parseCapability(c.descriptor, source),
+		ParseCapability(c.descriptor, source),
 		func(cap ucan.Capability[Caveats]) Match[Caveats] {
 			return NewMatch(source, cap, c.descriptor)
 		},
 	)
 }
 
-func (c *capability[Caveats]) String() string {
+func (c capability[Caveats]) String() string {
 	return fmt.Sprintf(`{can:"%s"}`, c.Can())
 }
 
-func (c *capability[Caveats]) New(with ucan.Resource, nb Caveats) ucan.Capability[Caveats] {
+func (c capability[Caveats]) New(with ucan.Resource, nb Caveats) ucan.Capability[Caveats] {
 	return ucan.NewCapability(c.descriptor.Can(), with, nb)
 }
 
-func NewCapability[Caveats any](can ucan.Ability, with schema.Reader[string, ucan.Resource], nb schema.Reader[any, Caveats]) CapabilityParser[Caveats] {
-	d := descriptor[Caveats]{can: can, with: with, nb: nb}
-	return &capability[Caveats]{descriptor: &d}
+type DerivesFunc[Caveats any] func(parent ucan.Capability[Caveats], child ucan.Capability[Caveats]) result.Result[result.Unit, failure.Failure]
+
+func NewCapability[Caveats any](
+	can ucan.Ability,
+	with schema.Reader[string, ucan.Resource],
+	nb schema.Reader[any, Caveats],
+	derives DerivesFunc[Caveats],
+) CapabilityParser[Caveats] {
+	d := descriptor[Caveats]{can, with, nb, derives}
+	return &capability[Caveats]{descriptor: d}
 }
 
-func parseCapability[O any](descriptor Descriptor[any, O], source Source) result.Result[ucan.Capability[O], InvalidCapability] {
+func ParseCapability[O any](descriptor Descriptor[any, O], source Source) result.Result[ucan.Capability[O], InvalidCapability] {
 	cap := source.Capability()
 
 	if descriptor.Can() != cap.Can() {
@@ -188,4 +210,68 @@ func Select[Caveats any](matcher Matcher[Caveats], capabilities []Source) (match
 		}
 	}
 	return
+}
+
+// ResolveCapability resolves delegated capability `source` from the `claimed`
+// capability using provided capability `parser`. It is similar to
+// `parseCapability` except `source` here is treated as capability pattern which
+// is matched against the `claimed` capability. This means we resolve `can` and
+// `with` fields from the `claimed` capability and...
+// TODO: inherit all missing `nb` fields from the claimed capability.
+func ResolveCapability[Caveats any](descriptor Descriptor[any, Caveats], claimed ucan.Capability[Caveats], source Source) result.Result[ucan.Capability[Caveats], InvalidCapability] {
+	can := ResolveAbility(source.Capability().Can(), claimed.Can())
+	if can == "" {
+		return result.Error[ucan.Capability[Caveats], InvalidCapability](NewUnknownCapabilityError(source.Capability()))
+	}
+
+	resource := ResolveResource(source.Capability().With(), claimed.With())
+	if resource == "" {
+		resource = source.Capability().With()
+	}
+
+	return result.MapResultR0(
+		descriptor.With().Read(resource),
+		func(uri string) {
+			// TODODODODODOD
+			descriptor.Nb().Read()
+		},
+		func(x failure.Failure) InvalidCapability {
+			return NewMalformedCapabilityError(source.Capability(), x)
+		},
+	)
+}
+
+// ResolveAbility resolves ability `pattern` of the delegated capability from
+// the ability of the claimed capability. If pattern matches returns claimed
+// ability otherwise returns "".
+//
+//   - pattern "*" 			can "store/add" 	→ "store/add"
+//   - pattern "store/*"	can "store/add" 	→ "store/add"
+//   - pattern "*" 			can "store/add" 	→ "store/add"
+//   - pattern "*" 			can "store/add" 	→ ""
+//   - pattern "*" 			can "store/add" 	→ ""
+//   - pattern "*" 			can "store/add" 	→ ""
+func ResolveAbility(pattern string, can ucan.Ability) ucan.Ability {
+	if pattern == can || pattern == "*" {
+		return can
+	}
+	if strings.HasSuffix(pattern, "/*") && strings.HasPrefix(can, pattern[0:len(pattern)-1]) {
+		return can
+	}
+	return ""
+}
+
+// ResolveResource resolves `source` resource of the delegated capability from
+// the resource `uri` of the claimed capability. If `source` is `"ucan:*""` or
+// matches `uri` then it returns `uri` back otherwise it returns "".
+//
+//   - source "ucan:*"					resource "did:key:zAlice"				→ "did:key:zAlice"
+//   - source "ucan:*"					resource "https://example.com"	→ "https://example.com"
+//   - source "did:*"					resource "did:key:zAlice"				→ ""
+//   - source "did:key:zAlice"	resource "did:key:zAlice"				→ "did:key:zAlice"
+func ResolveResource(source string, uri ucan.Resource) ucan.Resource {
+	if source == uri || source == "ucan:*" {
+		return uri
+	}
+	return ""
 }

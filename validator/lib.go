@@ -3,7 +3,9 @@ package validator
 import (
 	"fmt"
 	"strings"
+	"sync"
 
+	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
 	"github.com/storacha-network/go-ucanto/core/delegation"
 	"github.com/storacha-network/go-ucanto/core/invocation"
 	"github.com/storacha-network/go-ucanto/core/policy"
@@ -35,7 +37,7 @@ type PrincipalParser interface {
 	ParsePrincipal(str string) (principal.Verifier, error)
 }
 
-type PrincipalParserFunc = func(str string) (principal.Verifier, error)
+type PrincipalParserFunc func(str string) (principal.Verifier, error)
 
 // PrincipalResolver is used to resolve a key of the principal that is
 // identified by DID different from did:key method. It can be passed into a
@@ -46,7 +48,7 @@ type PrincipalResolver interface {
 
 // PrincipalResolverFunc resolves the key of a principal that is identified by
 // DID different from did:key method.
-type PrincipalResolverFunc = func(did did.DID) result.Result[did.DID, UnresolvedDID]
+type PrincipalResolverFunc func(did did.DID) result.Result[did.DID, UnresolvedDID]
 
 // ProofResolver finds a delegations when external proof links are present in
 // UCANs. If a resolver is not provided the validator may not be able to explore
@@ -57,7 +59,7 @@ type ProofResolver interface {
 }
 
 // Resolve finds a delegation corresponding to an external proof link.
-type ProofResolverFunc = func(proof ucan.Link) result.Result[delegation.Delegation, UnavailableProof]
+type ProofResolverFunc func(proof ucan.Link) result.Result[delegation.Delegation, UnavailableProof]
 
 type CanIssuer[Caveats any] interface {
 	// CanIssue informs validator whether given capability can be issued by a
@@ -189,13 +191,13 @@ func Claim[Caveats any](capability CapabilityParser[Caveats], proofs []delegatio
 	var sources []Source
 	var invalidprf []InvalidProof
 
-	delegations, rerrs := resolveProofs(proofs, context)
+	delegations, rerrs := ResolveProofs(proofs, context)
 	for _, err := range rerrs {
 		invalidprf = append(invalidprf, err)
 	}
 
 	for _, d := range delegations {
-		validation, err := validate(d, delegations, context)
+		validation, err := Validate(d, delegations, context)
 		if err != nil {
 			return nil, err
 		}
@@ -206,7 +208,7 @@ func Claim[Caveats any](capability CapabilityParser[Caveats], proofs []delegatio
 			validation,
 			func(d delegation.Delegation) {
 				for _, c := range d.Capabilities() {
-					sources = append(sources, source{c, d})
+					sources = append(sources, NewSource(c, d))
 				}
 			},
 			func(x InvalidProof) {
@@ -236,7 +238,7 @@ func Claim[Caveats any](capability CapabilityParser[Caveats], proofs []delegatio
 			}
 			invalidprf = append(invalidprf, revoked)
 		} else {
-			authorize(matched, context)
+			Authorize(matched, context)
 		}
 	}
 
@@ -245,11 +247,11 @@ func Claim[Caveats any](capability CapabilityParser[Caveats], proofs []delegatio
 	), nil
 }
 
-// resolveProofs takes `proofs` from the delegation which may contain
+// ResolveProofs takes `proofs` from the delegation which may contain
 // a `Delegation` or a link to one and attempts to resolve links by side loading
 // them. It returns a set of resolved `Delegation`s and errors for the proofs
 // that could not be resolved.
-func resolveProofs(proofs []delegation.Proof, resolver ProofResolver) (dels []delegation.Delegation, errs []UnavailableProof) {
+func ResolveProofs(proofs []delegation.Proof, resolver ProofResolver) (dels []delegation.Delegation, errs []UnavailableProof) {
 	for _, p := range proofs {
 		d, ok := p.Delegation()
 		if ok {
@@ -267,24 +269,24 @@ func resolveProofs(proofs []delegation.Proof, resolver ProofResolver) (dels []de
 
 // Validate a delegation to check it is within the time bound and that it is
 // authorized by the issuer.
-func validate(dlg delegation.Delegation, prfs []delegation.Delegation, ctx ClaimContext) (result.Result[delegation.Delegation, InvalidProof], error) {
+func Validate(dlg delegation.Delegation, prfs []delegation.Delegation, ctx ClaimContext) (result.Result[delegation.Delegation, InvalidProof], error) {
 	if ucan.IsExpired(dlg) {
 		return result.Error[delegation.Delegation, InvalidProof](NewExpiredError(dlg)), nil
 	}
 	if ucan.IsTooEarly(dlg) {
 		return result.Error[delegation.Delegation, InvalidProof](NewNotValidBeforeError(dlg)), nil
 	}
-	return verifyAuthorization(dlg, prfs, ctx)
+	return VerifyAuthorization(dlg, prfs, ctx)
 }
 
-// verifyAuthorization verifies that delegation has been authorized by the
+// VerifyAuthorization verifies that delegation has been authorized by the
 // issuer. If issued by the did:key principal checks that the signature is
 // valid. If issued by the root authority checks that the signature is valid. If
 // issued by the principal identified by other DID method attempts to resolve a
 // valid `ucan/attest` attestation from the authority, if attestation is not
 // found falls back to resolving did:key for the issuer and verifying its
 // signature.
-func verifyAuthorization(dlg delegation.Delegation, prfs []delegation.Delegation, ctx ClaimContext) (result.Result[delegation.Delegation, InvalidProof], error) {
+func VerifyAuthorization(dlg delegation.Delegation, prfs []delegation.Delegation, ctx ClaimContext) (result.Result[delegation.Delegation, InvalidProof], error) {
 	issuer := dlg.Issuer().DID()
 	// If the issuer is a did:key we just verify a signature
 	if strings.HasPrefix(issuer.String(), "did:key:") {
@@ -292,7 +294,7 @@ func verifyAuthorization(dlg delegation.Delegation, prfs []delegation.Delegation
 		if err != nil {
 			return nil, err
 		}
-		sig, err := verifySignature(dlg, vfr)
+		sig, err := VerifySignature(dlg, vfr)
 		if err != nil {
 			return nil, err
 		}
@@ -302,7 +304,7 @@ func verifyAuthorization(dlg delegation.Delegation, prfs []delegation.Delegation
 	}
 
 	// Attempt to resolve embedded authorization session from the authority
-	sess, err := verifySession(dlg, prfs, ctx)
+	sess, err := VerifySession(dlg, prfs, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +338,7 @@ func verifyAuthorization(dlg delegation.Delegation, prfs []delegation.Delegation
 			return result.MatchResultR2(
 				vfr,
 				func(v principal.Verifier) (result.Result[delegation.Delegation, InvalidProof], error) {
-					sig, err := verifySignature(dlg, v)
+					sig, err := VerifySignature(dlg, v)
 					if err != nil {
 						return nil, err
 					}
@@ -352,7 +354,7 @@ func verifyAuthorization(dlg delegation.Delegation, prfs []delegation.Delegation
 	)
 }
 
-func verifySignature(dlg delegation.Delegation, vfr principal.Verifier) (result.Result[delegation.Delegation, InvalidSignature], error) {
+func VerifySignature(dlg delegation.Delegation, vfr principal.Verifier) (result.Result[delegation.Delegation, InvalidSignature], error) {
 	ok, err := ucan.VerifySignature(dlg.Data(), vfr)
 	if err != nil {
 		return nil, err
@@ -363,12 +365,12 @@ func verifySignature(dlg delegation.Delegation, vfr principal.Verifier) (result.
 	return result.Ok[delegation.Delegation, InvalidSignature](dlg), nil
 }
 
-// verifySession attempts to find an authorization session - an `ucan/attest`
+// VerifySession attempts to find an authorization session - an `ucan/attest`
 // capability delegation where `with` matches `config.authority` and `nb.proof`
 // matches given delegation.
 //
 // https://github.com/storacha-network/specs/blob/main/w3-session.md#authorization-session
-func verifySession(dlg delegation.Delegation, prfs []delegation.Delegation, ctx ClaimContext) (result.Result[Authorization[vdm.AttestationModel], Unauthorized], error) {
+func VerifySession(dlg delegation.Delegation, prfs []delegation.Delegation, ctx ClaimContext) (result.Result[Authorization[vdm.AttestationModel], Unauthorized], error) {
 	// Create a schema that will match an authorization for this exact delegation
 	attestation := NewCapability(
 		"ucan/attest",
@@ -393,8 +395,94 @@ func verifySession(dlg delegation.Delegation, prfs []delegation.Delegation, ctx 
 	return Claim(attestation, aprfs, ctx)
 }
 
-// authorize verifies whether any of the delegated proofs grant capability.
-func authorize[Caveats any](match Match[Caveats], context ClaimContext) (result.Result[Authorization[Caveats], InvalidClaim], error) {
+// Authorize verifies whether any of the delegated proofs grant capability.
+func Authorize[Caveats any](match Match[Caveats], context ClaimContext) (result.Result[Authorization[Caveats], InvalidClaim], error) {
 	// load proofs from all delegations
-	sources, errors, err := resolveMatch(match, config)
+	sources, errors, err := ResolveMatch(match, context)
+	if err != nil {
+		return nil, err
+	}
+
+	match.Select(sources)
+}
+
+func ResolveMatch[Caveats any](match Match[Caveats], context ClaimContext) (sources []Source, errors []ProofError, err error) {
+	includes := map[string]struct{}{}
+	var wg sync.WaitGroup
+	var lock sync.RWMutex
+	for _, source := range match.Source() {
+		id := source.Delegation().Link().String()
+		if _, ok := includes[id]; !ok {
+			includes[id] = struct{}{}
+			wg.Add(1)
+			go func(s Source) {
+				srcs, errs, rerr := ResolveSources(s, context)
+				lock.Lock()
+				defer lock.Unlock()
+				defer wg.Done()
+				if rerr != nil {
+					err = rerr
+					return
+				}
+				sources = append(sources, srcs...)
+				errors = append(errors, errs...)
+			}(source)
+		}
+	}
+	wg.Wait()
+	return
+}
+
+func ResolveSources(source Source, context ClaimContext) (sources []Source, errors []ProofError, err error) {
+	dlg := source.Delegation()
+	var prfs []delegation.Delegation
+
+	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(dlg.Blocks()))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	dlgs, failedprf := ResolveProofs(
+		delegation.NewProofsView(dlg.Proofs(), br),
+		context,
+	)
+
+	// All the proofs that failed to resolve are saved as proof errors.
+	for _, err := range failedprf {
+		errors = append(errors, NewProofError(err.Link(), err))
+	}
+
+	// All the proofs that resolved are checked for principal alignment. Ones that
+	// do not align are saved as proof errors.
+	for _, prf := range dlgs {
+		// If proof does not delegate to a matching audience save an proof error.
+		if dlg.Issuer().DID() != prf.Audience().DID() {
+			errors = append(errors, NewProofError(prf.Link(), NewPrincipalAlignmentError(dlg.Issuer(), prf)))
+		} else {
+			prfs = append(prfs, prf)
+		}
+	}
+	// In the second pass we attempt to proofs that were resolved and are aligned.
+	for _, prf := range prfs {
+		validation, err := Validate(prf, prfs, context)
+		if err != nil {
+			return nil, nil, err
+		}
+		// If proof is not valid (expired, not active yet or has incorrect
+		// signature) save a corresponding proof error.
+		// otherwise create source objects for it's capabilities, so we could
+		// track which proof in which capability the are from.
+		result.MatchResultR0(
+			validation,
+			func(d delegation.Delegation) {
+				for _, cap := range prf.Capabilities() {
+					sources = append(sources, NewSource(cap, prf))
+				}
+			},
+			func(x InvalidProof) {
+				errors = append(errors, NewProofError(prf.Link(), x))
+			},
+		)
+	}
+	return
 }

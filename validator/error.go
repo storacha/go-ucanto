@@ -505,3 +505,25 @@ func indent(message string) string {
 func li(message string) string {
 	return indent("- " + message)
 }
+
+type ProofError struct {
+	failure.NamedWithStackTrace
+	proof ucan.Link
+	cause error
+}
+
+func (pe ProofError) Error() string {
+	return fmt.Sprintf("Capability can not be derived from prf: %s because: %s\n", pe.proof, li(pe.cause.Error()))
+}
+
+func (pe ProofError) Proof() ucan.Link {
+	return pe.proof
+}
+
+func (pe ProofError) Unwrap() error {
+	return pe.cause
+}
+
+func NewProofError(proof ucan.Link, cause error) ProofError {
+	return ProofError{failure.NamedWithCurrentStackTrace("ProofError"), proof, cause}
+}
