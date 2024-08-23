@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
-	"github.com/storacha-network/go-ucanto/core/ipld"
 	"github.com/storacha-network/go-ucanto/core/ipld/block"
 	"github.com/storacha-network/go-ucanto/core/ipld/codec/cbor"
 	"github.com/storacha-network/go-ucanto/core/ipld/hash/sha256"
@@ -71,7 +70,7 @@ func WithProofs(prf Proofs) Option {
 // Delegate creates a new signed token with a given `options.issuer`. If
 // expiration is not set it defaults to 30 seconds from now. Returns UCAN in
 // primary IPLD representation.
-func Delegate(issuer ucan.Signer, audience ucan.Principal, capabilities []ucan.Capability[ipld.Builder], options ...Option) (Delegation, error) {
+func Delegate[C ucan.CaveatBuilder](issuer ucan.Signer, audience ucan.Principal, capabilities []ucan.Capability[C], options ...Option) (Delegation, error) {
 	cfg := delegationConfig{}
 	for _, opt := range options {
 		if err := opt(&cfg); err != nil {

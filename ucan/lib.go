@@ -80,7 +80,7 @@ type CaveatBuilder interface {
 
 // Issue creates a new signed token with a given issuer. If expiration is
 // not set it defaults to 30 seconds from now.
-func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBuilder], options ...Option) (View, error) {
+func Issue[C CaveatBuilder](issuer Signer, audience Principal, capabilities []Capability[C], options ...Option) (View, error) {
 	cfg := ucanConfig{}
 	for _, opt := range options {
 		if err := opt(&cfg); err != nil {

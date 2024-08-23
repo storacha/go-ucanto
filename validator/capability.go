@@ -52,7 +52,7 @@ type Match[Caveats any] interface {
 type match[Caveats any] struct {
 	sources    []Source
 	value      ucan.Capability[Caveats]
-	descriptor Descriptor[any, Caveats]
+	descriptor Descriptor[Caveats]
 }
 
 func (m match[Caveats]) Proofs() []delegation.Delegation {
@@ -75,14 +75,44 @@ func (m match[Caveats]) Value() ucan.Capability[Caveats] {
 }
 
 func (m match[Caveats]) Select(sources []Source) (matches []Match[Caveats], errors []DelegationError, unknowns []ucan.Capability[any], err error) {
-	for _, cap := range sources {
-		result := ResolveCapability(m.descriptor, m.value, cap)
+	for _, source := range sources {
+		err = result.MatchResultR1(
+			ResolveCapability(m.descriptor, m.value, source),
+			func(cap ucan.Capability[Caveats]) error {
+				result.MatchResultR0(
+					m.descriptor.Derives(m.value, cap),
+					func(_ result.Unit) {
+						matches = append(matches, NewMatch(source, cap, m.descriptor))
+					},
+					func(x failure.Failure) {
+						errors = append(errors, NewDelegationError([]DelegationSubError{NewEscalatedCapabilityError(m.value, cap, x)}, m))
+					},
+				)
+				return nil
+			},
+			func(x InvalidCapability) error {
+				if uerr, ok := err.(UnknownCapability); ok {
+					unknowns = append(unknowns, uerr.Capability())
+				}
+				if merr, ok := err.(MalformedCapability); ok {
+					errors = append(errors, NewDelegationError([]DelegationSubError{merr}, m))
+				}
+				return fmt.Errorf("unexpected error type in resolved capability result")
+			},
+		)
+		if err != nil {
+			return
+		}
 	}
-	// TODODODO
 	return
 }
 
-func NewMatch[Caveats any](source Source, capability ucan.Capability[Caveats], descriptor Descriptor[any, Caveats]) Match[Caveats] {
+func (m match[Caveats]) String() string {
+	s, _ := m.value.MarshalJSON()
+	return string(s)
+}
+
+func NewMatch[Caveats any](source Source, capability ucan.Capability[Caveats], descriptor Descriptor[Caveats]) Match[Caveats] {
 	return match[Caveats]{[]Source{source}, capability, descriptor}
 }
 
@@ -94,10 +124,18 @@ type CapabilityParser[Caveats any] interface {
 	New(with ucan.Resource, nb Caveats) ucan.Capability[Caveats]
 }
 
-type Descriptor[I, O any] interface {
+type Derivable[Caveats any] interface {
+	// Derives determines if a capability is derivable from another.
+	Derives(claimed, delegated ucan.Capability[Caveats]) result.Result[result.Unit, failure.Failure]
+}
+
+type DerivesFunc[Caveats any] func(claimed, delegated ucan.Capability[Caveats]) result.Result[result.Unit, failure.Failure]
+
+type Descriptor[Caveats any] interface {
+	Derivable[Caveats]
 	Can() ucan.Ability
 	With() schema.Reader[string, ucan.Resource]
-	Nb() schema.Reader[I, O]
+	Nb() schema.Reader[any, Caveats]
 }
 
 type descriptor[Caveats any] struct {
@@ -119,8 +157,12 @@ func (d descriptor[C]) Nb() schema.Reader[any, C] {
 	return d.nb
 }
 
+func (d descriptor[C]) Derives(parent, child ucan.Capability[C]) result.Result[result.Unit, failure.Failure] {
+	return d.derives(parent, child)
+}
+
 type capability[Caveats any] struct {
-	descriptor Descriptor[any, Caveats]
+	descriptor Descriptor[Caveats]
 }
 
 func (c capability[Caveats]) Can() ucan.Ability {
@@ -148,19 +190,20 @@ func (c capability[Caveats]) New(with ucan.Resource, nb Caveats) ucan.Capability
 	return ucan.NewCapability(c.descriptor.Can(), with, nb)
 }
 
-type DerivesFunc[Caveats any] func(parent ucan.Capability[Caveats], child ucan.Capability[Caveats]) result.Result[result.Unit, failure.Failure]
-
 func NewCapability[Caveats any](
 	can ucan.Ability,
 	with schema.Reader[string, ucan.Resource],
 	nb schema.Reader[any, Caveats],
 	derives DerivesFunc[Caveats],
 ) CapabilityParser[Caveats] {
+	if derives == nil {
+		derives = DefaultDerives
+	}
 	d := descriptor[Caveats]{can, with, nb, derives}
 	return &capability[Caveats]{descriptor: d}
 }
 
-func ParseCapability[O any](descriptor Descriptor[any, O], source Source) result.Result[ucan.Capability[O], InvalidCapability] {
+func ParseCapability[O any](descriptor Descriptor[O], source Source) result.Result[ucan.Capability[O], InvalidCapability] {
 	cap := source.Capability()
 
 	if descriptor.Can() != cap.Can() {
@@ -218,7 +261,7 @@ func Select[Caveats any](matcher Matcher[Caveats], capabilities []Source) (match
 // is matched against the `claimed` capability. This means we resolve `can` and
 // `with` fields from the `claimed` capability and...
 // TODO: inherit all missing `nb` fields from the claimed capability.
-func ResolveCapability[Caveats any](descriptor Descriptor[any, Caveats], claimed ucan.Capability[Caveats], source Source) result.Result[ucan.Capability[Caveats], InvalidCapability] {
+func ResolveCapability[Caveats any](descriptor Descriptor[Caveats], claimed ucan.Capability[Caveats], source Source) result.Result[ucan.Capability[Caveats], InvalidCapability] {
 	can := ResolveAbility(source.Capability().Can(), claimed.Can())
 	if can == "" {
 		return result.Error[ucan.Capability[Caveats], InvalidCapability](NewUnknownCapabilityError(source.Capability()))
@@ -229,14 +272,22 @@ func ResolveCapability[Caveats any](descriptor Descriptor[any, Caveats], claimed
 		resource = source.Capability().With()
 	}
 
-	return result.MapResultR0(
+	return result.MatchResultR1(
 		descriptor.With().Read(resource),
-		func(uri string) {
-			// TODODODODODOD
-			descriptor.Nb().Read()
+		func(uri string) result.Result[ucan.Capability[Caveats], InvalidCapability] {
+			return result.MapResultR0(
+				// TODO: inherit missing fields
+				descriptor.Nb().Read(claimed),
+				func(nb Caveats) ucan.Capability[Caveats] {
+					return ucan.NewCapability(can, resource, nb)
+				},
+				func(x failure.Failure) InvalidCapability {
+					return NewMalformedCapabilityError(source.Capability(), x)
+				},
+			)
 		},
-		func(x failure.Failure) InvalidCapability {
-			return NewMalformedCapabilityError(source.Capability(), x)
+		func(x failure.Failure) result.Result[ucan.Capability[Caveats], InvalidCapability] {
+			return result.Error[ucan.Capability[Caveats], InvalidCapability](NewMalformedCapabilityError(source.Capability(), x))
 		},
 	)
 }
@@ -245,12 +296,12 @@ func ResolveCapability[Caveats any](descriptor Descriptor[any, Caveats], claimed
 // the ability of the claimed capability. If pattern matches returns claimed
 // ability otherwise returns "".
 //
-//   - pattern "*" 			can "store/add" 	→ "store/add"
-//   - pattern "store/*"	can "store/add" 	→ "store/add"
-//   - pattern "*" 			can "store/add" 	→ "store/add"
-//   - pattern "*" 			can "store/add" 	→ ""
-//   - pattern "*" 			can "store/add" 	→ ""
-//   - pattern "*" 			can "store/add" 	→ ""
+//   - pattern "*"       can "store/add" → "store/add"
+//   - pattern "store/*" can "store/add" → "store/add"
+//   - pattern "*"       can "store/add" → "store/add"
+//   - pattern "*"       can "store/add" → ""
+//   - pattern "*"       can "store/add" → ""
+//   - pattern "*"       can "store/add" → ""
 func ResolveAbility(pattern string, can ucan.Ability) ucan.Ability {
 	if pattern == can || pattern == "*" {
 		return can
@@ -265,13 +316,30 @@ func ResolveAbility(pattern string, can ucan.Ability) ucan.Ability {
 // the resource `uri` of the claimed capability. If `source` is `"ucan:*""` or
 // matches `uri` then it returns `uri` back otherwise it returns "".
 //
-//   - source "ucan:*"					resource "did:key:zAlice"				→ "did:key:zAlice"
-//   - source "ucan:*"					resource "https://example.com"	→ "https://example.com"
-//   - source "did:*"					resource "did:key:zAlice"				→ ""
-//   - source "did:key:zAlice"	resource "did:key:zAlice"				→ "did:key:zAlice"
+//   - source "ucan:*"         uri "did:key:zAlice"      → "did:key:zAlice"
+//   - source "ucan:*"         uri "https://example.com" → "https://example.com"
+//   - source "did:*"          uri "did:key:zAlice"      → ""
+//   - source "did:key:zAlice" uri "did:key:zAlice"      → "did:key:zAlice"
 func ResolveResource(source string, uri ucan.Resource) ucan.Resource {
 	if source == uri || source == "ucan:*" {
 		return uri
 	}
 	return ""
+}
+
+func DefaultDerives[Caveats any](claimed, delegated ucan.Capability[Caveats]) result.Result[result.Unit, failure.Failure] {
+	dres := delegated.With()
+	cres := claimed.With()
+
+	if strings.HasSuffix(dres, "*") {
+		if !strings.HasPrefix(cres, dres[0:len(dres)-1]) {
+			return result.Error[result.Unit](schema.NewSchemaError(fmt.Sprintf("Resource %s does not match delegated %s", cres, dres)))
+		}
+	} else if dres != cres {
+		return result.Error[result.Unit](schema.NewSchemaError(fmt.Sprintf("Resource %s is not contained by %s", cres, dres)))
+	}
+
+	// TODO: is it possible to ensure claimed caveats match delegated caveats?
+
+	return result.Ok[result.Unit, failure.Failure](struct{}{})
 }

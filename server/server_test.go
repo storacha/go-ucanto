@@ -81,7 +81,7 @@ func TestHandlerNotFound(t *testing.T) {
 	capability := ucan.NewCapability(
 		"upload/add",
 		space.DID().String(),
-		ipld.Builder(&uploadAddCaveats{Root: rt}),
+		uploadAddCaveats{Root: rt},
 	)
 
 	invs := []invocation.Invocation{helpers.Must(invocation.Invoke(alice, service, capability))}
@@ -116,6 +116,7 @@ func TestSimpleHandler(t *testing.T) {
 		"upload/add",
 		schema.DIDString(),
 		schema.Struct[uploadAddCaveats](uploadAddCaveatsType(), nil),
+		nil,
 	)
 
 	server := helpers.Must(NewServer(
@@ -169,6 +170,7 @@ func TestHandlerExecutionError(t *testing.T) {
 		"upload/add",
 		schema.DIDString(),
 		schema.Struct[uploadAddCaveats](uploadAddCaveatsType(), nil),
+		nil,
 	)
 
 	server := helpers.Must(NewServer(

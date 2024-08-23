@@ -7,7 +7,6 @@ import (
 )
 
 // Result is a golang compatible generic result type
-// https://github.com/ucan-wg/receipt/#6-result
 type Result[O any, X any] interface {
 	isResult(ok O, err X)
 }
@@ -19,8 +18,7 @@ type errResult[O any, X any] struct {
 	value X
 }
 
-func (o *okResult[O, X]) isResult(ok O, err X) {}
-
+func (o *okResult[O, X]) isResult(ok O, err X)  {}
 func (e *errResult[O, X]) isResult(ok O, err X) {}
 
 // MatchResultR3 handles a result with functions returning 3 values

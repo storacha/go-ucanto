@@ -8,7 +8,7 @@ import (
 	"github.com/ipld/go-ipld-prime/schema"
 )
 
-//go:embed errors.ipldsch
+//go:embed attestation.ipldsch
 var attestationsch []byte
 var attestationTypeSystem *schema.TypeSystem
 

@@ -7,19 +7,19 @@ type InvalidAudience struct {
 	Audience   String
 	Delegation Delegation
 	Message    String
-	Stack      optional Sstring
+	Stack      optional String
 }
 
 type Expired struct {
 	Name      optional String
 	Message   String
-	ExpiredAt Integer
+	ExpiredAt Int
 	Stack     optional String
 }
 
 type NotValidBefore struct {
 	Name      optional String
 	Message   String
-	ValidAt   Integer
+	ValidAt   Int
 	Stack     optional String
 }

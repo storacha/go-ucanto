@@ -29,7 +29,7 @@ func FormatHeader(version string, algorithm string) (string, error) {
 		Ucv: version,
 		Typ: "JWT",
 	}
-	bytes, err := ipld.Marshal(dagjson.Encode, header, hdm.Type())
+	bytes, err := ipld.Marshal(dagjson.Encode, &header, hdm.Type())
 	if err != nil {
 		return "", fmt.Errorf("dag-json encoding header: %s", err)
 	}
@@ -37,7 +37,7 @@ func FormatHeader(version string, algorithm string) (string, error) {
 }
 
 func FormatPayload(payload pdm.PayloadModel) (string, error) {
-	bytes, err := ipld.Marshal(dagjson.Encode, payload, pdm.Type())
+	bytes, err := ipld.Marshal(dagjson.Encode, &payload, pdm.Type())
 	if err != nil {
 		return "", fmt.Errorf("dag-json encoding payload: %s", err)
 	}

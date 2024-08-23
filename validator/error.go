@@ -35,7 +35,7 @@ type EscalatedCapabilityError[Caveats any] struct {
 	cause     error
 }
 
-func NewEscalatedCapabilityError[Caveats any](claimed ucan.Capability[Caveats], delegated interface{}, cause error) failure.Failure {
+func NewEscalatedCapabilityError[Caveats any](claimed ucan.Capability[Caveats], delegated interface{}, cause error) EscalatedCapabilityError[Caveats] {
 	return EscalatedCapabilityError[Caveats]{failure.NamedWithCurrentStackTrace("EscalatedCapability"), claimed, delegated, cause}
 }
 
@@ -260,6 +260,7 @@ type InvalidCapability interface {
 
 type MalformedCapability interface {
 	InvalidCapability
+	DelegationSubError
 	Capability() ucan.Capability[any]
 	isMalformedCapability()
 }
@@ -400,12 +401,96 @@ func (nvbe NotValidBeforeError) Build() (datamodel.Node, error) {
 
 func (nvbe NotValidBeforeError) isInvalidProof() {}
 
-// TODO: this may just be the concrete type from the implementation once
-// the rest of the validator is done
 type InvalidClaim interface {
 	failure.Failure
 	Issuer() ucan.Principal
 	Delegation() delegation.Delegation
+}
+
+type InvalidClaimError[Caveats any] struct {
+	failure.NamedWithStackTrace
+	match               Match[Caveats]
+	delegationErrors    []DelegationError
+	unknownCapabilities []ucan.Capability[any]
+	invalidProofs       []ProofError
+	failedProofs        []InvalidClaim
+}
+
+func NewInvalidClaimError[Caveats any](
+	match Match[Caveats],
+	delegationErrors []DelegationError,
+	unknownCapabilities []ucan.Capability[any],
+	invalidProofs []ProofError,
+	failedProofs []InvalidClaim,
+) InvalidClaim {
+	return InvalidClaimError[Caveats]{
+		failure.NamedWithCurrentStackTrace("InvalidClaim"),
+		match,
+		delegationErrors,
+		unknownCapabilities,
+		invalidProofs,
+		failedProofs,
+	}
+}
+
+func (ice InvalidClaimError[Caveats]) Error() string {
+	errorStrings := make([]string, 0, len(ice.failedProofs)+len(ice.delegationErrors)+len(ice.invalidProofs))
+
+	for _, failedProof := range ice.failedProofs {
+		errorStrings = append(errorStrings, li(failedProof.Error()))
+	}
+
+	for _, delegationError := range ice.delegationErrors {
+		errorStrings = append(errorStrings, li(delegationError.Error()))
+	}
+
+	for _, invalidProof := range ice.invalidProofs {
+		errorStrings = append(errorStrings, li(invalidProof.Error()))
+	}
+
+	unknowns := make([]string, 0, len(ice.unknownCapabilities))
+	for _, unknownCapability := range ice.unknownCapabilities {
+		out, _ := unknownCapability.MarshalJSON()
+		unknowns = append(unknowns, li(string(out)))
+	}
+
+	var finalList []string
+	finalList = append(finalList, fmt.Sprintf("Capability %s is not authorized because:", ice.match))
+	finalList = append(finalList, li(fmt.Sprintf("Capability can not be (self) issued by '%s'", ice.Issuer().DID())))
+	if len(errorStrings) > 0 {
+		finalList = append(finalList, errorStrings...)
+	} else {
+		finalList = append(finalList, li("Delegated capability not found"))
+	}
+	if len(unknowns) > 0 {
+		finalList = append(finalList, li(fmt.Sprintf("Encountered unknown capabilities\n%s", strings.Join(unknowns, "\n"))))
+	}
+
+	return strings.Join(finalList, "\n")
+}
+
+func (ice InvalidClaimError[Caveats]) Issuer() ucan.Principal {
+	return ice.Delegation().Issuer()
+}
+
+func (ice InvalidClaimError[Caveats]) Delegation() delegation.Delegation {
+	return ice.match.Source()[0].Delegation()
+}
+
+func (ice InvalidClaimError[Caveats]) DelegationErrors() []DelegationError {
+	return ice.delegationErrors
+}
+
+func (ice InvalidClaimError[Caveats]) UnknownCapabilities() []ucan.Capability[any] {
+	return ice.unknownCapabilities
+}
+
+func (ice InvalidClaimError[Caveats]) InvalidProofs() []ProofError {
+	return ice.invalidProofs
+}
+
+func (ice InvalidClaimError[Caveats]) FailedProofs() []InvalidClaim {
+	return ice.failedProofs
 }
 
 type Unauthorized interface {

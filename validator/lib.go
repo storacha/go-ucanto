@@ -12,6 +12,7 @@ import (
 	"github.com/storacha-network/go-ucanto/core/policy/literal"
 	"github.com/storacha-network/go-ucanto/core/policy/selector"
 	"github.com/storacha-network/go-ucanto/core/result"
+	"github.com/storacha-network/go-ucanto/core/result/failure"
 	"github.com/storacha-network/go-ucanto/core/schema"
 	"github.com/storacha-network/go-ucanto/did"
 	"github.com/storacha-network/go-ucanto/principal"
@@ -227,18 +228,44 @@ func Claim[Caveats any](capability CapabilityParser[Caveats], proofs []delegatio
 	for _, matched := range matches {
 		selector := matched.Prune(canissuer[Caveats]{canIssue: context.CanIssue})
 		if selector == nil {
-			authorization := NewAuthorization(matched, nil)
+			auth := NewAuthorization(matched, nil)
 			revoked := result.MatchResultR1(
-				context.ValidateAuthorization(ConvertUnknownAuthorization(authorization)),
+				context.ValidateAuthorization(ConvertUnknownAuthorization(auth)),
 				func(o result.Unit) Revoked { return nil },
 				func(x Revoked) Revoked { return x },
 			)
 			if revoked == nil {
-				return result.Ok[Authorization[Caveats], Unauthorized](authorization), nil
+				return result.Ok[Authorization[Caveats], Unauthorized](auth), nil
 			}
 			invalidprf = append(invalidprf, revoked)
 		} else {
-			Authorize(matched, context)
+			ar, err := Authorize(matched, context)
+			if err != nil {
+				return nil, err
+			}
+			auth := result.MatchResultR1(
+				ar,
+				func(a Authorization[Caveats]) Authorization[Caveats] {
+					auth := NewAuthorization(matched, []Authorization[Caveats]{a})
+					return result.MatchResultR1(
+						context.ValidateAuthorization(ConvertUnknownAuthorization(auth)),
+						func(o result.Unit) Authorization[Caveats] {
+							return auth
+						},
+						func(x Revoked) Authorization[Caveats] {
+							invalidprf = append(invalidprf, x)
+							return nil
+						},
+					)
+				},
+				func(x InvalidClaim) Authorization[Caveats] {
+					failedprf = append(failedprf, x)
+					return nil
+				},
+			)
+			if auth != nil {
+				return result.Ok[Authorization[Caveats], Unauthorized](auth), nil
+			}
 		}
 	}
 
@@ -381,6 +408,17 @@ func VerifySession(dlg delegation.Delegation, prfs []delegation.Delegation, ctx 
 				policy.Equal(selector.MustParse(".proof"), literal.Link(dlg.Link())),
 			},
 		),
+		func(claimed, delegated ucan.Capability[vdm.AttestationModel]) result.Result[result.Unit, failure.Failure] {
+			return result.AndThen(
+				DefaultDerives(claimed, delegated),
+				func(o result.Unit) result.Result[result.Unit, failure.Failure] {
+					if claimed.Nb().Proof != delegated.Nb().Proof {
+						return result.Error[result.Unit, failure.Failure](schema.NewSchemaError(fmt.Sprintf(`proof: %s violates %s`, claimed.Nb().Proof, delegated.Nb().Proof)))
+					}
+					return result.Ok[result.Unit, failure.Failure](o)
+				},
+			)
+		},
 	)
 
 	// We only consider attestations otherwise we will end up doing an
@@ -398,12 +436,45 @@ func VerifySession(dlg delegation.Delegation, prfs []delegation.Delegation, ctx 
 // Authorize verifies whether any of the delegated proofs grant capability.
 func Authorize[Caveats any](match Match[Caveats], context ClaimContext) (result.Result[Authorization[Caveats], InvalidClaim], error) {
 	// load proofs from all delegations
-	sources, errors, err := ResolveMatch(match, context)
+	sources, invalidprf, err := ResolveMatch(match, context)
 	if err != nil {
 		return nil, err
 	}
 
-	match.Select(sources)
+	matches, dlgerrs, unknowns, err := match.Select(sources)
+	if err != nil {
+		return nil, err
+	}
+
+	var failedprf []InvalidClaim
+	for _, matched := range matches {
+		selector := matched.Prune(canissuer[Caveats]{canIssue: context.CanIssue})
+		if selector == nil {
+			return result.Ok[Authorization[Caveats], InvalidClaim](NewAuthorization(matched, nil)), nil
+		} else {
+			ar, err := Authorize(matched, context)
+			if err != nil {
+				return nil, err
+			}
+			auth := result.MatchResultR1(
+				ar,
+				func(a Authorization[Caveats]) Authorization[Caveats] {
+					return NewAuthorization(matched, []Authorization[Caveats]{a})
+				},
+				func(x InvalidClaim) Authorization[Caveats] {
+					failedprf = append(failedprf, x)
+					return nil
+				},
+			)
+			if auth != nil {
+				return result.Ok[Authorization[Caveats], InvalidClaim](auth), nil
+			}
+		}
+	}
+
+	return result.Error[Authorization[Caveats], InvalidClaim](
+		NewInvalidClaimError(match, dlgerrs, unknowns, invalidprf, failedprf),
+	), nil
 }
 
 func ResolveMatch[Caveats any](match Match[Caveats], context ClaimContext) (sources []Source, errors []ProofError, err error) {
