@@ -65,7 +65,7 @@ func (a unknownauth[C]) Issuer() ucan.Principal {
 
 func (a unknownauth[C]) Proofs() []Authorization[any] {
 	var prf []Authorization[any]
-	for _, p := range a.Proofs() {
+	for _, p := range a.auth.Proofs() {
 		prf = append(prf, ConvertUnknownAuthorization(p))
 	}
 	return prf
