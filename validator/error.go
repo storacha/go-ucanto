@@ -584,7 +584,7 @@ func (ue UnauthorizedError[Caveats]) isUnauthorized() {}
 
 func indent(message string) string {
 	indent := "  "
-	return indent + strings.Join(strings.Split(message, "\n"), "\n$"+indent)
+	return indent + strings.Join(strings.Split(message, "\n"), "\n"+indent)
 }
 
 func li(message string) string {

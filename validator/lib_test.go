@@ -30,8 +30,10 @@ func (c storeAddCaveats) Build() (ipld.Node, error) {
 	ma, _ := nb.BeginMap(2)
 	ma.AssembleKey().AssignString("link")
 	ma.AssembleValue().AssignLink(c.Link)
-	ma.AssembleKey().AssignString("origin")
-	ma.AssembleValue().AssignLink(c.Origin)
+	if c.Origin != nil {
+		ma.AssembleKey().AssignString("origin")
+		ma.AssembleValue().AssignLink(c.Origin)
+	}
 	ma.Finish()
 	return nb.Build(), nil
 }
@@ -110,7 +112,7 @@ func TestAccess(t *testing.T) {
 			res,
 			func(a Authorization[storeAddCaveats]) {
 				require.Equal(t, storeAdd.Can(), a.Capability().Can())
-				require.Equal(t, alice.DID(), a.Capability().With())
+				require.Equal(t, alice.DID().String(), a.Capability().With())
 				require.Equal(t, alice.DID(), a.Issuer().DID())
 				require.Equal(t, bob.DID(), a.Audience().DID())
 			},

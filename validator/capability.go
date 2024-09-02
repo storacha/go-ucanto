@@ -61,9 +61,9 @@ func (m match[Caveats]) Proofs() []delegation.Delegation {
 
 func (m match[Caveats]) Prune(context CanIssuer[Caveats]) Match[Caveats] {
 	if context.CanIssue(m.value, m.sources[0].Delegation().Issuer().DID()) {
-		return m
+		return nil
 	}
-	return nil
+	return m
 }
 
 func (m match[Caveats]) Source() []Source {
