@@ -91,13 +91,15 @@ func (m match[Caveats]) Select(sources []Source) (matches []Match[Caveats], erro
 				return nil
 			},
 			func(x InvalidCapability) error {
-				if uerr, ok := err.(UnknownCapability); ok {
+				if uerr, ok := x.(UnknownCapability); ok {
 					unknowns = append(unknowns, uerr.Capability())
+					return nil
 				}
-				if merr, ok := err.(MalformedCapability); ok {
+				if merr, ok := x.(MalformedCapability); ok {
 					errors = append(errors, NewDelegationError([]DelegationSubError{merr}, m))
+					return nil
 				}
-				return fmt.Errorf("unexpected error type in resolved capability result")
+				return fmt.Errorf("unexpected error type in resolved capability result: %w", err)
 			},
 		)
 		if err != nil {
@@ -244,14 +246,16 @@ func Select[Caveats any](matcher Matcher[Caveats], capabilities []Source) (match
 				matches = append(matches, match)
 				return nil
 			},
-			func(err InvalidCapability) error {
-				if uerr, ok := err.(UnknownCapability); ok {
-					unknowns = append(unknowns, uerr.Capability())
+			func(x InvalidCapability) error {
+				if ux, ok := x.(UnknownCapability); ok {
+					unknowns = append(unknowns, ux.Capability())
+					return nil
 				}
-				if serr, ok := err.(DelegationSubError); ok {
-					errors = append(errors, NewDelegationError([]DelegationSubError{serr}, capability.Capability()))
+				if sx, ok := x.(DelegationSubError); ok {
+					errors = append(errors, NewDelegationError([]DelegationSubError{sx}, capability.Capability()))
+					return nil
 				}
-				return fmt.Errorf("unexpected error type in match result")
+				return fmt.Errorf("unexpected error type in match result: %w", x)
 			},
 		)
 		if err != nil {

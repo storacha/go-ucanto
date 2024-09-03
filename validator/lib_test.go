@@ -2,6 +2,7 @@ package validator
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -160,9 +161,10 @@ func TestAccess(t *testing.T) {
 				},
 				func(x Unauthorized) {
 					require.Equal(t, x.Name(), "Unauthorized")
-
-					isoexp := time.Unix(int64(exp), 0).Format(time.RFC3339)
-					msg := fmt.Sprintf("Claim %s is not authorized\n  - Proof %s has expired on %s", storeAdd, inv.Link(), isoexp)
+					msg := strings.Join([]string{
+						fmt.Sprintf("Claim %s is not authorized", storeAdd),
+						fmt.Sprintf("  - Proof %s has expired on %s", inv.Link(), time.Unix(int64(exp), 0).Format(time.RFC3339)),
+					}, "\n")
 					require.Equal(t, msg, x.Error())
 				},
 			)
@@ -201,9 +203,10 @@ func TestAccess(t *testing.T) {
 				},
 				func(x Unauthorized) {
 					require.Equal(t, x.Name(), "Unauthorized")
-
-					isoexp := time.Unix(int64(nbf), 0).Format(time.RFC3339)
-					msg := fmt.Sprintf("Claim %s is not authorized\n  - Proof %s is not valid before %s", storeAdd, inv.Link(), isoexp)
+					msg := strings.Join([]string{
+						fmt.Sprintf("Claim %s is not authorized", storeAdd),
+						fmt.Sprintf("  - Proof %s is not valid before %s", inv.Link(), time.Unix(int64(nbf), 0).Format(time.RFC3339)),
+					}, "\n")
 					require.Equal(t, msg, x.Error())
 				},
 			)
@@ -242,7 +245,55 @@ func TestAccess(t *testing.T) {
 				},
 				func(x Unauthorized) {
 					require.Equal(t, x.Name(), "Unauthorized")
-					msg := fmt.Sprintf("Claim %s is not authorized\n  - Proof %s does not has a valid signature from %s", storeAdd, inv.Link(), alice.DID())
+					msg := strings.Join([]string{
+						fmt.Sprintf("Claim %s is not authorized", storeAdd),
+						fmt.Sprintf("  - Proof %s does not has a valid signature from %s", inv.Link(), alice.DID()),
+					}, "\n")
+					require.Equal(t, msg, x.Error())
+				},
+			)
+		})
+
+		t.Run("unknown capability", func(t *testing.T) {
+			type storeWriteCaveats = storeAddCaveats
+
+			inv, err := invocation.Invoke(
+				alice,
+				service,
+				ucan.NewCapability(
+					"store/write",
+					alice.DID().String(),
+					storeWriteCaveats{Link: testLink},
+				),
+			)
+			require.NoError(t, err)
+
+			context := NewValidationContext(
+				service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			res, err := Access(inv, context)
+			require.NoError(t, err)
+
+			result.MatchResultR0(
+				res,
+				func(a Authorization[storeAddCaveats]) {
+					t.Fatalf("unexpected authorization: %+v", a)
+				},
+				func(x Unauthorized) {
+					require.Equal(t, x.Name(), "Unauthorized")
+					msg := strings.Join([]string{
+						fmt.Sprintf("Claim %s is not authorized", storeAdd),
+						"  - No matching delegated capability found",
+						"  - Encountered unknown capabilities",
+						fmt.Sprintf("    - {\"can\":\"store/write\",\"with\":\"%s\",\"nb\":{}}", alice.DID()),
+					}, "\n")
 					require.Equal(t, msg, x.Error())
 				},
 			)

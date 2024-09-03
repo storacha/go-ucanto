@@ -5,8 +5,8 @@ import (
 )
 
 type jsonModel struct {
-	With Resource    `json:"with"`
 	Can  Ability     `json:"can"`
+	With Resource    `json:"with"`
 	Nb   interface{} `json:"nb,omitempty"`
 }
 
@@ -32,8 +32,8 @@ func (c *capability[T]) With() Resource {
 
 func (c *capability[T]) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonModel{
-		With: c.with,
 		Can:  c.can,
+		With: c.with,
 		Nb:   c.nb,
 	})
 }
