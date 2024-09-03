@@ -3,11 +3,13 @@ package validator
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipld/go-ipld-prime/node/basicnode"
+	"github.com/storacha-network/go-ucanto/core/delegation"
 	"github.com/storacha-network/go-ucanto/core/invocation"
 	"github.com/storacha-network/go-ucanto/core/result"
 	"github.com/storacha-network/go-ucanto/core/result/failure"
@@ -84,42 +86,167 @@ func TestAccess(t *testing.T) {
 		return verifier.Parse(str)
 	}
 
-	t.Run("authorize self-issued invocation", func(t *testing.T) {
-		inv, err := invocation.Invoke(
-			alice,
-			bob,
-			storeAdd.New(
-				alice.DID().String(),
-				storeAddCaveats{Link: testLink},
-			),
-		)
-		require.NoError(t, err)
+	t.Run("authorized", func(t *testing.T) {
+		t.Run("self-issued invocation", func(t *testing.T) {
+			inv, err := invocation.Invoke(
+				alice,
+				bob,
+				storeAdd.New(
+					alice.DID().String(),
+					storeAddCaveats{Link: testLink},
+				),
+			)
+			require.NoError(t, err)
 
-		context := NewValidationContext(
-			service.Verifier(),
-			storeAdd,
-			IsSelfIssued,
-			validateAuthOk,
-			ProofUnavailable,
-			parseEdPrincipal,
-			FailDIDKeyResolution,
-		)
+			context := NewValidationContext(
+				service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
 
-		res, err := Access(inv, context)
-		require.NoError(t, err)
+			res, err := Access(inv, context)
+			require.NoError(t, err)
 
-		result.MatchResultR0(
-			res,
-			func(a Authorization[storeAddCaveats]) {
-				require.Equal(t, storeAdd.Can(), a.Capability().Can())
-				require.Equal(t, alice.DID().String(), a.Capability().With())
-				require.Equal(t, alice.DID(), a.Issuer().DID())
-				require.Equal(t, bob.DID(), a.Audience().DID())
-			},
-			func(x Unauthorized) {
-				t.Fatalf("unexpected unauthorized failure: %s", x)
-			},
-		)
+			result.MatchResultR0(
+				res,
+				func(a Authorization[storeAddCaveats]) {
+					require.Equal(t, storeAdd.Can(), a.Capability().Can())
+					require.Equal(t, alice.DID().String(), a.Capability().With())
+					require.Equal(t, alice.DID(), a.Issuer().DID())
+					require.Equal(t, bob.DID(), a.Audience().DID())
+				},
+				func(x Unauthorized) {
+					t.Fatalf("unexpected unauthorized failure: %s", x)
+				},
+			)
+		})
+	})
+
+	t.Run("unauthorized", func(t *testing.T) {
+		t.Run("expired invocation", func(t *testing.T) {
+			exp := ucan.Now() - 5
+			inv, err := invocation.Invoke(
+				alice,
+				service,
+				storeAdd.New(
+					alice.DID().String(),
+					storeAddCaveats{Link: testLink},
+				),
+				delegation.WithExpiration(exp),
+			)
+			require.NoError(t, err)
+
+			context := NewValidationContext(
+				service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			res, err := Access(inv, context)
+			require.NoError(t, err)
+
+			result.MatchResultR0(
+				res,
+				func(a Authorization[storeAddCaveats]) {
+					t.Fatalf("unexpected authorization: %+v", a)
+				},
+				func(x Unauthorized) {
+					require.Equal(t, x.Name(), "Unauthorized")
+
+					isoexp := time.Unix(int64(exp), 0).Format(time.RFC3339)
+					msg := fmt.Sprintf("Claim %s is not authorized\n  - Proof %s has expired on %s", storeAdd, inv.Link(), isoexp)
+					require.Equal(t, msg, x.Error())
+				},
+			)
+		})
+
+		t.Run("not valid before", func(t *testing.T) {
+			nbf := ucan.Now() + 500
+			inv, err := invocation.Invoke(
+				alice,
+				service,
+				storeAdd.New(
+					alice.DID().String(),
+					storeAddCaveats{Link: testLink},
+				),
+				delegation.WithNotBefore(nbf),
+			)
+			require.NoError(t, err)
+
+			context := NewValidationContext(
+				service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			res, err := Access(inv, context)
+			require.NoError(t, err)
+
+			result.MatchResultR0(
+				res,
+				func(a Authorization[storeAddCaveats]) {
+					t.Fatalf("unexpected authorization: %+v", a)
+				},
+				func(x Unauthorized) {
+					require.Equal(t, x.Name(), "Unauthorized")
+
+					isoexp := time.Unix(int64(nbf), 0).Format(time.RFC3339)
+					msg := fmt.Sprintf("Claim %s is not authorized\n  - Proof %s is not valid before %s", storeAdd, inv.Link(), isoexp)
+					require.Equal(t, msg, x.Error())
+				},
+			)
+		})
+
+		t.Run("invalid signature", func(t *testing.T) {
+			inv, err := invocation.Invoke(
+				alice,
+				service,
+				storeAdd.New(
+					alice.DID().String(),
+					storeAddCaveats{Link: testLink},
+				),
+			)
+			require.NoError(t, err)
+
+			inv.Data().Model().S = bob.Sign(inv.Root().Bytes()).Bytes()
+
+			context := NewValidationContext(
+				service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			res, err := Access(inv, context)
+			require.NoError(t, err)
+
+			result.MatchResultR0(
+				res,
+				func(a Authorization[storeAddCaveats]) {
+					t.Fatalf("unexpected authorization: %+v", a)
+				},
+				func(x Unauthorized) {
+					require.Equal(t, x.Name(), "Unauthorized")
+					msg := fmt.Sprintf("Claim %s is not authorized\n  - Proof %s does not has a valid signature from %s", storeAdd, inv.Link(), alice.DID())
+					require.Equal(t, msg, x.Error())
+				},
+			)
+		})
 	})
 }
 

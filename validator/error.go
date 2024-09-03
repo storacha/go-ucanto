@@ -143,7 +143,7 @@ func (ise InvalidSignatureError) Delegation() delegation.Delegation {
 func (ise InvalidSignatureError) Error() string {
 	issuer := ise.Issuer().DID()
 	key := ise.verifier.DID()
-	if !strings.HasPrefix(issuer.String(), "did:key") {
+	if strings.HasPrefix(issuer.String(), "did:key") {
 		return fmt.Sprintf(`Proof %s does not has a valid signature from %s`, ise.delegation.Link(), key)
 	}
 	return strings.Join([]string{
@@ -330,7 +330,7 @@ func NewExpiredError(delegation delegation.Delegation) InvalidProof {
 
 func (ee ExpiredError) Error() string {
 	return fmt.Sprintf("Proof %s has expired on %s", ee.delegation.Link(),
-		time.UnixMilli(int64(ee.delegation.Expiration())).Format(time.RFC3339))
+		time.Unix(int64(ee.delegation.Expiration()), 0).Format(time.RFC3339))
 }
 
 func (ee ExpiredError) Build() (datamodel.Node, error) {
@@ -384,7 +384,7 @@ func NewNotValidBeforeError(delegation delegation.Delegation) InvalidProof {
 
 func (nvbe NotValidBeforeError) Error() string {
 	return fmt.Sprintf("Proof %s is not valid before %s", nvbe.delegation.Link(),
-		time.UnixMilli(int64(nvbe.delegation.NotBefore())).Format(time.RFC3339))
+		time.Unix(int64(nvbe.delegation.NotBefore()), 0).Format(time.RFC3339))
 }
 
 func (nvbe NotValidBeforeError) Build() (datamodel.Node, error) {
