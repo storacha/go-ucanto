@@ -10,6 +10,7 @@ import (
 	ipldcar "github.com/ipld/go-car"
 	"github.com/ipld/go-car/util"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/multiformats/go-varint"
 	"github.com/storacha-network/go-ucanto/core/ipld"
 	"github.com/storacha-network/go-ucanto/core/ipld/block"
 	"github.com/storacha-network/go-ucanto/core/iterable"
@@ -57,6 +58,26 @@ func Encode(roots []ipld.Link, blocks iterable.Iterator[ipld.Block]) io.Reader {
 	return reader
 }
 
+type CarBlock interface {
+	ipld.Block
+	Offset() uint64
+	Length() uint64
+}
+
+type carBlock struct {
+	ipld.Block
+	offset uint64
+	length uint64
+}
+
+func (cb carBlock) Offset() uint64 {
+	return cb.offset
+}
+
+func (cb carBlock) Length() uint64 {
+	return cb.length
+}
+
 func Decode(reader io.Reader) ([]ipld.Link, iterable.Iterator[ipld.Block], error) {
 	br := bufio.NewReader(reader)
 
@@ -67,6 +88,11 @@ func Decode(reader io.Reader) ([]ipld.Link, iterable.Iterator[ipld.Block], error
 
 	if h.Version != 1 {
 		return nil, nil, fmt.Errorf("invalid car version: %d", h.Version)
+	}
+
+	offset, err := ipldcar.HeaderSize(h)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	var roots []ipld.Link
@@ -92,6 +118,9 @@ func Decode(reader io.Reader) ([]ipld.Link, iterable.Iterator[ipld.Block], error
 			return nil, fmt.Errorf("mismatch in content integrity, name: %s, data: %s", cid, hashed)
 		}
 
-		return block.NewBlock(cidlink.Link{Cid: cid}, bytes), nil
+		ss := uint64(cid.ByteLen()) + uint64(len(bytes))
+		offset += uint64(varint.UvarintSize(ss)) + ss
+
+		return carBlock{block.NewBlock(cidlink.Link{Cid: cid}, bytes), offset - uint64(len(bytes)), uint64(len(bytes))}, nil
 	}), nil
 }

@@ -47,7 +47,7 @@ func TestDecodeCAR(t *testing.T) {
 		t.Fatalf("unexpected root: %s, expected: %s", roots[0], fixtures[0].root)
 	}
 
-	var blks []ipld.Block
+	var blks []CarBlock
 	for {
 		b, err := blocks.Next()
 		if err != nil {
@@ -56,7 +56,11 @@ func TestDecodeCAR(t *testing.T) {
 			}
 			t.Fatalf("reading blocks: %s", err)
 		}
-		blks = append(blks, b)
+		cb, ok := b.(CarBlock)
+		if !ok {
+			t.Fatalf("did not return a CarBlock")
+		}
+		blks = append(blks, cb)
 	}
 
 	if len(blks) != len(fixtures[0].blocks) {
@@ -66,6 +70,22 @@ func TestDecodeCAR(t *testing.T) {
 		if b.String() != blks[i].Link().String() {
 			t.Fatalf("unexpected block: %s, expected: %s", b, blks[i].Link())
 		}
+		// verify offset and length can be used to directly read the block in the CAR file
+		file.Seek(int64(blks[i].Offset()), io.SeekStart)
+		data := make([]byte, blks[i].Length())
+		_, err := file.Read(data)
+		if err != nil {
+			t.Fatalf("error reading block from raw file")
+		}
+		hashed, err := blks[i].Link().(cidlink.Link).Cid.Prefix().Sum(data)
+		if err != nil {
+			t.Fatalf("error hashing block from raw file")
+		}
+
+		if hashed.String() != blks[i].Link().String() {
+			t.Fatalf("raw read from offset block: %s, expected: %s", hashed, blks[i].Link())
+		}
+
 	}
 }
 
