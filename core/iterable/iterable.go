@@ -50,6 +50,17 @@ func Collect[T any](it Iterator[T]) ([]T, error) {
 	return items, nil
 }
 
+func Map[T, U any](it Iterator[T], mapFn func(T) U) Iterator[U] {
+	return NewIterator(func() (U, error) {
+		t, err := it.Next()
+		if err != nil {
+			var undef U
+			return undef, err
+		}
+		return mapFn(t), nil
+	})
+}
+
 func Concat[T any](iterators ...Iterator[T]) Iterator[T] {
 	if len(iterators) == 0 {
 		return From([]T{})
