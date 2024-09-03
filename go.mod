@@ -1,6 +1,6 @@
 module github.com/storacha-network/go-ucanto
 
-go 1.21
+go 1.23
 
 require (
 	github.com/ipfs/go-cid v0.4.1
