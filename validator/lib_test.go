@@ -12,7 +12,6 @@ import (
 	"github.com/ipld/go-ipld-prime/node/basicnode"
 	"github.com/storacha-network/go-ucanto/core/delegation"
 	"github.com/storacha-network/go-ucanto/core/invocation"
-	"github.com/storacha-network/go-ucanto/core/result"
 	"github.com/storacha-network/go-ucanto/core/result/failure"
 	"github.com/storacha-network/go-ucanto/core/schema"
 	"github.com/storacha-network/go-ucanto/principal"
@@ -56,12 +55,11 @@ func newStoreAddCapability(t *testing.T) CapabilityParser[storeAddCaveats] {
 		"store/add",
 		schema.DIDString(),
 		schema.Struct[storeAddCaveats](typ.TypeByName("StoreAddCaveats"), nil),
-		func(claimed, delegated ucan.Capability[storeAddCaveats]) result.Result[result.Unit, failure.Failure] {
+		func(claimed, delegated ucan.Capability[storeAddCaveats]) failure.Failure {
 			if claimed.With() != delegated.With() {
 				err := fmt.Errorf("Expected 'with: \"%s\"' instead got '%s'", delegated.With(), claimed.With())
-				return result.Error[result.Unit](failure.FromError(err))
+				return failure.FromError(err)
 			}
-
 			if delegated.Nb().Link != nil && delegated.Nb().Link != claimed.Nb().Link {
 				var err error
 				if claimed.Nb().Link == nil {
@@ -69,10 +67,9 @@ func newStoreAddCapability(t *testing.T) CapabilityParser[storeAddCaveats] {
 				} else {
 					err = fmt.Errorf("Link %s violates imposed %s constraint", claimed.Nb().Link, delegated.Nb().Link)
 				}
-				return result.Error[result.Unit](failure.FromError(err))
+				return failure.FromError(err)
 			}
-
-			return result.Ok[result.Unit, failure.Failure](struct{}{})
+			return nil
 		},
 	)
 }
@@ -80,9 +77,7 @@ func newStoreAddCapability(t *testing.T) CapabilityParser[storeAddCaveats] {
 func TestAccess(t *testing.T) {
 	storeAdd := newStoreAddCapability(t)
 	testLink := cidlink.Link{Cid: cid.MustParse("bafkqaaa")}
-	validateAuthOk := func(auth Authorization[any]) result.Result[result.Unit, Revoked] {
-		return result.Ok[result.Unit, Revoked](nil)
-	}
+	validateAuthOk := func(auth Authorization[any]) Revoked { return nil }
 	parseEdPrincipal := func(str string) (principal.Verifier, error) {
 		return verifier.Parse(str)
 	}
@@ -109,21 +104,12 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			res, err := Access(inv, context)
-			require.NoError(t, err)
-
-			result.MatchResultR0(
-				res,
-				func(a Authorization[storeAddCaveats]) {
-					require.Equal(t, storeAdd.Can(), a.Capability().Can())
-					require.Equal(t, alice.DID().String(), a.Capability().With())
-					require.Equal(t, alice.DID(), a.Issuer().DID())
-					require.Equal(t, bob.DID(), a.Audience().DID())
-				},
-				func(x Unauthorized) {
-					t.Fatalf("unexpected unauthorized failure: %s", x)
-				},
-			)
+			a, x := Access(inv, context)
+			require.NoError(t, x)
+			require.Equal(t, storeAdd.Can(), a.Capability().Can())
+			require.Equal(t, alice.DID().String(), a.Capability().With())
+			require.Equal(t, alice.DID(), a.Issuer().DID())
+			require.Equal(t, bob.DID(), a.Audience().DID())
 		})
 	})
 
@@ -151,23 +137,15 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			res, err := Access(inv, context)
-			require.NoError(t, err)
-
-			result.MatchResultR0(
-				res,
-				func(a Authorization[storeAddCaveats]) {
-					t.Fatalf("unexpected authorization: %+v", a)
-				},
-				func(x Unauthorized) {
-					require.Equal(t, x.Name(), "Unauthorized")
-					msg := strings.Join([]string{
-						fmt.Sprintf("Claim %s is not authorized", storeAdd),
-						fmt.Sprintf("  - Proof %s has expired on %s", inv.Link(), time.Unix(int64(exp), 0).Format(time.RFC3339)),
-					}, "\n")
-					require.Equal(t, msg, x.Error())
-				},
-			)
+			a, x := Access(inv, context)
+			require.Nil(t, a)
+			require.Error(t, x)
+			require.Equal(t, x.Name(), "Unauthorized")
+			msg := strings.Join([]string{
+				fmt.Sprintf("Claim %s is not authorized", storeAdd),
+				fmt.Sprintf("  - Proof %s has expired on %s", inv.Link(), time.Unix(int64(exp), 0).Format(time.RFC3339)),
+			}, "\n")
+			require.Equal(t, msg, x.Error())
 		})
 
 		t.Run("not valid before", func(t *testing.T) {
@@ -193,23 +171,15 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			res, err := Access(inv, context)
-			require.NoError(t, err)
-
-			result.MatchResultR0(
-				res,
-				func(a Authorization[storeAddCaveats]) {
-					t.Fatalf("unexpected authorization: %+v", a)
-				},
-				func(x Unauthorized) {
-					require.Equal(t, x.Name(), "Unauthorized")
-					msg := strings.Join([]string{
-						fmt.Sprintf("Claim %s is not authorized", storeAdd),
-						fmt.Sprintf("  - Proof %s is not valid before %s", inv.Link(), time.Unix(int64(nbf), 0).Format(time.RFC3339)),
-					}, "\n")
-					require.Equal(t, msg, x.Error())
-				},
-			)
+			a, x := Access(inv, context)
+			require.Nil(t, a)
+			require.Error(t, x)
+			require.Equal(t, x.Name(), "Unauthorized")
+			msg := strings.Join([]string{
+				fmt.Sprintf("Claim %s is not authorized", storeAdd),
+				fmt.Sprintf("  - Proof %s is not valid before %s", inv.Link(), time.Unix(int64(nbf), 0).Format(time.RFC3339)),
+			}, "\n")
+			require.Equal(t, msg, x.Error())
 		})
 
 		t.Run("invalid signature", func(t *testing.T) {
@@ -235,23 +205,15 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			res, err := Access(inv, context)
-			require.NoError(t, err)
-
-			result.MatchResultR0(
-				res,
-				func(a Authorization[storeAddCaveats]) {
-					t.Fatalf("unexpected authorization: %+v", a)
-				},
-				func(x Unauthorized) {
-					require.Equal(t, x.Name(), "Unauthorized")
-					msg := strings.Join([]string{
-						fmt.Sprintf("Claim %s is not authorized", storeAdd),
-						fmt.Sprintf("  - Proof %s does not has a valid signature from %s", inv.Link(), alice.DID()),
-					}, "\n")
-					require.Equal(t, msg, x.Error())
-				},
-			)
+			a, x := Access(inv, context)
+			require.Nil(t, a)
+			require.Error(t, x)
+			require.Equal(t, x.Name(), "Unauthorized")
+			msg := strings.Join([]string{
+				fmt.Sprintf("Claim %s is not authorized", storeAdd),
+				fmt.Sprintf("  - Proof %s does not has a valid signature from %s", inv.Link(), alice.DID()),
+			}, "\n")
+			require.Equal(t, msg, x.Error())
 		})
 
 		t.Run("unknown capability", func(t *testing.T) {
@@ -278,25 +240,17 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			res, err := Access(inv, context)
-			require.NoError(t, err)
-
-			result.MatchResultR0(
-				res,
-				func(a Authorization[storeAddCaveats]) {
-					t.Fatalf("unexpected authorization: %+v", a)
-				},
-				func(x Unauthorized) {
-					require.Equal(t, x.Name(), "Unauthorized")
-					msg := strings.Join([]string{
-						fmt.Sprintf("Claim %s is not authorized", storeAdd),
-						"  - No matching delegated capability found",
-						"  - Encountered unknown capabilities",
-						fmt.Sprintf("    - {\"can\":\"store/write\",\"with\":\"%s\",\"nb\":{}}", alice.DID()),
-					}, "\n")
-					require.Equal(t, msg, x.Error())
-				},
-			)
+			a, x := Access(inv, context)
+			require.Nil(t, a)
+			require.Error(t, x)
+			require.Equal(t, x.Name(), "Unauthorized")
+			msg := strings.Join([]string{
+				fmt.Sprintf("Claim %s is not authorized", storeAdd),
+				"  - No matching delegated capability found",
+				"  - Encountered unknown capabilities",
+				fmt.Sprintf("    - {\"can\":\"store/write\",\"with\":\"%s\",\"nb\":{}}", alice.DID()),
+			}, "\n")
+			require.Equal(t, msg, x.Error())
 		})
 	})
 }

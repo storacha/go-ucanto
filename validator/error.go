@@ -110,11 +110,62 @@ func (see SessionEscalationError) Error() string {
 
 func (see SessionEscalationError) isInvalidProof() {}
 
-type InvalidSignature interface {
+// BadSignature is a signature that could not be verified or has been verified
+// invalid. i.e. it is an [UnverifiableSignature] or an [InvalidSignature].
+type BadSignature interface {
 	InvalidProof
 	Issuer() ucan.Principal
 	Audience() ucan.Principal
 	Delegation() delegation.Delegation
+	isBadSignature()
+}
+
+// UnverifiableSignature is a signature that cannot be verified. i.e. some error
+// occurred when attempting to verify the signature.
+type UnverifiableSignature interface {
+	BadSignature
+	Unwrap() error
+	isUnverifiableSignature()
+}
+
+type UnverifiableSignatureError struct {
+	failure.NamedWithStackTrace
+	delegation delegation.Delegation
+	cause      error
+}
+
+func NewUnverifiableSignatureError(delegation delegation.Delegation, cause error) UnverifiableSignature {
+	return UnverifiableSignatureError{failure.NamedWithCurrentStackTrace("UnverifiableSignature"), delegation, cause}
+}
+
+func (use UnverifiableSignatureError) Issuer() ucan.Principal {
+	return use.delegation.Issuer()
+}
+
+func (use UnverifiableSignatureError) Audience() ucan.Principal {
+	return use.delegation.Audience()
+}
+
+func (use UnverifiableSignatureError) Delegation() delegation.Delegation {
+	return use.delegation
+}
+
+func (use UnverifiableSignatureError) Error() string {
+	issuer := use.Issuer().DID()
+	return fmt.Sprintf("Proof %s issued by %s cannot be verified:\n%s", use.delegation.Link(), issuer, li(use.cause.Error()))
+}
+
+func (use UnverifiableSignatureError) Unwrap() error {
+	return use.cause
+}
+
+func (use UnverifiableSignatureError) isUnverifiableSignature() {}
+func (use UnverifiableSignatureError) isBadSignature()          {}
+func (use UnverifiableSignatureError) isInvalidProof()          {}
+
+// InvalidSignature is a signature that is verified to be invalid.
+type InvalidSignature interface {
+	BadSignature
 	isInvalidSignature()
 }
 
@@ -153,6 +204,7 @@ func (ise InvalidSignatureError) Error() string {
 }
 
 func (ise InvalidSignatureError) isInvalidSignature() {}
+func (ise InvalidSignatureError) isBadSignature()     {}
 func (ise InvalidSignatureError) isInvalidProof()     {}
 
 type UnavailableProof interface {

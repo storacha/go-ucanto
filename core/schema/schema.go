@@ -3,19 +3,18 @@ package schema
 import (
 	"github.com/ipld/go-ipld-prime/node/basicnode"
 	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/result"
 	"github.com/storacha-network/go-ucanto/core/result/failure"
 )
 
 type Reader[I, O any] interface {
-	Read(input I) result.Result[O, failure.Failure]
+	Read(input I) (O, failure.Failure)
 }
 
 type reader[I, O any] struct {
-	readFunc func(input I) result.Result[O, failure.Failure]
+	readFunc func(input I) (O, failure.Failure)
 }
 
-func (r reader[I, O]) Read(input I) result.Result[O, failure.Failure] {
+func (r reader[I, O]) Read(input I) (O, failure.Failure) {
 	return r.readFunc(input)
 }
 

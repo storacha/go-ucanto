@@ -98,8 +98,8 @@ func NewServer(id principal.Signer, options ...Option) (ServerView, error) {
 
 	validateAuthorization := cfg.validateAuthorization
 	if validateAuthorization == nil {
-		validateAuthorization = func(auth validator.Authorization[any]) result.Result[result.Unit, validator.Revoked] {
-			return result.Ok[result.Unit, validator.Revoked](nil)
+		validateAuthorization = func(auth validator.Authorization[any]) validator.Revoked {
+			return nil
 		}
 	}
 
@@ -145,11 +145,11 @@ func (ctx context) CanIssue(capability ucan.Capability[any], issuer did.DID) boo
 	return ctx.canIssue(capability, issuer)
 }
 
-func (ctx context) ValidateAuthorization(auth validator.Authorization[any]) result.Result[result.Unit, validator.Revoked] {
+func (ctx context) ValidateAuthorization(auth validator.Authorization[any]) validator.Revoked {
 	return ctx.validateAuthorization(auth)
 }
 
-func (ctx context) ResolveProof(proof ucan.Link) result.Result[delegation.Delegation, validator.UnavailableProof] {
+func (ctx context) ResolveProof(proof ucan.Link) (delegation.Delegation, validator.UnavailableProof) {
 	return ctx.resolveProof(proof)
 }
 
@@ -157,7 +157,7 @@ func (ctx context) ParsePrincipal(str string) (principal.Verifier, error) {
 	return ctx.parsePrincipal(str)
 }
 
-func (ctx context) ResolveDIDKey(did did.DID) result.Result[did.DID, validator.UnresolvedDID] {
+func (ctx context) ResolveDIDKey(did did.DID) (did.DID, validator.UnresolvedDID) {
 	return ctx.resolveDIDKey(did)
 }
 

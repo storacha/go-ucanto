@@ -1,8 +1,6 @@
 package server
 
 import (
-	"fmt"
-
 	"github.com/storacha-network/go-ucanto/core/invocation"
 	"github.com/storacha-network/go-ucanto/core/ipld"
 	"github.com/storacha-network/go-ucanto/core/result"
@@ -11,13 +9,13 @@ import (
 	"github.com/storacha-network/go-ucanto/validator"
 )
 
-type HandlerFunc[C any, O, X ipld.Builder] func(capability ucan.Capability[C], invocation invocation.Invocation, context InvocationContext) (transaction.Transaction[O, X], error)
+type HandlerFunc[C any, O any] func(capability ucan.Capability[C], invocation invocation.Invocation, context InvocationContext) (out O, fork []ipld.Link, join ipld.Link, err error)
 
 // Provide is used to define given capability provider. It decorates the passed
 // handler and takes care of UCAN validation. It only calls the handler
 // when validation succeeds.
-func Provide[C any, O, X ipld.Builder](capability validator.CapabilityParser[C], handler HandlerFunc[C, O, X]) ServiceMethod[O, X] {
-	return func(invocation invocation.Invocation, context InvocationContext) (transaction.Transaction[O, X], error) {
+func Provide[C any, O any](capability validator.CapabilityParser[C], handler HandlerFunc[C, O]) ServiceMethod[O, any] {
+	return func(invocation invocation.Invocation, context InvocationContext) (transaction.Transaction[O, any], error) {
 		vctx := validator.NewValidationContext(
 			context.ID().Verifier(),
 			capability,
@@ -30,16 +28,14 @@ func Provide[C any, O, X ipld.Builder](capability validator.CapabilityParser[C],
 
 		authorization, err := validator.Access(invocation, vctx)
 		if err != nil {
-			return nil, err
+			return transaction.NewTransaction(result.Error[O](any(err))), err
 		}
 
-		return result.MatchResultR2(authorization, func(ok validator.Authorization[C]) (transaction.Transaction[O, X], error) {
-			return handler(ok.Capability(), invocation, context)
-		}, func(err validator.Unauthorized) (transaction.Transaction[O, X], error) {
-			if failure, ok := any(err).(X); ok {
-				return transaction.NewTransaction(result.Error[O](failure)), nil
-			}
-			return nil, fmt.Errorf("error was not an IPLD builder")
-		})
+		o, fk, jn, herr := handler(authorization.Capability(), invocation, context)
+		if herr != nil {
+
+		}
+
+		return transaction.NewTransaction(result.Ok[O, any](o))
 	}
 }

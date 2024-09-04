@@ -8,7 +8,7 @@ import (
 
 // Transaction defines a result & effect pair, used by provider that wishes to
 // return results that have effects.
-type Transaction[O, X any] interface {
+type Transaction[O any, X any] interface {
 	Out() result.Result[O, X]
 	Fx() receipt.Effects
 }
@@ -18,15 +18,13 @@ type transaction[O, X any] struct {
 	fx  receipt.Effects
 }
 
-func (t *transaction[O, X]) Out() result.Result[O, X] {
+func (t transaction[O, X]) Out() result.Result[O, X] {
 	return t.out
 }
 
-func (t *transaction[O, X]) Fx() receipt.Effects {
+func (t transaction[O, X]) Fx() receipt.Effects {
 	return t.fx
 }
-
-var _ Transaction[any, any] = (*transaction[any, any])(nil)
 
 type effects struct {
 	fork []ipld.Link
