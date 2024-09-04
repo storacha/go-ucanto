@@ -31,11 +31,11 @@ type InvalidProof interface {
 type EscalatedCapabilityError[Caveats any] struct {
 	failure.NamedWithStackTrace
 	claimed   ucan.Capability[Caveats]
-	delegated interface{}
+	delegated ucan.Capability[Caveats]
 	cause     error
 }
 
-func NewEscalatedCapabilityError[Caveats any](claimed ucan.Capability[Caveats], delegated interface{}, cause error) EscalatedCapabilityError[Caveats] {
+func NewEscalatedCapabilityError[Caveats any](claimed ucan.Capability[Caveats], delegated ucan.Capability[Caveats], cause error) EscalatedCapabilityError[Caveats] {
 	return EscalatedCapabilityError[Caveats]{failure.NamedWithCurrentStackTrace("EscalatedCapability"), claimed, delegated, cause}
 }
 
@@ -47,8 +47,21 @@ func (ece EscalatedCapabilityError[Caveats]) Error() string {
 	return fmt.Sprintf("Constraint violation: %s", ece.cause.Error())
 }
 
-func (ece EscalatedCapabilityError[Caveats]) isDelegationSubError() {
+func (ece EscalatedCapabilityError[Caveats]) Build() (datamodel.Node, error) {
+	name := ece.Name()
+	stack := ece.Stack()
+	escalatedCapabilityModel := vdm.EscalatedCapabilityModel{
+		Name:      &name,
+		Message:   ece.Error(),
+		Stack:     &stack,
+		Claimed:   vdm.CapabilityModel{Can: ece.claimed.Can(), With: ece.claimed.With()},
+		Delegated: vdm.CapabilityModel{Can: ece.delegated.Can(), With: ece.delegated.With()},
+		Cause:     vdm.FailureModel{Message: ece.cause.Error()},
+	}
+	return ipld.WrapWithRecovery(&escalatedCapabilityModel, vdm.EscalatedCapabilityType())
 }
+
+func (ece EscalatedCapabilityError[Caveats]) isDelegationSubError() {}
 
 type DelegationError interface {
 	failure.Failure

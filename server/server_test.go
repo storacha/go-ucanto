@@ -19,7 +19,6 @@ import (
 	"github.com/storacha-network/go-ucanto/core/schema"
 	"github.com/storacha-network/go-ucanto/principal/ed25519/signer"
 	sdm "github.com/storacha-network/go-ucanto/server/datamodel"
-	"github.com/storacha-network/go-ucanto/server/transaction"
 	"github.com/storacha-network/go-ucanto/testing/helpers"
 	"github.com/storacha-network/go-ucanto/transport/car/request"
 	"github.com/storacha-network/go-ucanto/transport/car/response"
@@ -121,10 +120,12 @@ func TestSimpleHandler(t *testing.T) {
 
 	server := helpers.Must(NewServer(
 		service,
-		WithServiceMethod(uploadadd.Can(), Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (transaction.Transaction[uploadAddSuccess, ipld.Builder], error) {
-			r := result.Ok[uploadAddSuccess, ipld.Builder](uploadAddSuccess{Root: cap.Nb().Root, Status: "done"})
-			return transaction.NewTransaction(r), nil
-		})),
+		WithServiceMethod(
+			uploadadd.Can(),
+			Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (uploadAddSuccess, receipt.Effects, error) {
+				return uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}, nil, nil
+			}),
+		),
 	))
 
 	conn := helpers.Must(client.NewConnection(service, server))
@@ -175,9 +176,12 @@ func TestHandlerExecutionError(t *testing.T) {
 
 	server := helpers.Must(NewServer(
 		service,
-		WithServiceMethod(uploadadd.Can(), Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (transaction.Transaction[uploadAddSuccess, ipld.Builder], error) {
-			return nil, fmt.Errorf("test error")
-		})),
+		WithServiceMethod(
+			uploadadd.Can(),
+			Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (uploadAddSuccess, receipt.Effects, error) {
+				return uploadAddSuccess{}, nil, fmt.Errorf("test error")
+			}),
+		),
 	))
 
 	conn := helpers.Must(client.NewConnection(service, server))

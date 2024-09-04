@@ -31,35 +31,29 @@ type effects struct {
 	join ipld.Link
 }
 
-func (fx *effects) Fork() []ipld.Link {
+func (fx effects) Fork() []ipld.Link {
 	return fx.fork
 }
 
-func (fx *effects) Join() ipld.Link {
+func (fx effects) Join() ipld.Link {
 	return fx.join
 }
 
-var _ receipt.Effects = (*effects)(nil)
+func NewEffects(fork []ipld.Link, join ipld.Link) receipt.Effects {
+	return effects{fork, join}
+}
 
 // Option is an option configuring a transaction.
 type Option func(cfg *txConfig)
 
 type txConfig struct {
-	fork []ipld.Link
-	join ipld.Link
+	fx receipt.Effects
 }
 
-// WithForks configures the forks for the receipt.
-func WithForks(fork []ipld.Link) Option {
+// WithEffects configures the effects for the receipt.
+func WithEffects(fx receipt.Effects) Option {
 	return func(cfg *txConfig) {
-		cfg.fork = fork
-	}
-}
-
-// WithJoin configures the join for the receipt.
-func WithJoin(join ipld.Link) Option {
-	return func(cfg *txConfig) {
-		cfg.join = join
+		cfg.fx = fx
 	}
 }
 
@@ -68,14 +62,5 @@ func NewTransaction[O, X any](result result.Result[O, X], options ...Option) Tra
 	for _, opt := range options {
 		opt(&cfg)
 	}
-
-	fx := effects{}
-	if len(cfg.fork) > 0 {
-		fx.fork = cfg.fork
-	}
-	if cfg.join != nil {
-		fx.join = cfg.join
-	}
-
-	return &transaction[O, X]{out: result, fx: &fx}
+	return transaction[O, X]{out: result, fx: cfg.fx}
 }

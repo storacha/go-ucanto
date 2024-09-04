@@ -14,7 +14,7 @@ type Option func(cfg *srvConfig) error
 
 type srvConfig struct {
 	codec                 transport.InboundCodec
-	service               map[string]ServiceMethod[ipld.Builder, ipld.Builder]
+	service               Service
 	validateAuthorization validator.RevocationCheckerFunc[any]
 	canIssue              validator.CanIssueFunc[any]
 	resolveProof          validator.ProofResolverFunc
@@ -23,23 +23,15 @@ type srvConfig struct {
 	catch                 ErrorHandlerFunc
 }
 
-func WithServiceMethod[O, X ipld.Builder](can string, handleFunc ServiceMethod[O, X]) Option {
+func WithServiceMethod[O ipld.Builder](can string, handleFunc ServiceMethod[O]) Option {
 	return func(cfg *srvConfig) error {
 		cfg.service[can] = func(input invocation.Invocation, context InvocationContext) (transaction.Transaction[ipld.Builder, ipld.Builder], error) {
 			tx, err := handleFunc(input, context)
 			if err != nil {
 				return nil, err
 			}
-			out := result.MapResultR0(
-				tx.Out(),
-				func(o O) ipld.Builder { return o },
-				func(x X) ipld.Builder { return x },
-			)
-			var opts []transaction.Option
-			if tx.Fx() != nil {
-				opts = append(opts, transaction.WithForks(tx.Fx().Fork()), transaction.WithJoin(tx.Fx().Join()))
-			}
-			return transaction.NewTransaction(out, opts...), nil
+			out := result.MapOk(tx.Out(), func(o O) ipld.Builder { return o })
+			return transaction.NewTransaction(out, transaction.WithEffects(tx.Fx())), nil
 		}
 		return nil
 	}

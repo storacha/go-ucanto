@@ -38,11 +38,11 @@ type InvocationContext interface {
 }
 
 // ServiceMethod is an invocation handler.
-type ServiceMethod[O, X ipld.Builder] func(input invocation.Invocation, context InvocationContext) (transaction.Transaction[O, X], error)
+type ServiceMethod[O ipld.Builder] func(input invocation.Invocation, context InvocationContext) (transaction.Transaction[O, ipld.Builder], error)
 
 // Service is a mapping of service names to handlers, used to define a
 // service implementation.
-type Service = map[string]ServiceMethod[ipld.Builder, ipld.Builder]
+type Service = map[string]ServiceMethod[ipld.Builder]
 
 type ServiceInvocation = invocation.IssuedInvocation
 
@@ -277,20 +277,20 @@ func Run(server Server, invocation ServiceInvocation) (receipt.AnyReceipt, error
 		return receipt.Issue(server.ID(), result.NewFailure(err), ran.FromInvocation(invocation))
 	}
 
-	outcome, err := handle(invocation, server.Context())
+	tx, err := handle(invocation, server.Context())
 	if err != nil {
 		herr := NewHandlerExecutionError(err, cap)
 		server.Catch(herr)
 		return receipt.Issue(server.ID(), result.NewFailure(herr), ran.FromInvocation(invocation))
 	}
 
-	fx := outcome.Fx()
+	fx := tx.Fx()
 	var opts []receipt.Option
 	if fx != nil {
 		opts = append(opts, receipt.WithJoin(fx.Join()), receipt.WithForks(fx.Fork()))
 	}
 
-	rcpt, err := receipt.Issue(server.ID(), outcome.Out(), ran.FromInvocation(invocation), opts...)
+	rcpt, err := receipt.Issue(server.ID(), tx.Out(), ran.FromInvocation(invocation), opts...)
 	if err != nil {
 		herr := NewHandlerExecutionError(err, cap)
 		server.Catch(herr)

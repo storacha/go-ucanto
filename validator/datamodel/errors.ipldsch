@@ -1,25 +1,44 @@
 type Delegation struct {
-	Audience String
+	audience String
 }
 
 type InvalidAudience struct {
-	Name       optional String
-	Audience   String
-	Delegation Delegation
-	Message    String
-	Stack      optional String
+	name       optional String
+	audience   String
+	delegation Delegation
+	message    String
+	stack      optional String
 }
 
 type Expired struct {
-	Name      optional String
-	Message   String
-	ExpiredAt Int
-	Stack     optional String
+	name      optional String
+	message   String
+	expiredAt Int
+	stack     optional String
 }
 
 type NotValidBefore struct {
-	Name      optional String
-	Message   String
-	ValidAt   Int
-	Stack     optional String
+	name      optional String
+	message   String
+	validAt   Int
+	stack     optional String
+}
+
+type Capability struct {
+	can String
+	with String
+}
+
+type Failure struct {
+	name      optional String
+	message   String
+}
+
+type EscalatedCapability struct {
+	name      optional String
+	message   String
+	claimed		Capability
+	delegated	Capability
+	cause			Failure
+	stack     optional String
 }
