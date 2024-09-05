@@ -67,6 +67,15 @@ func WithProofs(prf Proofs) Option {
 	}
 }
 
+// WithProof configures the proofs for the UCAN in the case where there is only
+// a single proof.
+func WithProof(prf Proof) Option {
+	return func(cfg *delegationConfig) error {
+		cfg.prf = Proofs{prf}
+		return nil
+	}
+}
+
 // Delegate creates a new signed token with a given `options.issuer`. If
 // expiration is not set it defaults to 30 seconds from now. Returns UCAN in
 // primary IPLD representation.

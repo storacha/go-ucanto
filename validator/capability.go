@@ -187,10 +187,6 @@ func (c capability[Caveats]) New(with ucan.Resource, nb Caveats) ucan.Capability
 	return ucan.NewCapability(c.descriptor.Can(), with, nb)
 }
 
-// func (c capability[Caveats]) Invoke(issuer ucan.Signer, audience ucan.Principal, with ucan.Resource, nb Caveats, options ...delegation.Option) (invocation.IssuedInvocation, error) {
-// 	return invocation.Invoke(issuer, audience, c.New(with, nb), options...)
-// }
-
 func NewCapability[Caveats any](
 	can ucan.Ability,
 	with schema.Reader[string, ucan.Resource],

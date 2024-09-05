@@ -30,11 +30,13 @@ func (c storeAddCaveats) Build() (ipld.Node, error) {
 	np := basicnode.Prototype.Any
 	nb := np.NewBuilder()
 	ma, _ := nb.BeginMap(2)
-	ma.AssembleKey().AssignString("link")
-	ma.AssembleValue().AssignLink(c.Link)
-	if c.Origin != nil {
-		ma.AssembleKey().AssignString("origin")
-		ma.AssembleValue().AssignLink(c.Origin)
+	if c != (storeAddCaveats{}) {
+		ma.AssembleKey().AssignString("link")
+		ma.AssembleValue().AssignLink(c.Link)
+		if c.Origin != nil {
+			ma.AssembleKey().AssignString("origin")
+			ma.AssembleValue().AssignLink(c.Origin)
+		}
 	}
 	ma.Finish()
 	return nb.Build(), nil
@@ -110,6 +112,94 @@ func TestAccess(t *testing.T) {
 			require.Equal(t, fixtures.Alice.DID().String(), a.Capability().With())
 			require.Equal(t, fixtures.Alice.DID(), a.Issuer().DID())
 			require.Equal(t, fixtures.Bob.DID(), a.Audience().DID())
+		})
+
+		t.Run("delegated invocation", func(t *testing.T) {
+			dlg, err := delegation.Delegate(
+				fixtures.Alice,
+				fixtures.Bob,
+				[]ucan.Capability[storeAddCaveats]{
+					storeAdd.New(fixtures.Alice.DID().String(), storeAddCaveats{}),
+				},
+			)
+			require.NoError(t, err)
+
+			inv, err := invocation.Invoke(
+				fixtures.Bob,
+				fixtures.Service,
+				storeAdd.New(
+					fixtures.Alice.DID().String(),
+					storeAddCaveats{Link: testLink},
+				),
+				delegation.WithProof(delegation.FromDelegation(dlg)),
+			)
+			require.NoError(t, err)
+
+			context := NewValidationContext(
+				fixtures.Service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			a, x := Access(inv, context)
+			require.NoError(t, x)
+			require.Equal(t, storeAdd.Can(), a.Capability().Can())
+			require.Equal(t, fixtures.Alice.DID().String(), a.Capability().With())
+			require.Equal(t, fixtures.Bob.DID(), a.Issuer().DID())
+			require.Equal(t, fixtures.Service.DID(), a.Audience().DID())
+		})
+
+		t.Run("delegation chain", func(t *testing.T) {
+			alice2bob, err := delegation.Delegate(
+				fixtures.Alice,
+				fixtures.Bob,
+				[]ucan.Capability[storeAddCaveats]{
+					storeAdd.New(fixtures.Alice.DID().String(), storeAddCaveats{}),
+				},
+			)
+			require.NoError(t, err)
+
+			bob2mallory, err := delegation.Delegate(
+				fixtures.Bob,
+				fixtures.Mallory,
+				[]ucan.Capability[storeAddCaveats]{
+					storeAdd.New(fixtures.Alice.DID().String(), storeAddCaveats{}),
+				},
+				delegation.WithProof(delegation.FromDelegation(alice2bob)),
+			)
+			require.NoError(t, err)
+
+			inv, err := invocation.Invoke(
+				fixtures.Mallory,
+				fixtures.Service,
+				storeAdd.New(
+					fixtures.Alice.DID().String(),
+					storeAddCaveats{Link: testLink},
+				),
+				delegation.WithProof(delegation.FromDelegation(bob2mallory)),
+			)
+			require.NoError(t, err)
+
+			context := NewValidationContext(
+				fixtures.Service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			a, x := Access(inv, context)
+			require.NoError(t, x)
+			require.Equal(t, storeAdd.Can(), a.Capability().Can())
+			require.Equal(t, fixtures.Alice.DID().String(), a.Capability().With())
+			require.Equal(t, fixtures.Mallory.DID(), a.Issuer().DID())
+			require.Equal(t, fixtures.Service.DID(), a.Audience().DID())
 		})
 	})
 
