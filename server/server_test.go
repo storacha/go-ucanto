@@ -20,7 +20,6 @@ import (
 	"github.com/storacha-network/go-ucanto/core/result"
 	fdm "github.com/storacha-network/go-ucanto/core/result/failure/datamodel"
 	"github.com/storacha-network/go-ucanto/core/schema"
-	"github.com/storacha-network/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha-network/go-ucanto/testing/fixtures"
 	"github.com/storacha-network/go-ucanto/testing/helpers"
 	"github.com/storacha-network/go-ucanto/transport/car/request"
@@ -116,10 +115,7 @@ func asFailure(t testing.TB, n ipld.Node) fdm.FailureModel {
 }
 
 func TestExecute(t *testing.T) {
-	t.Run("simple", func(t *testing.T) {
-		space, err := signer.Generate()
-		require.NoError(t, err)
-
+	t.Run("self-signed", func(t *testing.T) {
 		uploadadd := validator.NewCapability(
 			"upload/add",
 			schema.DIDString(),
@@ -139,11 +135,59 @@ func TestExecute(t *testing.T) {
 
 		conn := helpers.Must(client.NewConnection(fixtures.Service, server))
 		rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
-		cap := uploadadd.New(space.DID().String(), uploadAddCaveats{Root: rt})
+		cap := uploadadd.New(fixtures.Service.DID().String(), uploadAddCaveats{Root: rt})
+		inv, err := invocation.Invoke(fixtures.Service, fixtures.Service, cap)
+		require.NoError(t, err)
+
+		resp, err := client.Execute([]invocation.Invocation{inv}, conn)
+		require.NoError(t, err)
+
+		// get the receipt link for the invocation from the response
+		rcptlnk, ok := resp.Get(inv.Link())
+		require.True(t, ok, "missing receipt for invocation: %s", inv.Link())
+
+		reader := helpers.Must(receipt.NewReceiptReader[uploadAddSuccess, ipld.Node](rcptsch))
+		rcpt := helpers.Must(reader.Read(rcptlnk, resp.Blocks()))
+
+		result.MatchResultR0(rcpt.Out(), func(ok uploadAddSuccess) {
+			fmt.Printf("%+v\n", ok)
+			require.Equal(t, ok.Root, rt)
+			require.Equal(t, ok.Status, "done")
+		}, func(x ipld.Node) {
+			f := asFailure(t, x)
+			fmt.Println(f.Message)
+			fmt.Println(*f.Stack)
+			require.Nil(t, f)
+		})
+	})
+
+	t.Run("delegated", func(t *testing.T) {
+		uploadadd := validator.NewCapability(
+			"upload/add",
+			schema.DIDString(),
+			schema.Struct[uploadAddCaveats](uploadAddCaveatsType(), nil),
+			nil,
+		)
+
+		server := helpers.Must(NewServer(
+			fixtures.Service,
+			WithServiceMethod(
+				uploadadd.Can(),
+				Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (uploadAddSuccess, receipt.Effects, error) {
+					return uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}, nil, nil
+				}),
+			),
+		))
+
+		conn := helpers.Must(client.NewConnection(fixtures.Service, server))
+		rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
+		cap := uploadadd.New(fixtures.Service.DID().String(), uploadAddCaveats{Root: rt})
 		dgl, err := delegation.Delegate(
 			fixtures.Service,
 			fixtures.Alice,
-			[]ucan.Capability[uploadAddCaveats]{ucan.NewCapability(uploadadd.Can(), space.DID().String(), uploadAddCaveats{})},
+			[]ucan.Capability[uploadAddCaveats]{
+				ucan.NewCapability(uploadadd.Can(), fixtures.Service.DID().String(), uploadAddCaveats{}),
+			},
 		)
 		require.NoError(t, err)
 
@@ -174,16 +218,13 @@ func TestExecute(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		space, err := signer.Generate()
-		require.NoError(t, err)
-
 		server := helpers.Must(NewServer(fixtures.Service))
 		conn := helpers.Must(client.NewConnection(fixtures.Service, server))
 
 		rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
 		capability := ucan.NewCapability(
 			"upload/add",
-			space.DID().String(),
+			fixtures.Alice.DID().String(),
 			uploadAddCaveats{Root: rt},
 		)
 
@@ -205,9 +246,6 @@ func TestExecute(t *testing.T) {
 	})
 
 	t.Run("execution error", func(t *testing.T) {
-		space, err := signer.Generate()
-		require.NoError(t, err)
-
 		uploadadd := validator.NewCapability(
 			"upload/add",
 			schema.DIDString(),
@@ -227,7 +265,7 @@ func TestExecute(t *testing.T) {
 
 		conn := helpers.Must(client.NewConnection(fixtures.Service, server))
 		rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
-		cap := uploadadd.New(space.DID().String(), uploadAddCaveats{Root: rt})
+		cap := uploadadd.New(fixtures.Alice.DID().String(), uploadAddCaveats{Root: rt})
 		invs := []invocation.Invocation{helpers.Must(invocation.Invoke(fixtures.Alice, fixtures.Service, cap))}
 		resp := helpers.Must(client.Execute(invs, conn))
 		rcptlnk, ok := resp.Get(invs[0].Link())

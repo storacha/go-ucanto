@@ -264,8 +264,6 @@ func ResolveCapability[Caveats any](descriptor Descriptor[Caveats], claimed ucan
 		return nil, NewMalformedCapabilityError(source.Capability(), err)
 	}
 
-	fmt.Printf("DELEGATED %+v\n", source.Capability().Nb())
-	fmt.Printf("CLAIMED %+v\n", claimed.Nb())
 	// TODO: inherit missing fields
 	nb, err := descriptor.Nb().Read(claimed.Nb())
 	if err != nil {
