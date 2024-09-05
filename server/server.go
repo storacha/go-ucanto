@@ -42,7 +42,7 @@ type ServiceMethod[O ipld.Builder] func(input invocation.Invocation, context Inv
 
 // Service is a mapping of service names to handlers, used to define a
 // service implementation.
-type Service = map[string]ServiceMethod[ipld.Builder]
+type Service = map[ucan.Ability]ServiceMethod[ipld.Builder]
 
 type ServiceInvocation = invocation.IssuedInvocation
 

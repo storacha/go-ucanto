@@ -61,26 +61,3 @@ type NotValidBeforeModel struct {
 func NotValidBeforeType() schema.Type {
 	return errorTypeSystem.TypeByName("NotValidBefore")
 }
-
-type FailureModel struct {
-	Name    *string
-	Message string
-}
-
-type CapabilityModel struct {
-	Can  string
-	With string
-}
-
-type EscalatedCapabilityModel struct {
-	Name      *string
-	Message   string
-	Claimed   CapabilityModel
-	Delegated CapabilityModel
-	Cause     FailureModel
-	Stack     *string
-}
-
-func EscalatedCapabilityType() schema.Type {
-	return errorTypeSystem.TypeByName("EscalatedCapability")
-}

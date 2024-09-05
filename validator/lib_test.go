@@ -15,8 +15,8 @@ import (
 	"github.com/storacha-network/go-ucanto/core/result/failure"
 	"github.com/storacha-network/go-ucanto/core/schema"
 	"github.com/storacha-network/go-ucanto/principal"
-	"github.com/storacha-network/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha-network/go-ucanto/principal/ed25519/verifier"
+	"github.com/storacha-network/go-ucanto/testing/fixtures"
 	"github.com/storacha-network/go-ucanto/ucan"
 	"github.com/stretchr/testify/require"
 )
@@ -85,17 +85,17 @@ func TestAccess(t *testing.T) {
 	t.Run("authorized", func(t *testing.T) {
 		t.Run("self-issued invocation", func(t *testing.T) {
 			inv, err := invocation.Invoke(
-				alice,
-				bob,
+				fixtures.Alice,
+				fixtures.Bob,
 				storeAdd.New(
-					alice.DID().String(),
+					fixtures.Alice.DID().String(),
 					storeAddCaveats{Link: testLink},
 				),
 			)
 			require.NoError(t, err)
 
 			context := NewValidationContext(
-				service.Verifier(),
+				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
 				validateAuthOk,
@@ -107,9 +107,9 @@ func TestAccess(t *testing.T) {
 			a, x := Access(inv, context)
 			require.NoError(t, x)
 			require.Equal(t, storeAdd.Can(), a.Capability().Can())
-			require.Equal(t, alice.DID().String(), a.Capability().With())
-			require.Equal(t, alice.DID(), a.Issuer().DID())
-			require.Equal(t, bob.DID(), a.Audience().DID())
+			require.Equal(t, fixtures.Alice.DID().String(), a.Capability().With())
+			require.Equal(t, fixtures.Alice.DID(), a.Issuer().DID())
+			require.Equal(t, fixtures.Bob.DID(), a.Audience().DID())
 		})
 	})
 
@@ -117,10 +117,10 @@ func TestAccess(t *testing.T) {
 		t.Run("expired invocation", func(t *testing.T) {
 			exp := ucan.Now() - 5
 			inv, err := invocation.Invoke(
-				alice,
-				service,
+				fixtures.Alice,
+				fixtures.Service,
 				storeAdd.New(
-					alice.DID().String(),
+					fixtures.Alice.DID().String(),
 					storeAddCaveats{Link: testLink},
 				),
 				delegation.WithExpiration(exp),
@@ -128,7 +128,7 @@ func TestAccess(t *testing.T) {
 			require.NoError(t, err)
 
 			context := NewValidationContext(
-				service.Verifier(),
+				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
 				validateAuthOk,
@@ -151,10 +151,10 @@ func TestAccess(t *testing.T) {
 		t.Run("not valid before", func(t *testing.T) {
 			nbf := ucan.Now() + 500
 			inv, err := invocation.Invoke(
-				alice,
-				service,
+				fixtures.Alice,
+				fixtures.Service,
 				storeAdd.New(
-					alice.DID().String(),
+					fixtures.Alice.DID().String(),
 					storeAddCaveats{Link: testLink},
 				),
 				delegation.WithNotBefore(nbf),
@@ -162,7 +162,7 @@ func TestAccess(t *testing.T) {
 			require.NoError(t, err)
 
 			context := NewValidationContext(
-				service.Verifier(),
+				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
 				validateAuthOk,
@@ -184,19 +184,19 @@ func TestAccess(t *testing.T) {
 
 		t.Run("invalid signature", func(t *testing.T) {
 			inv, err := invocation.Invoke(
-				alice,
-				service,
+				fixtures.Alice,
+				fixtures.Service,
 				storeAdd.New(
-					alice.DID().String(),
+					fixtures.Alice.DID().String(),
 					storeAddCaveats{Link: testLink},
 				),
 			)
 			require.NoError(t, err)
 
-			inv.Data().Model().S = bob.Sign(inv.Root().Bytes()).Bytes()
+			inv.Data().Model().S = fixtures.Bob.Sign(inv.Root().Bytes()).Bytes()
 
 			context := NewValidationContext(
-				service.Verifier(),
+				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
 				validateAuthOk,
@@ -211,7 +211,7 @@ func TestAccess(t *testing.T) {
 			require.Equal(t, x.Name(), "Unauthorized")
 			msg := strings.Join([]string{
 				fmt.Sprintf("Claim %s is not authorized", storeAdd),
-				fmt.Sprintf("  - Proof %s does not has a valid signature from %s", inv.Link(), alice.DID()),
+				fmt.Sprintf("  - Proof %s does not has a valid signature from %s", inv.Link(), fixtures.Alice.DID()),
 			}, "\n")
 			require.Equal(t, msg, x.Error())
 		})
@@ -220,18 +220,18 @@ func TestAccess(t *testing.T) {
 			type storeWriteCaveats = storeAddCaveats
 
 			inv, err := invocation.Invoke(
-				alice,
-				service,
+				fixtures.Alice,
+				fixtures.Service,
 				ucan.NewCapability(
 					"store/write",
-					alice.DID().String(),
+					fixtures.Alice.DID().String(),
 					storeWriteCaveats{Link: testLink},
 				),
 			)
 			require.NoError(t, err)
 
 			context := NewValidationContext(
-				service.Verifier(),
+				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
 				validateAuthOk,
@@ -248,7 +248,7 @@ func TestAccess(t *testing.T) {
 				fmt.Sprintf("Claim %s is not authorized", storeAdd),
 				"  - No matching delegated capability found",
 				"  - Encountered unknown capabilities",
-				fmt.Sprintf("    - {\"can\":\"store/write\",\"with\":\"%s\",\"nb\":{}}", alice.DID()),
+				fmt.Sprintf("    - {\"can\":\"store/write\",\"with\":\"%s\",\"nb\":{}}", fixtures.Alice.DID()),
 			}, "\n")
 			require.Equal(t, msg, x.Error())
 		})
@@ -256,23 +256,14 @@ func TestAccess(t *testing.T) {
 }
 
 func TestIsSelfIssued(t *testing.T) {
-	alice, err := signer.Generate()
-	if err != nil {
-		t.Fatalf("generating key: %v", err)
-	}
-	bob, err := signer.Generate()
-	if err != nil {
-		t.Fatalf("generating key: %v", err)
-	}
+	cap := ucan.NewCapability("upload/add", fixtures.Alice.DID().String(), struct{}{})
 
-	cap := ucan.NewCapability("upload/add", alice.DID().String(), struct{}{})
-
-	canIssue := IsSelfIssued(cap, alice.DID())
+	canIssue := IsSelfIssued(cap, fixtures.Alice.DID())
 	if canIssue == false {
 		t.Fatal("capability self issued by alice")
 	}
 
-	canIssue = IsSelfIssued(cap, bob.DID())
+	canIssue = IsSelfIssued(cap, fixtures.Bob.DID())
 	if canIssue == true {
 		t.Fatal("capability not self issued by bob")
 	}

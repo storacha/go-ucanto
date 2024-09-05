@@ -176,7 +176,7 @@ func NewFailure(err error) Result[ipld.Builder, ipld.Builder] {
 		return Error[ipld.Builder, ipld.Builder](ipldConvertableError)
 	}
 
-	model := datamodel.Failure{Message: err.Error()}
+	model := datamodel.FailureModel{Message: err.Error()}
 	if named, ok := err.(failure.Named); ok {
 		name := named.Name()
 		model.Name = &name

@@ -30,6 +30,11 @@ type Failure interface {
 	Named
 }
 
+type IPLDBuilderFailure interface {
+	IPLDConvertableError
+	Failure
+}
+
 type NamedWithStackTrace interface {
 	Named
 	WithStackTrace
@@ -63,7 +68,7 @@ func NamedWithCurrentStackTrace(name string) NamedWithStackTrace {
 }
 
 type failure struct {
-	model datamodel.Failure
+	model datamodel.FailureModel
 	build func() (ipld.Node, error)
 }
 
@@ -90,8 +95,8 @@ func (f failure) Build() (ipld.Node, error) {
 	return f.model.Build()
 }
 
-func FromError(err error) Failure {
-	model := datamodel.Failure{Message: err.Error()}
+func FromError(err error) IPLDBuilderFailure {
+	model := datamodel.FailureModel{Message: err.Error()}
 	if named, ok := err.(Named); ok {
 		name := named.Name()
 		model.Name = &name

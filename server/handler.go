@@ -5,6 +5,7 @@ import (
 	"github.com/storacha-network/go-ucanto/core/ipld"
 	"github.com/storacha-network/go-ucanto/core/receipt"
 	"github.com/storacha-network/go-ucanto/core/result"
+	"github.com/storacha-network/go-ucanto/core/result/failure"
 	"github.com/storacha-network/go-ucanto/server/transaction"
 	"github.com/storacha-network/go-ucanto/ucan"
 	"github.com/storacha-network/go-ucanto/validator"
@@ -27,12 +28,12 @@ func Provide[C any, O ipld.Builder](capability validator.CapabilityParser[C], ha
 			context.ResolveDIDKey,
 		)
 
-		authorization, aerr := validator.Access(invocation, vctx)
+		auth, aerr := validator.Access(invocation, vctx)
 		if aerr != nil {
-			return transaction.NewTransaction(result.Error[O, ipld.Builder](aerr)), nil
+			return transaction.NewTransaction(result.Error[O, ipld.Builder](failure.FromError(aerr))), nil
 		}
 
-		o, fx, herr := handler(authorization.Capability(), invocation, context)
+		o, fx, herr := handler(auth.Capability(), invocation, context)
 		if herr != nil {
 			return nil, herr
 		}

@@ -19,7 +19,7 @@ import (
 
 // go hack for union type -- unexported method cannot be implemented outside module limiting satisfying types
 type DelegationSubError interface {
-	error
+	failure.Failure
 	isDelegationSubError()
 }
 
@@ -45,20 +45,6 @@ func (ece EscalatedCapabilityError[Caveats]) Unwrap() error {
 
 func (ece EscalatedCapabilityError[Caveats]) Error() string {
 	return fmt.Sprintf("Constraint violation: %s", ece.cause.Error())
-}
-
-func (ece EscalatedCapabilityError[Caveats]) Build() (datamodel.Node, error) {
-	name := ece.Name()
-	stack := ece.Stack()
-	escalatedCapabilityModel := vdm.EscalatedCapabilityModel{
-		Name:      &name,
-		Message:   ece.Error(),
-		Stack:     &stack,
-		Claimed:   vdm.CapabilityModel{Can: ece.claimed.Can(), With: ece.claimed.With()},
-		Delegated: vdm.CapabilityModel{Can: ece.delegated.Can(), With: ece.delegated.With()},
-		Cause:     vdm.FailureModel{Message: ece.cause.Error()},
-	}
-	return ipld.WrapWithRecovery(&escalatedCapabilityModel, vdm.EscalatedCapabilityType())
 }
 
 func (ece EscalatedCapabilityError[Caveats]) isDelegationSubError() {}
@@ -300,19 +286,6 @@ func NewPrincipalAlignmentError(audience ucan.Principal, delegation delegation.D
 
 func (pae PrincipalAlignmentError) Error() string {
 	return fmt.Sprintf("Delegation audience is '%s' instead of '%s'", pae.delegation.Audience().DID(), pae.audience.DID())
-}
-
-func (pae PrincipalAlignmentError) Build() (datamodel.Node, error) {
-	name := pae.Name()
-	stack := pae.Stack()
-	invalidAudienceModel := vdm.InvalidAudienceModel{
-		Name:       &name,
-		Audience:   pae.audience.DID().String(),
-		Delegation: vdm.Delegation{Audience: pae.delegation.Audience().DID().String()},
-		Message:    pae.Error(),
-		Stack:      &stack,
-	}
-	return ipld.WrapWithRecovery(&invalidAudienceModel, vdm.InvalidAudienceType())
 }
 
 func (pae PrincipalAlignmentError) isInvalidProof() {}

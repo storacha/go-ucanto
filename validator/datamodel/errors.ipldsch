@@ -23,22 +23,3 @@ type NotValidBefore struct {
 	validAt   Int
 	stack     optional String
 }
-
-type Capability struct {
-	can String
-	with String
-}
-
-type Failure struct {
-	name      optional String
-	message   String
-}
-
-type EscalatedCapability struct {
-	name      optional String
-	message   String
-	claimed		Capability
-	delegated	Capability
-	cause			Failure
-	stack     optional String
-}
