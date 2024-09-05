@@ -636,7 +636,7 @@ type ProofError struct {
 }
 
 func (pe ProofError) Error() string {
-	return fmt.Sprintf("Capability can not be derived from prf: %s because: %s\n", pe.proof, li(pe.cause.Error()))
+	return fmt.Sprintf("Capability can not be derived from prf: %s because:\n%s", pe.proof, li(pe.cause.Error()))
 }
 
 func (pe ProofError) Proof() ucan.Link {

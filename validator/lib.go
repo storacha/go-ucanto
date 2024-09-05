@@ -293,11 +293,11 @@ func VerifyAuthorization(dlg delegation.Delegation, prfs []delegation.Delegation
 		if err != nil {
 			return nil, NewUnverifiableSignatureError(dlg, err)
 		}
-		dlg, serr := VerifySignature(dlg, vfr)
-		if serr != nil {
-			return nil, serr
-		}
-		return dlg, nil
+		return VerifySignature(dlg, vfr)
+	}
+
+	if dlg.Issuer().DID() == ctx.Authority().DID() {
+		return VerifySignature(dlg, ctx.Authority())
 	}
 
 	// Attempt to resolve embedded authorization session from the authority
@@ -319,10 +319,7 @@ func VerifyAuthorization(dlg delegation.Delegation, prfs []delegation.Delegation
 			return nil, NewUnverifiableSignatureError(dlg, perr)
 		}
 
-		_, verr := VerifySignature(dlg, vfr)
-		if verr != nil {
-			return nil, verr
-		}
+		return VerifySignature(dlg, vfr)
 	}
 
 	return dlg, nil
@@ -394,12 +391,13 @@ func Authorize[Caveats any](match Match[Caveats], context ClaimContext) (Authori
 			return NewAuthorization(matched, nil), nil
 		}
 
-		auth, err := Authorize(matched, context)
+		auth, err := Authorize(selector, context)
 		if err != nil {
 			failedprf = append(failedprf, err)
 			continue
 		}
-		return auth, nil
+
+		return NewAuthorization(matched, []Authorization[Caveats]{auth}), nil
 	}
 
 	return nil, NewInvalidClaimError(match, dlgerrs, unknowns, invalidprf, failedprf)
