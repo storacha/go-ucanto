@@ -10,14 +10,19 @@ import (
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipld/go-ipld-prime/node/basicnode"
+	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
 	"github.com/storacha-network/go-ucanto/core/delegation"
 	"github.com/storacha-network/go-ucanto/core/invocation"
+	"github.com/storacha-network/go-ucanto/core/ipld/block"
+	"github.com/storacha-network/go-ucanto/core/ipld/codec/cbor"
+	"github.com/storacha-network/go-ucanto/core/ipld/hash/sha256"
 	"github.com/storacha-network/go-ucanto/core/result/failure"
 	"github.com/storacha-network/go-ucanto/core/schema"
 	"github.com/storacha-network/go-ucanto/principal"
 	"github.com/storacha-network/go-ucanto/principal/ed25519/verifier"
 	"github.com/storacha-network/go-ucanto/testing/fixtures"
 	"github.com/storacha-network/go-ucanto/ucan"
+	udm "github.com/storacha-network/go-ucanto/ucan/datamodel/ucan"
 	"github.com/stretchr/testify/require"
 )
 
@@ -311,21 +316,19 @@ func TestAccess(t *testing.T) {
 			require.Equal(t, x.Name(), "Unauthorized")
 			msg := strings.Join([]string{
 				fmt.Sprintf("Claim %s is not authorized", storeAdd),
-				fmt.Sprintf("  - Proof %s does not has a valid signature from %s", inv.Link(), fixtures.Alice.DID()),
+				fmt.Sprintf("  - Proof %s does not have a valid signature from %s", inv.Link(), fixtures.Alice.DID()),
 			}, "\n")
 			require.Equal(t, msg, x.Error())
 		})
 
 		t.Run("unknown capability", func(t *testing.T) {
-			type storeWriteCaveats = storeAddCaveats
-
 			inv, err := invocation.Invoke(
 				fixtures.Alice,
 				fixtures.Service,
 				ucan.NewCapability(
 					"store/write",
 					fixtures.Alice.DID().String(),
-					storeWriteCaveats{Link: testLink},
+					ucan.NoCaveats{},
 				),
 			)
 			require.NoError(t, err)
@@ -483,53 +486,207 @@ func TestAccess(t *testing.T) {
 			require.Equal(t, msg, x.Error())
 		})
 
-		// t.Run("invalid signature", func(t *testing.T) {
-		// 	dlg, err := delegation.Delegate(
-		// 		fixtures.Alice,
-		// 		fixtures.Bob,
-		// 		[]ucan.Capability[storeAddCaveats]{
-		// 			storeAdd.New(fixtures.Alice.DID().String(), storeAddCaveats{}),
-		// 		},
-		// 	)
-		// 	require.NoError(t, err)
+		t.Run("invalid signature", func(t *testing.T) {
+			// In order to mess up the signature we need to reach deep in UCAN library
+			// to create a UCAN model, manually setting the signature to something bad
+			// and then encode it as the root block of the delegation.
+			nb, _ := storeAddCaveats{Link: testLink}.Build()
+			model := udm.UCANModel{
+				V:   "0.9.1",
+				S:   fixtures.Alice.Sign([]byte{}).Bytes(),
+				Iss: fixtures.Alice.DID().Bytes(),
+				Aud: fixtures.Bob.DID().Bytes(),
+				Att: []udm.CapabilityModel{
+					{
+						Can:  storeAdd.Can(),
+						With: fixtures.Alice.DID().String(),
+						Nb:   nb,
+					},
+				},
+				Exp: ucan.Now() + 30,
+			}
 
-		// 	// TODO: mess up signature - cannot just change model as already encoded
-		// 	// blocks are used in the invocation...
+			rt, err := block.Encode(&model, udm.Type(), cbor.Codec, sha256.Hasher)
+			require.NoError(t, err)
 
-		// 	inv, err := invocation.Invoke(
-		// 		fixtures.Bob,
-		// 		fixtures.Service,
-		// 		storeAdd.New(
-		// 			fixtures.Alice.DID().String(),
-		// 			storeAddCaveats{Link: testLink},
-		// 		),
-		// 		delegation.WithProof(delegation.FromDelegation(dlg)),
-		// 	)
-		// 	require.NoError(t, err)
+			bs, err := blockstore.NewBlockStore(blockstore.WithBlocks([]block.Block{rt}))
+			require.NoError(t, err)
 
-		// 	context := NewValidationContext(
-		// 		fixtures.Service.Verifier(),
-		// 		storeAdd,
-		// 		IsSelfIssued,
-		// 		validateAuthOk,
-		// 		ProofUnavailable,
-		// 		parseEdPrincipal,
-		// 		FailDIDKeyResolution,
-		// 	)
+			dlg := delegation.NewDelegation(rt, bs)
 
-		// 	a, x := Access(inv, context)
-		// 	require.Nil(t, a)
-		// 	require.Error(t, x)
-		// 	require.Equal(t, x.Name(), "Unauthorized")
-		// 	msg := strings.Join([]string{
-		// 		fmt.Sprintf("Claim %s is not authorized", storeAdd),
-		// 		fmt.Sprintf(`  - Capability {"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}} is not authorized because:`, storeAdd.Can(), fixtures.Alice.DID(), testLink),
-		// 		fmt.Sprintf("    - Capability can not be (self) issued by '%s'", fixtures.Bob.DID()),
-		// 		fmt.Sprintf("    - Capability can not be derived from prf: %s because:", dlg.Link()),
-		// 		fmt.Sprintf("      - Proof %s has an invalid signature from %s", dlg.Link(), fixtures.Alice.DID()),
-		// 	}, "\n")
-		// 	require.Equal(t, msg, x.Error())
-		// })
+			inv, err := invocation.Invoke(
+				fixtures.Bob,
+				fixtures.Service,
+				storeAdd.New(
+					fixtures.Alice.DID().String(),
+					storeAddCaveats{Link: testLink},
+				),
+				delegation.WithProof(delegation.FromDelegation(dlg)),
+			)
+			require.NoError(t, err)
+
+			context := NewValidationContext(
+				fixtures.Service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			a, x := Access(inv, context)
+			require.Nil(t, a)
+			require.Error(t, x)
+			require.Equal(t, x.Name(), "Unauthorized")
+			msg := strings.Join([]string{
+				fmt.Sprintf("Claim %s is not authorized", storeAdd),
+				fmt.Sprintf(`  - Capability {"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}} is not authorized because:`, storeAdd.Can(), fixtures.Alice.DID(), testLink),
+				fmt.Sprintf("    - Capability can not be (self) issued by '%s'", fixtures.Bob.DID()),
+				fmt.Sprintf("    - Capability can not be derived from prf: %s because:", dlg.Link()),
+				fmt.Sprintf("      - Proof %s does not have a valid signature from %s", dlg.Link(), fixtures.Alice.DID()),
+			}, "\n")
+			require.Equal(t, msg, x.Error())
+		})
+
+		t.Run("unknown capability", func(t *testing.T) {
+			dlg, err := delegation.Delegate(
+				fixtures.Alice,
+				fixtures.Bob,
+				[]ucan.Capability[ucan.NoCaveats]{
+					ucan.NewCapability("store/pin", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+				},
+			)
+			require.NoError(t, err)
+
+			inv, err := invocation.Invoke(
+				fixtures.Bob,
+				fixtures.Service,
+				storeAdd.New(
+					fixtures.Alice.DID().String(),
+					storeAddCaveats{Link: testLink},
+				),
+				delegation.WithProof(delegation.FromDelegation(dlg)),
+			)
+			require.NoError(t, err)
+
+			context := NewValidationContext(
+				fixtures.Service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			a, x := Access(inv, context)
+			require.Nil(t, a)
+			require.Error(t, x)
+			require.Equal(t, x.Name(), "Unauthorized")
+			msg := strings.Join([]string{
+				fmt.Sprintf("Claim %s is not authorized", storeAdd),
+				fmt.Sprintf(`  - Capability {"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}} is not authorized because:`, storeAdd.Can(), fixtures.Alice.DID(), testLink),
+				fmt.Sprintf("    - Capability can not be (self) issued by '%s'", fixtures.Bob.DID()),
+				"    - Delegated capability not found",
+				"    - Encountered unknown capabilities",
+				fmt.Sprintf(`      - {"can":"store/pin","with":"%s","nb":{}}`, fixtures.Alice.DID()),
+			}, "\n")
+			require.Equal(t, msg, x.Error())
+		})
+
+		t.Run("malformed capability", func(t *testing.T) {
+			badDID := fmt.Sprintf("bib:%s", fixtures.Alice.DID().String()[4:])
+			dlg, err := delegation.Delegate(
+				fixtures.Alice,
+				fixtures.Bob,
+				[]ucan.Capability[storeAddCaveats]{
+					ucan.NewCapability("store/add", badDID, storeAddCaveats{}),
+				},
+			)
+			require.NoError(t, err)
+
+			inv, err := invocation.Invoke(
+				fixtures.Bob,
+				fixtures.Service,
+				storeAdd.New(
+					fixtures.Alice.DID().String(),
+					storeAddCaveats{Link: testLink},
+				),
+				delegation.WithProof(delegation.FromDelegation(dlg)),
+			)
+			require.NoError(t, err)
+
+			context := NewValidationContext(
+				fixtures.Service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			a, x := Access(inv, context)
+			require.Nil(t, a)
+			require.Error(t, x)
+			require.Equal(t, x.Name(), "Unauthorized")
+			msg := strings.Join([]string{
+				fmt.Sprintf("Claim %s is not authorized", storeAdd),
+				fmt.Sprintf(`  - Capability {"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}} is not authorized because:`, storeAdd.Can(), fixtures.Alice.DID(), testLink),
+				fmt.Sprintf("    - Capability can not be (self) issued by '%s'", fixtures.Bob.DID()),
+				fmt.Sprintf(`    - Cannot derive {"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}} from delegated capabilities:`, storeAdd.Can(), fixtures.Alice.DID(), testLink),
+				fmt.Sprintf(`      - Encountered malformed '%s' capability: {"can":"%s","with":"%s","nb":{}}`, storeAdd.Can(), storeAdd.Can(), badDID),
+				fmt.Sprintf(`        - Expected a "did:" but got "%s" instead`, badDID),
+			}, "\n")
+			require.Equal(t, msg, x.Error())
+		})
+
+		t.Run("unavailable proof", func(t *testing.T) {
+			dlg, err := delegation.Delegate(
+				fixtures.Alice,
+				fixtures.Bob,
+				[]ucan.Capability[storeAddCaveats]{
+					ucan.NewCapability("store/add", fixtures.Alice.DID().String(), storeAddCaveats{}),
+				},
+			)
+			require.NoError(t, err)
+
+			inv, err := invocation.Invoke(
+				fixtures.Bob,
+				fixtures.Service,
+				storeAdd.New(
+					fixtures.Alice.DID().String(),
+					storeAddCaveats{Link: testLink},
+				),
+				delegation.WithProof(delegation.FromLink(dlg.Link())),
+			)
+			require.NoError(t, err)
+
+			context := NewValidationContext(
+				fixtures.Service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			a, x := Access(inv, context)
+			require.Nil(t, a)
+			require.Error(t, x)
+			require.Equal(t, x.Name(), "Unauthorized")
+			msg := strings.Join([]string{
+				fmt.Sprintf("Claim %s is not authorized", storeAdd),
+				fmt.Sprintf(`  - Capability {"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}} is not authorized because:`, storeAdd.Can(), fixtures.Alice.DID(), testLink),
+				fmt.Sprintf("    - Capability can not be (self) issued by '%s'", fixtures.Bob.DID()),
+				fmt.Sprintf(`    - Capability can not be derived from prf: %s because:`, dlg.Link()),
+				fmt.Sprintf(`      - Linked proof "%s" is not included and could not be resolved`, dlg.Link()),
+				`        - Proof resolution failed with: no proof resolver configured`,
+			}, "\n")
+			require.Equal(t, msg, x.Error())
+		})
 	})
 }
 

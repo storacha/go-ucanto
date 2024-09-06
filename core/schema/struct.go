@@ -13,14 +13,19 @@ type strukt[T any] struct {
 }
 
 func (s strukt[T]) Read(input any) (T, failure.Failure) {
-	if o, ok := input.(T); ok {
-		return o, nil
-	}
-
 	var bind T
 	node, ok := input.(ipld.Node)
 	if !ok {
-		return bind, NewSchemaError("unexpected input: not an IPLD node")
+		// If input is not an IPLD node, can it be converted to one?
+		if builder, ok := input.(ipld.Builder); ok {
+			n, err := builder.Build()
+			if err != nil {
+				return bind, NewSchemaError(err.Error())
+			}
+			node = n
+		} else {
+			return bind, NewSchemaError("unexpected input: not an IPLD node")
+		}
 	}
 
 	if s.policy != nil {

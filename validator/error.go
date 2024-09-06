@@ -67,7 +67,7 @@ func NewDelegationError(causes []DelegationSubError, context interface{}) Delega
 }
 
 func (de delegationError) Error() string {
-	return fmt.Sprintf("Cannot derive %s from delegated capabilities: %s", de.context, errors.Join(de.Unwrap()...).Error())
+	return fmt.Sprintf("Cannot derive %s from delegated capabilities:\n%s", de.context, li(errors.Join(de.Unwrap()...).Error()))
 }
 
 func (de delegationError) Causes() []DelegationSubError {
@@ -194,11 +194,11 @@ func (ise InvalidSignatureError) Error() string {
 	issuer := ise.Issuer().DID()
 	key := ise.verifier.DID()
 	if strings.HasPrefix(issuer.String(), "did:key") {
-		return fmt.Sprintf(`Proof %s does not has a valid signature from %s`, ise.delegation.Link(), key)
+		return fmt.Sprintf(`Proof %s does not have a valid signature from %s`, ise.delegation.Link(), key)
 	}
 	return strings.Join([]string{
-		fmt.Sprintf("Proof %s issued by %s does not has a valid signature from %s", ise.delegation.Link(), issuer, key),
-		"  ℹ️ Probably issuer signed with a different key, which got rotated, invalidating delegations that were issued with prior keys",
+		fmt.Sprintf("Proof %s issued by %s does not have a valid signature from %s", ise.delegation.Link(), issuer, key),
+		"  ℹ️ Issuer probably signed with a different key, which got rotated, invalidating delegations that were issued with prior keys",
 	}, "\n")
 }
 
@@ -232,7 +232,7 @@ func (upe UnavailableProofError) Link() ucan.Link {
 
 func (upe UnavailableProofError) Error() string {
 	messages := []string{
-		fmt.Sprintf("Linked proof '%s' is not included and could not be resolved", upe.link),
+		fmt.Sprintf(`Linked proof "%s" is not included and could not be resolved`, upe.link),
 	}
 	if upe.cause != nil {
 		messages = append(messages, li(fmt.Sprintf("Proof resolution failed with: %s", upe.cause.Error())))

@@ -113,8 +113,6 @@ type CapabilityParser[Caveats any] interface {
 	Can() ucan.Ability
 	// New creates a new capability from the passed options.
 	New(with ucan.Resource, nb Caveats) ucan.Capability[Caveats]
-	// Invoke creates an invocation of this capability.
-	// Invoke(with ucan.Resource, nb Caveats) (invocation.IssuedInvocation, error)
 }
 
 type Derivable[Caveats any] interface {
