@@ -1,7 +1,7 @@
 package ipld
 
 import (
-	"github.com/storacha-network/go-ucanto/core/iterable"
+	"iter"
 )
 
 // View represents a materialized IPLD DAG View, which provides a generic
@@ -19,7 +19,7 @@ type View interface {
 	//
 	// Iterator MUST include the root block otherwise it will lead encoders into
 	// omitting it when encoding the view into a CAR archive.
-	Blocks() iterable.Iterator[Block]
+	Blocks() iter.Seq2[Block, error]
 }
 
 // ViewBuilder represents a materializable IPLD DAG View. It is a useful

@@ -1,88 +1,55 @@
 package iterable
 
 import (
-	"io"
+	"iter"
 )
 
-// Iterator returns items in a collection with every call to Next().
-// The error will be set to io.EOF when the iterator is complete.
-type Iterator[T any] interface {
-	Next() (T, error)
-}
+// TODO: remove when https://github.com/golang/go/issues/61898 lands
 
-type iterator[T any] struct {
-	next func() (T, error)
-}
-
-func (it *iterator[T]) Next() (T, error) {
-	return it.next()
-}
-
-func NewIterator[T any](next func() (T, error)) Iterator[T] {
-	return &iterator[T]{next}
-}
-
-func From[Slice ~[]T, T any](slice Slice) Iterator[T] {
-	i := 0
-	return NewIterator(func() (T, error) {
-		if i < len(slice) {
-			item := slice[i]
-			i++
-			return item, nil
-		}
-		var undef T
-		return undef, io.EOF
-	})
-}
-
-func Collect[T any](it Iterator[T]) ([]T, error) {
-	var items []T
-	for {
-		item, err := it.Next()
-		if err != nil {
-			if err == io.EOF {
-				break
+// Map returns an iterator over f applied to seq.
+func Map[In, Out any](f func(In) Out, seq iter.Seq[In]) iter.Seq[Out] {
+	return func(yield func(Out) bool) {
+		for in := range seq {
+			if !yield(f(in)) {
+				return
 			}
-			return nil, err
 		}
-		items = append(items, item)
 	}
-	return items, nil
 }
 
-func Map[T, U any](it Iterator[T], mapFn func(T) U) Iterator[U] {
-	return NewIterator(func() (U, error) {
-		t, err := it.Next()
-		if err != nil {
-			var undef U
-			return undef, err
+// Map2 returns an iterator over f applied to seq.
+func Map2[KIn, VIn, KOut, VOut any](f func(KIn, VIn) (KOut, VOut), seq iter.Seq2[KIn, VIn]) iter.Seq2[KOut, VOut] {
+	return func(yield func(KOut, VOut) bool) {
+		for k, v := range seq {
+			if !yield(f(k, v)) {
+				return
+			}
 		}
-		return mapFn(t), nil
-	})
+	}
 }
 
-func Concat[T any](iterators ...Iterator[T]) Iterator[T] {
-	if len(iterators) == 0 {
-		return From([]T{})
-	}
-
-	i := 0
-	iterator := iterators[i]
-	return NewIterator(func() (T, error) {
-		for {
-			item, err := iterator.Next()
-			if err != nil {
-				if err == io.EOF {
-					i++
-					if i < len(iterators) {
-						iterator = iterators[i]
-						continue
-					}
+// Concat returns an iterator over the concatenation of the sequences.
+func Concat[V any](seqs ...iter.Seq[V]) iter.Seq[V] {
+	return func(yield func(V) bool) {
+		for _, seq := range seqs {
+			for e := range seq {
+				if !yield(e) {
+					return
 				}
-				var undef T
-				return undef, err
 			}
-			return item, nil
 		}
-	})
+	}
+}
+
+// Concat2 returns an iterator over the concatenation of the sequences.
+func Concat2[K, V any](seqs ...iter.Seq2[K, V]) iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {
+		for _, seq := range seqs {
+			for k, v := range seq {
+				if !yield(k, v) {
+					return
+				}
+			}
+		}
+	}
 }

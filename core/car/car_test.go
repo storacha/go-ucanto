@@ -48,17 +48,13 @@ func TestDecodeCAR(t *testing.T) {
 	}
 
 	var blks []CarBlock
-	for {
-		b, err := blocks.Next()
+	for b, err := range blocks {
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
 			t.Fatalf("reading blocks: %s", err)
 		}
 		cb, ok := b.(CarBlock)
 		if !ok {
-			t.Fatalf("did not return a CarBlock")
+			t.Fatalf("should have returned a car block")
 		}
 		blks = append(blks, cb)
 	}
