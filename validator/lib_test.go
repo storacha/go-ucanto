@@ -18,8 +18,10 @@ import (
 	"github.com/storacha-network/go-ucanto/core/ipld/hash/sha256"
 	"github.com/storacha-network/go-ucanto/core/result/failure"
 	"github.com/storacha-network/go-ucanto/core/schema"
+	"github.com/storacha-network/go-ucanto/did"
 	"github.com/storacha-network/go-ucanto/principal"
 	"github.com/storacha-network/go-ucanto/principal/ed25519/verifier"
+	"github.com/storacha-network/go-ucanto/principal/signer"
 	"github.com/storacha-network/go-ucanto/testing/fixtures"
 	"github.com/storacha-network/go-ucanto/ucan"
 	udm "github.com/storacha-network/go-ucanto/ucan/datamodel/ucan"
@@ -81,13 +83,14 @@ func newStoreAddCapability(t *testing.T) CapabilityParser[storeAddCaveats] {
 	)
 }
 
+var testLink = cidlink.Link{Cid: cid.MustParse("bafkqaaa")}
+var validateAuthOk = func(auth Authorization[any]) Revoked { return nil }
+var parseEdPrincipal = func(str string) (principal.Verifier, error) {
+	return verifier.Parse(str)
+}
+
 func TestAccess(t *testing.T) {
 	storeAdd := newStoreAddCapability(t)
-	testLink := cidlink.Link{Cid: cid.MustParse("bafkqaaa")}
-	validateAuthOk := func(auth Authorization[any]) Revoked { return nil }
-	parseEdPrincipal := func(str string) (principal.Verifier, error) {
-		return verifier.Parse(str)
-	}
 
 	t.Run("authorized", func(t *testing.T) {
 		t.Run("self-issued invocation", func(t *testing.T) {
@@ -841,6 +844,171 @@ func TestAccess(t *testing.T) {
 			}, "\n")
 			require.Equal(t, msg, x.Error())
 		})
+
+		t.Run("principal alignment", func(t *testing.T) {
+			prf, err := storeAdd.Delegate(
+				fixtures.Alice,
+				fixtures.Bob,
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{},
+			)
+			require.NoError(t, err)
+
+			nb := storeAddCaveats{Link: testLink}
+			inv, err := storeAdd.Invoke(
+				fixtures.Mallory,
+				fixtures.Service,
+				fixtures.Alice.DID().String(),
+				nb,
+				delegation.WithProof(delegation.FromDelegation(prf)),
+			)
+			require.NoError(t, err)
+
+			context := NewValidationContext(
+				fixtures.Service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			cstr := fmt.Sprintf(`{"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}}`, storeAdd.Can(), fixtures.Alice.DID(), testLink)
+			a, x := Access(inv, context)
+			require.Nil(t, a)
+			require.Error(t, x)
+			require.Equal(t, x.Name(), "Unauthorized")
+			msg := strings.Join([]string{
+				fmt.Sprintf("Claim %s is not authorized", storeAdd),
+				fmt.Sprintf(`  - Capability %s is not authorized because:`, cstr),
+				fmt.Sprintf("    - Capability can not be (self) issued by '%s'", fixtures.Mallory.DID()),
+				fmt.Sprintf(`    - Capability can not be derived from prf: %s because:`, prf.Link()),
+				fmt.Sprintf(`      - Delegation audience is '%s' instead of '%s'`, fixtures.Bob.DID(), fixtures.Mallory.DID()),
+			}, "\n")
+			require.Equal(t, msg, x.Error())
+		})
+
+		t.Run("invalid delegation chain", func(t *testing.T) {
+			space := fixtures.Alice
+
+			prf, err := storeAdd.Delegate(
+				space,
+				fixtures.Service,
+				space.DID().String(),
+				storeAddCaveats{},
+			)
+			require.NoError(t, err)
+
+			nb := storeAddCaveats{Link: testLink}
+			inv, err := storeAdd.Invoke(
+				fixtures.Bob,
+				fixtures.Service,
+				space.DID().String(),
+				nb,
+				delegation.WithProof(delegation.FromDelegation(prf)),
+			)
+			require.NoError(t, err)
+
+			context := NewValidationContext(
+				fixtures.Service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			cstr := fmt.Sprintf(`{"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}}`, storeAdd.Can(), space.DID(), testLink)
+			a, x := Access(inv, context)
+			require.Nil(t, a)
+			require.Error(t, x)
+			require.Equal(t, x.Name(), "Unauthorized")
+			msg := strings.Join([]string{
+				fmt.Sprintf("Claim %s is not authorized", storeAdd),
+				fmt.Sprintf(`  - Capability %s is not authorized because:`, cstr),
+				fmt.Sprintf("    - Capability can not be (self) issued by '%s'", fixtures.Bob.DID()),
+				fmt.Sprintf(`    - Capability can not be derived from prf: %s because:`, prf.Link()),
+				fmt.Sprintf(`      - Delegation audience is '%s' instead of '%s'`, fixtures.Service.DID(), fixtures.Bob.DID()),
+			}, "\n")
+			require.Equal(t, msg, x.Error())
+		})
+	})
+}
+
+func TestClaim(t *testing.T) {
+	storeAdd := newStoreAddCapability(t)
+
+	t.Run("without a proof", func(t *testing.T) {
+		dlg, err := storeAdd.Delegate(
+			fixtures.Alice,
+			fixtures.Service,
+			fixtures.Alice.DID().String(),
+			storeAddCaveats{},
+		)
+		require.NoError(t, err)
+
+		context := NewValidationContext(
+			fixtures.Service.Verifier(),
+			storeAdd,
+			IsSelfIssued,
+			validateAuthOk,
+			ProofUnavailable,
+			parseEdPrincipal,
+			FailDIDKeyResolution,
+		)
+
+		a, x := Claim(storeAdd, []delegation.Proof{delegation.FromLink(dlg.Link())}, context)
+		require.Nil(t, a)
+		require.Error(t, x)
+		require.Equal(t, x.Name(), "Unauthorized")
+		msg := strings.Join([]string{
+			fmt.Sprintf("Claim %s is not authorized", storeAdd),
+			fmt.Sprintf(`  - Linked proof "%s" is not included and could not be resolved`, dlg.Link()),
+			`    - Proof resolution failed with: no proof resolver configured`,
+		}, "\n")
+		require.Equal(t, msg, x.Error())
+	})
+
+	t.Run("mismatched signature", func(t *testing.T) {
+		svcdid, err := did.Parse("did:web:w3.storage")
+		require.NoError(t, err)
+
+		old, err := signer.Wrap(fixtures.Alice, svcdid)
+		require.NoError(t, err)
+
+		new, err := signer.Wrap(fixtures.Bob, svcdid)
+		require.NoError(t, err)
+
+		dlg, err := storeAdd.Delegate(
+			old,
+			old,
+			old.DID().String(),
+			storeAddCaveats{Link: testLink},
+		)
+		require.NoError(t, err)
+
+		context := NewValidationContext(
+			new.Verifier(),
+			storeAdd,
+			IsSelfIssued,
+			validateAuthOk,
+			ProofUnavailable,
+			parseEdPrincipal,
+			FailDIDKeyResolution,
+		)
+
+		a, x := Claim(storeAdd, []delegation.Proof{delegation.FromDelegation(dlg)}, context)
+		require.Nil(t, a)
+		require.Error(t, x)
+		require.Equal(t, x.Name(), "Unauthorized")
+		msg := strings.Join([]string{
+			fmt.Sprintf("Claim %s is not authorized", storeAdd),
+			fmt.Sprintf(`  - Proof %s issued by %s does not have a valid signature from %s`, dlg.Link(), new.DID(), new.DID()),
+			`    ℹ️ Issuer probably signed with a different key, which got rotated, invalidating delegations that were issued with prior keys`,
+		}, "\n")
+		require.Equal(t, msg, x.Error())
 	})
 }
 
