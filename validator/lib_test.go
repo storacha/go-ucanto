@@ -687,6 +687,147 @@ func TestAccess(t *testing.T) {
 			}, "\n")
 			require.Equal(t, msg, x.Error())
 		})
+
+		t.Run("invalid audience", func(t *testing.T) {
+			dlg, err := storeAdd.Delegate(
+				fixtures.Alice,
+				fixtures.Bob,
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{},
+			)
+			require.NoError(t, err)
+
+			inv, err := storeAdd.Invoke(
+				fixtures.Mallory,
+				fixtures.Service,
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{Link: testLink},
+				delegation.WithProof(delegation.FromDelegation(dlg)),
+			)
+			require.NoError(t, err)
+
+			context := NewValidationContext(
+				fixtures.Service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			a, x := Access(inv, context)
+			require.Nil(t, a)
+			require.Error(t, x)
+			require.Equal(t, x.Name(), "Unauthorized")
+			msg := strings.Join([]string{
+				fmt.Sprintf("Claim %s is not authorized", storeAdd),
+				fmt.Sprintf(`  - Capability {"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}} is not authorized because:`, storeAdd.Can(), fixtures.Alice.DID(), testLink),
+				fmt.Sprintf("    - Capability can not be (self) issued by '%s'", fixtures.Mallory.DID()),
+				fmt.Sprintf(`    - Capability can not be derived from prf: %s because:`, dlg.Link()),
+				fmt.Sprintf(`      - Delegation audience is '%s' instead of '%s'`, fixtures.Bob.DID(), fixtures.Mallory.DID()),
+			}, "\n")
+			require.Equal(t, msg, x.Error())
+		})
+
+		t.Run("invalid claim", func(t *testing.T) {
+			dlg, err := storeAdd.Delegate(
+				fixtures.Alice,
+				fixtures.Bob,
+				fixtures.Mallory.DID().String(),
+				storeAddCaveats{},
+			)
+			require.NoError(t, err)
+
+			nb := storeAddCaveats{Link: testLink}
+			inv, err := storeAdd.Invoke(
+				fixtures.Bob,
+				fixtures.Service,
+				fixtures.Alice.DID().String(),
+				nb,
+				delegation.WithProof(delegation.FromDelegation(dlg)),
+			)
+			require.NoError(t, err)
+
+			context := NewValidationContext(
+				fixtures.Service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			a, x := Access(inv, context)
+			require.Nil(t, a)
+			require.Error(t, x)
+			require.Equal(t, x.Name(), "Unauthorized")
+			msg := strings.Join([]string{
+				fmt.Sprintf("Claim %s is not authorized", storeAdd),
+				fmt.Sprintf(`  - Capability {"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}} is not authorized because:`, storeAdd.Can(), fixtures.Alice.DID(), testLink),
+				fmt.Sprintf("    - Capability can not be (self) issued by '%s'", fixtures.Bob.DID()),
+				fmt.Sprintf(`    - Cannot derive {"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}} from delegated capabilities:`, storeAdd.Can(), fixtures.Alice.DID(), testLink),
+				fmt.Sprintf(`      - Constraint violation: Expected 'with: "%s"' instead got '%s'`, fixtures.Mallory.DID(), fixtures.Alice.DID()),
+			}, "\n")
+			require.Equal(t, msg, x.Error())
+		})
+
+		t.Run("invalid sub delegation", func(t *testing.T) {
+			prf, err := storeAdd.Delegate(
+				fixtures.Alice,
+				fixtures.Bob,
+				fixtures.Service.DID().String(),
+				storeAddCaveats{},
+			)
+			require.NoError(t, err)
+
+			dlg, err := storeAdd.Delegate(
+				fixtures.Bob,
+				fixtures.Mallory,
+				fixtures.Service.DID().String(),
+				storeAddCaveats{},
+				delegation.WithProof(delegation.FromDelegation(prf)),
+			)
+			require.NoError(t, err)
+
+			nb := storeAddCaveats{Link: testLink}
+			inv, err := storeAdd.Invoke(
+				fixtures.Mallory,
+				fixtures.Service,
+				fixtures.Service.DID().String(),
+				nb,
+				delegation.WithProof(delegation.FromDelegation(dlg)),
+			)
+			require.NoError(t, err)
+
+			context := NewValidationContext(
+				fixtures.Service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			cstr := fmt.Sprintf(`{"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}}`, storeAdd.Can(), fixtures.Service.DID(), testLink)
+			a, x := Access(inv, context)
+			require.Nil(t, a)
+			require.Error(t, x)
+			require.Equal(t, x.Name(), "Unauthorized")
+			msg := strings.Join([]string{
+				fmt.Sprintf("Claim %s is not authorized", storeAdd),
+				fmt.Sprintf(`  - Capability %s is not authorized because:`, cstr),
+				fmt.Sprintf("    - Capability can not be (self) issued by '%s'", fixtures.Mallory.DID()),
+				fmt.Sprintf(`    - Capability %s is not authorized because:`, cstr),
+				fmt.Sprintf(`      - Capability can not be (self) issued by '%s'`, fixtures.Bob.DID()),
+				fmt.Sprintf(`      - Capability %s is not authorized because:`, cstr),
+				fmt.Sprintf(`        - Capability can not be (self) issued by '%s'`, fixtures.Alice.DID()),
+				"        - Delegated capability not found",
+			}, "\n")
+			require.Equal(t, msg, x.Error())
+		})
 	})
 }
 

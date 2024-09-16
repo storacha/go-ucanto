@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/storacha-network/go-ucanto/core/delegation"
+	"github.com/storacha-network/go-ucanto/core/invocation"
 	"github.com/storacha-network/go-ucanto/core/result/failure"
 	"github.com/storacha-network/go-ucanto/core/schema"
 	"github.com/storacha-network/go-ucanto/ucan"
@@ -113,6 +114,11 @@ type CapabilityParser[Caveats any] interface {
 	Can() ucan.Ability
 	// New creates a new capability from the passed options.
 	New(with ucan.Resource, nb Caveats) ucan.Capability[Caveats]
+	// Delegate creates a new signed token for this capability. If expiration is
+	// not set it defaults to 30 seconds from now.
+	Delegate(issuer ucan.Signer, audience ucan.Principal, with ucan.Resource, nb Caveats, options ...delegation.Option) (delegation.Delegation, error)
+	// Invoke creates an invocation of this capability.
+	Invoke(issuer ucan.Signer, audience ucan.Principal, with ucan.Resource, nb Caveats, options ...delegation.Option) (invocation.IssuedInvocation, error)
 }
 
 type Derivable[Caveats any] interface {
@@ -183,6 +189,22 @@ func (c capability[Caveats]) String() string {
 
 func (c capability[Caveats]) New(with ucan.Resource, nb Caveats) ucan.Capability[Caveats] {
 	return ucan.NewCapability(c.descriptor.Can(), with, nb)
+}
+
+func (c capability[Caveats]) Delegate(issuer ucan.Signer, audience ucan.Principal, with ucan.Resource, nb Caveats, options ...delegation.Option) (delegation.Delegation, error) {
+	if bc, ok := any(nb).(ucan.CaveatBuilder); ok {
+		caps := []ucan.Capability[ucan.CaveatBuilder]{ucan.NewCapability(c.Can(), with, bc)}
+		return delegation.Delegate(issuer, audience, caps, options...)
+	}
+	return nil, fmt.Errorf("not an IPLD builder: %v", nb)
+}
+
+func (c capability[Caveats]) Invoke(issuer ucan.Signer, audience ucan.Principal, with ucan.Resource, nb Caveats, options ...delegation.Option) (invocation.IssuedInvocation, error) {
+	if bc, ok := any(nb).(ucan.CaveatBuilder); ok {
+		cap := ucan.NewCapability(c.Can(), with, bc)
+		return invocation.Invoke(issuer, audience, cap, options...)
+	}
+	return nil, fmt.Errorf("not an IPLD builder: %v", nb)
 }
 
 func NewCapability[Caveats any](
