@@ -3,8 +3,8 @@ package schema
 import (
 	"github.com/ipld/go-ipld-prime/schema"
 	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/policy"
 	"github.com/storacha-network/go-ucanto/core/result/failure"
+	"github.com/ucan-wg/go-ucan/capability/policy"
 )
 
 type strukt[T any] struct {

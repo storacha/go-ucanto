@@ -8,15 +8,15 @@ import (
 	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
 	"github.com/storacha-network/go-ucanto/core/delegation"
 	"github.com/storacha-network/go-ucanto/core/invocation"
-	"github.com/storacha-network/go-ucanto/core/policy"
-	"github.com/storacha-network/go-ucanto/core/policy/literal"
-	"github.com/storacha-network/go-ucanto/core/policy/selector"
 	"github.com/storacha-network/go-ucanto/core/result/failure"
 	"github.com/storacha-network/go-ucanto/core/schema"
 	"github.com/storacha-network/go-ucanto/did"
 	"github.com/storacha-network/go-ucanto/principal"
 	"github.com/storacha-network/go-ucanto/ucan"
 	vdm "github.com/storacha-network/go-ucanto/validator/datamodel"
+	"github.com/ucan-wg/go-ucan/capability/policy"
+	"github.com/ucan-wg/go-ucan/capability/policy/literal"
+	"github.com/ucan-wg/go-ucan/capability/policy/selector"
 )
 
 func IsSelfIssued[Caveats any](capability ucan.Capability[Caveats], issuer did.DID) bool {
