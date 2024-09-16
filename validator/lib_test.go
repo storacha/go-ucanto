@@ -91,13 +91,11 @@ func TestAccess(t *testing.T) {
 
 	t.Run("authorized", func(t *testing.T) {
 		t.Run("self-issued invocation", func(t *testing.T) {
-			inv, err := invocation.Invoke(
+			inv, err := storeAdd.Invoke(
 				fixtures.Alice,
 				fixtures.Bob,
-				storeAdd.New(
-					fixtures.Alice.DID().String(),
-					storeAddCaveats{Link: testLink},
-				),
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{Link: testLink},
 			)
 			require.NoError(t, err)
 
@@ -120,22 +118,19 @@ func TestAccess(t *testing.T) {
 		})
 
 		t.Run("delegated invocation", func(t *testing.T) {
-			dlg, err := delegation.Delegate(
+			dlg, err := storeAdd.Delegate(
 				fixtures.Alice,
 				fixtures.Bob,
-				[]ucan.Capability[storeAddCaveats]{
-					storeAdd.New(fixtures.Alice.DID().String(), storeAddCaveats{}),
-				},
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{},
 			)
 			require.NoError(t, err)
 
-			inv, err := invocation.Invoke(
+			inv, err := storeAdd.Invoke(
 				fixtures.Bob,
 				fixtures.Service,
-				storeAdd.New(
-					fixtures.Alice.DID().String(),
-					storeAddCaveats{Link: testLink},
-				),
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{Link: testLink},
 				delegation.WithProof(delegation.FromDelegation(dlg)),
 			)
 			require.NoError(t, err)
@@ -159,32 +154,28 @@ func TestAccess(t *testing.T) {
 		})
 
 		t.Run("delegation chain", func(t *testing.T) {
-			alice2bob, err := delegation.Delegate(
+			alice2bob, err := storeAdd.Delegate(
 				fixtures.Alice,
 				fixtures.Bob,
-				[]ucan.Capability[storeAddCaveats]{
-					storeAdd.New(fixtures.Alice.DID().String(), storeAddCaveats{}),
-				},
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{},
 			)
 			require.NoError(t, err)
 
-			bob2mallory, err := delegation.Delegate(
+			bob2mallory, err := storeAdd.Delegate(
 				fixtures.Bob,
 				fixtures.Mallory,
-				[]ucan.Capability[storeAddCaveats]{
-					storeAdd.New(fixtures.Alice.DID().String(), storeAddCaveats{}),
-				},
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{},
 				delegation.WithProof(delegation.FromDelegation(alice2bob)),
 			)
 			require.NoError(t, err)
 
-			inv, err := invocation.Invoke(
+			inv, err := storeAdd.Invoke(
 				fixtures.Mallory,
 				fixtures.Service,
-				storeAdd.New(
-					fixtures.Alice.DID().String(),
-					storeAddCaveats{Link: testLink},
-				),
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{Link: testLink},
 				delegation.WithProof(delegation.FromDelegation(bob2mallory)),
 			)
 			require.NoError(t, err)
@@ -221,13 +212,11 @@ func TestAccess(t *testing.T) {
 	t.Run("unauthorized", func(t *testing.T) {
 		t.Run("expired invocation", func(t *testing.T) {
 			exp := ucan.Now() - 5
-			inv, err := invocation.Invoke(
+			inv, err := storeAdd.Invoke(
 				fixtures.Alice,
 				fixtures.Service,
-				storeAdd.New(
-					fixtures.Alice.DID().String(),
-					storeAddCaveats{Link: testLink},
-				),
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{Link: testLink},
 				delegation.WithExpiration(exp),
 			)
 			require.NoError(t, err)
@@ -255,13 +244,11 @@ func TestAccess(t *testing.T) {
 
 		t.Run("not valid before", func(t *testing.T) {
 			nbf := ucan.Now() + 500
-			inv, err := invocation.Invoke(
+			inv, err := storeAdd.Invoke(
 				fixtures.Alice,
 				fixtures.Service,
-				storeAdd.New(
-					fixtures.Alice.DID().String(),
-					storeAddCaveats{Link: testLink},
-				),
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{Link: testLink},
 				delegation.WithNotBefore(nbf),
 			)
 			require.NoError(t, err)
@@ -288,13 +275,11 @@ func TestAccess(t *testing.T) {
 		})
 
 		t.Run("invalid signature", func(t *testing.T) {
-			inv, err := invocation.Invoke(
+			inv, err := storeAdd.Invoke(
 				fixtures.Alice,
 				fixtures.Service,
-				storeAdd.New(
-					fixtures.Alice.DID().String(),
-					storeAddCaveats{Link: testLink},
-				),
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{Link: testLink},
 			)
 			require.NoError(t, err)
 
@@ -359,13 +344,11 @@ func TestAccess(t *testing.T) {
 
 	t.Run("invalid claim", func(t *testing.T) {
 		t.Run("no proofs", func(t *testing.T) {
-			inv, err := invocation.Invoke(
+			inv, err := storeAdd.Invoke(
 				fixtures.Alice,
 				fixtures.Bob,
-				storeAdd.New(
-					fixtures.Bob.DID().String(),
-					storeAddCaveats{Link: testLink},
-				),
+				fixtures.Bob.DID().String(),
+				storeAddCaveats{Link: testLink},
 			)
 			require.NoError(t, err)
 
@@ -394,23 +377,20 @@ func TestAccess(t *testing.T) {
 
 		t.Run("expired", func(t *testing.T) {
 			exp := ucan.Now() - 5
-			dlg, err := delegation.Delegate(
+			dlg, err := storeAdd.Delegate(
 				fixtures.Alice,
 				fixtures.Bob,
-				[]ucan.Capability[storeAddCaveats]{
-					storeAdd.New(fixtures.Alice.DID().String(), storeAddCaveats{}),
-				},
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{},
 				delegation.WithExpiration(exp),
 			)
 			require.NoError(t, err)
 
-			inv, err := invocation.Invoke(
+			inv, err := storeAdd.Invoke(
 				fixtures.Bob,
 				fixtures.Service,
-				storeAdd.New(
-					fixtures.Alice.DID().String(),
-					storeAddCaveats{Link: testLink},
-				),
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{Link: testLink},
 				delegation.WithProof(delegation.FromDelegation(dlg)),
 			)
 			require.NoError(t, err)
@@ -441,23 +421,20 @@ func TestAccess(t *testing.T) {
 
 		t.Run("not valid before", func(t *testing.T) {
 			nbf := ucan.Now() + 60*60
-			dlg, err := delegation.Delegate(
+			dlg, err := storeAdd.Delegate(
 				fixtures.Alice,
 				fixtures.Bob,
-				[]ucan.Capability[storeAddCaveats]{
-					storeAdd.New(fixtures.Alice.DID().String(), storeAddCaveats{}),
-				},
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{},
 				delegation.WithNotBefore(nbf),
 			)
 			require.NoError(t, err)
 
-			inv, err := invocation.Invoke(
+			inv, err := storeAdd.Invoke(
 				fixtures.Bob,
 				fixtures.Service,
-				storeAdd.New(
-					fixtures.Alice.DID().String(),
-					storeAddCaveats{Link: testLink},
-				),
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{Link: testLink},
 				delegation.WithProof(delegation.FromDelegation(dlg)),
 			)
 			require.NoError(t, err)
@@ -514,13 +491,11 @@ func TestAccess(t *testing.T) {
 
 			dlg := delegation.NewDelegation(rt, bs)
 
-			inv, err := invocation.Invoke(
+			inv, err := storeAdd.Invoke(
 				fixtures.Bob,
 				fixtures.Service,
-				storeAdd.New(
-					fixtures.Alice.DID().String(),
-					storeAddCaveats{Link: testLink},
-				),
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{Link: testLink},
 				delegation.WithProof(delegation.FromDelegation(dlg)),
 			)
 			require.NoError(t, err)
@@ -559,13 +534,11 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			inv, err := invocation.Invoke(
+			inv, err := storeAdd.Invoke(
 				fixtures.Bob,
 				fixtures.Service,
-				storeAdd.New(
-					fixtures.Alice.DID().String(),
-					storeAddCaveats{Link: testLink},
-				),
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{Link: testLink},
 				delegation.WithProof(delegation.FromDelegation(dlg)),
 			)
 			require.NoError(t, err)
@@ -597,22 +570,19 @@ func TestAccess(t *testing.T) {
 
 		t.Run("malformed capability", func(t *testing.T) {
 			badDID := fmt.Sprintf("bib:%s", fixtures.Alice.DID().String()[4:])
-			dlg, err := delegation.Delegate(
+			dlg, err := storeAdd.Delegate(
 				fixtures.Alice,
 				fixtures.Bob,
-				[]ucan.Capability[storeAddCaveats]{
-					ucan.NewCapability("store/add", badDID, storeAddCaveats{}),
-				},
+				badDID,
+				storeAddCaveats{},
 			)
 			require.NoError(t, err)
 
-			inv, err := invocation.Invoke(
+			inv, err := storeAdd.Invoke(
 				fixtures.Bob,
 				fixtures.Service,
-				storeAdd.New(
-					fixtures.Alice.DID().String(),
-					storeAddCaveats{Link: testLink},
-				),
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{Link: testLink},
 				delegation.WithProof(delegation.FromDelegation(dlg)),
 			)
 			require.NoError(t, err)
@@ -643,22 +613,19 @@ func TestAccess(t *testing.T) {
 		})
 
 		t.Run("unavailable proof", func(t *testing.T) {
-			dlg, err := delegation.Delegate(
+			dlg, err := storeAdd.Delegate(
 				fixtures.Alice,
 				fixtures.Bob,
-				[]ucan.Capability[storeAddCaveats]{
-					ucan.NewCapability("store/add", fixtures.Alice.DID().String(), storeAddCaveats{}),
-				},
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{},
 			)
 			require.NoError(t, err)
 
-			inv, err := invocation.Invoke(
+			inv, err := storeAdd.Invoke(
 				fixtures.Bob,
 				fixtures.Service,
-				storeAdd.New(
-					fixtures.Alice.DID().String(),
-					storeAddCaveats{Link: testLink},
-				),
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{Link: testLink},
 				delegation.WithProof(delegation.FromLink(dlg.Link())),
 			)
 			require.NoError(t, err)
