@@ -4,6 +4,7 @@ import (
 	// for go:embed
 	_ "embed"
 	"fmt"
+	"iter"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/schema"
@@ -77,8 +78,8 @@ type receipt[O, X any] struct {
 
 var _ Receipt[any, any] = (*receipt[any, any])(nil)
 
-func (r *receipt[O, X]) Blocks() iterable.Iterator[block.Block] {
-	var iterators []iterable.Iterator[block.Block]
+func (r *receipt[O, X]) Blocks() iter.Seq2[block.Block, error] {
+	var iterators []iter.Seq2[block.Block, error]
 	iterators = append(iterators, r.Ran().Blocks())
 
 	for _, prf := range r.Proofs() {
@@ -87,9 +88,9 @@ func (r *receipt[O, X]) Blocks() iterable.Iterator[block.Block] {
 		}
 	}
 
-	iterators = append(iterators, iterable.From([]block.Block{r.Root()}))
+	iterators = append(iterators, func(yield func(block.Block, error) bool) { yield(r.Root(), nil) })
 
-	return iterable.Concat(iterators...)
+	return iterable.Concat2(iterators...)
 }
 
 func (r *receipt[O, X]) Fx() Effects {
@@ -165,14 +166,14 @@ func NewReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, typ sch
 }
 
 type ReceiptReader[O, X any] interface {
-	Read(rcpt ipld.Link, blks iterable.Iterator[block.Block]) (Receipt[O, X], error)
+	Read(rcpt ipld.Link, blks iter.Seq2[block.Block, error]) (Receipt[O, X], error)
 }
 
 type receiptReader[O, X any] struct {
 	typ schema.Type
 }
 
-func (rr *receiptReader[O, X]) Read(rcpt ipld.Link, blks iterable.Iterator[block.Block]) (Receipt[O, X], error) {
+func (rr *receiptReader[O, X]) Read(rcpt ipld.Link, blks iter.Seq2[block.Block, error]) (Receipt[O, X], error) {
 	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(blks))
 	if err != nil {
 		return nil, fmt.Errorf("creating block reader: %s", err)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"iter"
 	"sync"
 
 	"github.com/storacha-network/go-ucanto/core/car"
@@ -13,7 +14,6 @@ import (
 	"github.com/storacha-network/go-ucanto/core/ipld/block"
 	"github.com/storacha-network/go-ucanto/core/ipld/codec/cbor"
 	"github.com/storacha-network/go-ucanto/core/ipld/hash/sha256"
-	"github.com/storacha-network/go-ucanto/core/iterable"
 	"github.com/storacha-network/go-ucanto/ucan"
 	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
 	udm "github.com/storacha-network/go-ucanto/ucan/datamodel/ucan"
@@ -64,7 +64,7 @@ func (d *delegation) Link() ucan.Link {
 	return d.rt.Link()
 }
 
-func (d *delegation) Blocks() iterable.Iterator[ipld.Block] {
+func (d *delegation) Blocks() iter.Seq2[ipld.Block, error] {
 	return d.blks.Iterator()
 }
 

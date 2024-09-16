@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"iter"
 
 	"github.com/ipfs/go-cid"
 	cbor "github.com/ipfs/go-ipld-cbor"
@@ -13,14 +14,13 @@ import (
 	"github.com/multiformats/go-varint"
 	"github.com/storacha-network/go-ucanto/core/ipld"
 	"github.com/storacha-network/go-ucanto/core/ipld/block"
-	"github.com/storacha-network/go-ucanto/core/iterable"
 )
 
 // ContentType is the value the HTTP Content-Type header should have for CARs.
 // See https://www.iana.org/assignments/media-types/application/vnd.ipld.car
 const ContentType = "application/vnd.ipld.car"
 
-func Encode(roots []ipld.Link, blocks iterable.Iterator[ipld.Block]) io.Reader {
+func Encode(roots []ipld.Link, blocks iter.Seq2[ipld.Block, error]) io.Reader {
 	reader, writer := io.Pipe()
 	go func() {
 		cids := []cid.Cid{}
@@ -42,16 +42,16 @@ func Encode(roots []ipld.Link, blocks iterable.Iterator[ipld.Block]) io.Reader {
 			return
 		}
 		util.LdWrite(writer, hb)
-		for {
-			block, err := blocks.Next()
+		for block, err := range blocks {
 			if err != nil {
-				if err == io.EOF {
-					break
-				}
 				writer.CloseWithError(fmt.Errorf("writing CAR blocks: %s", err))
 				return
 			}
-			util.LdWrite(writer, []byte(block.Link().Binary()), block.Bytes())
+			err = util.LdWrite(writer, []byte(block.Link().Binary()), block.Bytes())
+			if err != nil {
+				writer.CloseWithError(fmt.Errorf("writing CAR blocks: %s", err))
+				return
+			}
 		}
 		writer.Close()
 	}()
@@ -78,7 +78,7 @@ func (cb carBlock) Length() uint64 {
 	return cb.length
 }
 
-func Decode(reader io.Reader) ([]ipld.Link, iterable.Iterator[ipld.Block], error) {
+func Decode(reader io.Reader) ([]ipld.Link, iter.Seq2[ipld.Block, error], error) {
 	br := bufio.NewReader(reader)
 
 	h, err := ipldcar.ReadHeader(br)
@@ -100,27 +100,42 @@ func Decode(reader io.Reader) ([]ipld.Link, iterable.Iterator[ipld.Block], error
 		roots = append(roots, cidlink.Link{Cid: r})
 	}
 
-	return roots, iterable.NewIterator(func() (ipld.Block, error) {
-		cid, bytes, err := util.ReadNode(br)
-		if err != nil {
+	r := &blkReader{br, offset}
+	return roots, func(yield func(ipld.Block, error) bool) {
+		for {
+			blk, err := r.next()
 			if err == io.EOF {
-				br = nil
+				return
 			}
-			return nil, err
+			if !yield(blk, err) {
+				return
+			}
 		}
+	}, nil
+}
 
-		hashed, err := cid.Prefix().Sum(bytes)
-		if err != nil {
-			return nil, err
-		}
+type blkReader struct {
+	br     *bufio.Reader
+	offset uint64
+}
 
-		if !hashed.Equals(cid) {
-			return nil, fmt.Errorf("mismatch in content integrity, name: %s, data: %s", cid, hashed)
-		}
+func (r *blkReader) next() (CarBlock, error) {
+	cid, bytes, err := util.ReadNode(r.br)
+	if err != nil {
+		return nil, err
+	}
 
-		ss := uint64(cid.ByteLen()) + uint64(len(bytes))
-		offset += uint64(varint.UvarintSize(ss)) + ss
+	hashed, err := cid.Prefix().Sum(bytes)
+	if err != nil {
+		return nil, err
+	}
 
-		return carBlock{block.NewBlock(cidlink.Link{Cid: cid}, bytes), offset - uint64(len(bytes)), uint64(len(bytes))}, nil
-	}), nil
+	if !hashed.Equals(cid) {
+		return nil, fmt.Errorf("mismatch in content integrity, name: %s, data: %s", cid, hashed)
+	}
+
+	ss := uint64(cid.ByteLen()) + uint64(len(bytes))
+	r.offset += uint64(varint.UvarintSize(ss)) + ss
+
+	return carBlock{block.NewBlock(cidlink.Link{Cid: cid}, bytes), r.offset - uint64(len(bytes)), uint64(len(bytes))}, nil
 }
