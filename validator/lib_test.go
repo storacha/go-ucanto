@@ -207,6 +207,52 @@ func TestAccess(t *testing.T) {
 			require.Equal(t, fixtures.Alice.DID(), a.Proofs()[0].Proofs()[0].Issuer().DID())
 			require.Equal(t, fixtures.Bob.DID(), a.Proofs()[0].Proofs()[0].Audience().DID())
 		})
+
+		t.Run("resolve external proof", func(t *testing.T) {
+			dlg, err := storeAdd.Delegate(
+				fixtures.Alice,
+				fixtures.Bob,
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{},
+			)
+			require.NoError(t, err)
+
+			inv, err := storeAdd.Invoke(
+				fixtures.Bob,
+				fixtures.Service,
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{Link: testLink},
+				delegation.WithProof(delegation.FromDelegation(dlg)),
+			)
+			require.NoError(t, err)
+
+			context := NewValidationContext(
+				fixtures.Service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				func(p ucan.Link) (delegation.Delegation, UnavailableProof) {
+					if p == dlg.Link() {
+						return dlg, nil
+					}
+					return nil, NewUnavailableProofError(p, fmt.Errorf("no proof resolver configured"))
+				},
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+			)
+
+			a, x := Access(inv, context)
+			require.NoError(t, x)
+			require.Equal(t, storeAdd.Can(), a.Capability().Can())
+			require.Equal(t, fixtures.Alice.DID().String(), a.Capability().With())
+			require.Equal(t, fixtures.Bob.DID(), a.Issuer().DID())
+			require.Equal(t, fixtures.Service.DID(), a.Audience().DID())
+
+			require.Equal(t, storeAdd.Can(), a.Proofs()[0].Capability().Can())
+			require.Equal(t, fixtures.Alice.DID().String(), a.Proofs()[0].Capability().With())
+			require.Equal(t, fixtures.Alice.DID(), a.Proofs()[0].Issuer().DID())
+			require.Equal(t, fixtures.Bob.DID(), a.Proofs()[0].Audience().DID())
+		})
 	})
 
 	t.Run("unauthorized", func(t *testing.T) {
