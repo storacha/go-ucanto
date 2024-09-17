@@ -367,17 +367,19 @@ func NewExpiredError(delegation delegation.Delegation) InvalidProof {
 }
 
 func (ee ExpiredError) Error() string {
+	exp := ee.delegation.Expiration()
 	return fmt.Sprintf("Proof %s has expired on %s", ee.delegation.Link(),
-		time.Unix(int64(ee.delegation.Expiration()), 0).Format(time.RFC3339))
+		time.Unix(int64(*exp), 0).Format(time.RFC3339))
 }
 
 func (ee ExpiredError) Build() (datamodel.Node, error) {
 	name := ee.Name()
 	stack := ee.Stack()
+	exp := ee.delegation.Expiration()
 	expiredModel := vdm.ExpiredModel{
 		Name:      &name,
 		Message:   ee.Error(),
-		ExpiredAt: int64(ee.delegation.Expiration()),
+		ExpiredAt: int64(*exp),
 		Stack:     &stack,
 	}
 	return ipld.WrapWithRecovery(expiredModel, vdm.ExpiredType())

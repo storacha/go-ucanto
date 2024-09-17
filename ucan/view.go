@@ -19,7 +19,7 @@ type UCAN interface {
 	Capabilities() []Capability[any]
 	// Expiration is the time in seconds since the Unix epoch that the UCAN
 	// becomes invalid.
-	Expiration() UTCUnixTimestamp
+	Expiration() *UTCUnixTimestamp
 	// NotBefore is the time in seconds since the Unix epoch that the UCAN
 	// becomes valid.
 	NotBefore() UTCUnixTimestamp
@@ -63,7 +63,7 @@ func (v *ucanView) Capabilities() []Capability[any] {
 	return caps
 }
 
-func (v *ucanView) Expiration() uint64 {
+func (v *ucanView) Expiration() *UTCUnixTimestamp {
 	return v.model.Exp
 }
 
@@ -98,7 +98,7 @@ func (v *ucanView) Nonce() string {
 	return *v.model.Nnc
 }
 
-func (v *ucanView) NotBefore() uint64 {
+func (v *ucanView) NotBefore() int {
 	if v.model.Nbf == nil {
 		return 0
 	}

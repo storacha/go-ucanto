@@ -17,25 +17,38 @@ const version = "0.9.1"
 type Option func(cfg *ucanConfig) error
 
 type ucanConfig struct {
-	exp uint64
-	nbf uint64
-	nnc string
-	fct []FactBuilder
-	prf []Link
+	exp   *UTCUnixTimestamp
+	noexp bool
+	nbf   UTCUnixTimestamp
+	nnc   string
+	fct   []FactBuilder
+	prf   []Link
 }
 
 // WithExpiration configures the expiration time in UTC seconds since Unix
 // epoch.
-func WithExpiration(exp uint64) Option {
+func WithExpiration(exp UTCUnixTimestamp) Option {
 	return func(cfg *ucanConfig) error {
-		cfg.exp = exp
+		cfg.exp = &exp
+		cfg.noexp = false
+		return nil
+	}
+}
+
+// WithNoExpiration configures the UCAN to never expire.
+//
+// WARNING: this will cause the delegation to be valid FOREVER, unless revoked.
+func WithNoExpiration() Option {
+	return func(cfg *ucanConfig) error {
+		cfg.exp = nil
+		cfg.noexp = true
 		return nil
 	}
 }
 
 // WithNotBefore configures the time in UTC seconds since Unix epoch when the
 // UCAN will become valid.
-func WithNotBefore(nbf uint64) Option {
+func WithNotBefore(nbf int) Option {
 	return func(cfg *ucanConfig) error {
 		cfg.nbf = nbf
 		return nil
@@ -88,8 +101,14 @@ func Issue[C CaveatBuilder](issuer Signer, audience Principal, capabilities []Ca
 		}
 	}
 
-	if cfg.exp == 0 {
-		cfg.exp = Now() + 30
+	var exp *int
+	if !cfg.noexp {
+		if cfg.exp == nil {
+			in30s := int(Now() + 30)
+			exp = &in30s
+		} else {
+			exp = cfg.exp
+		}
 	}
 
 	var capsmdl []udm.CapabilityModel
@@ -132,7 +151,7 @@ func Issue[C CaveatBuilder](issuer Signer, audience Principal, capabilities []Ca
 		Aud: audience.DID().String(),
 		Att: capsmdl,
 		Prf: prfstrs,
-		Exp: cfg.exp,
+		Exp: exp,
 		Fct: fctsmdl,
 	}
 	if cfg.nnc != "" {
@@ -153,7 +172,7 @@ func Issue[C CaveatBuilder](issuer Signer, audience Principal, capabilities []Ca
 		Aud: audience.DID().Bytes(),
 		Att: capsmdl,
 		Prf: cfg.prf,
-		Exp: cfg.exp,
+		Exp: exp,
 		Fct: fctsmdl,
 	}
 	if cfg.nnc != "" {
@@ -203,7 +222,11 @@ func VerifySignature(ucan View, verifier Verifier) (bool, error) {
 
 // IsExpired checks if a UCAN is expired.
 func IsExpired(ucan UCAN) bool {
-	return ucan.Expiration() <= Now()
+	exp := ucan.Expiration()
+	if exp == nil {
+		return false
+	}
+	return *exp <= Now()
 }
 
 // IsTooEarly checks if a UCAN is not active yet.
@@ -214,6 +237,6 @@ func IsTooEarly(ucan UCAN) bool {
 
 // Now returns a UTC Unix timestamp for comparing it against time window of the
 // UCAN.
-func Now() uint64 {
-	return uint64(time.Now().Unix())
+func Now() UTCUnixTimestamp {
+	return UTCUnixTimestamp(time.Now().Unix())
 }

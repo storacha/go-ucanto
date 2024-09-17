@@ -40,10 +40,10 @@ type UCANModel struct {
 	S   []byte
 	Att []CapabilityModel
 	Prf []ipld.Link
-	Exp uint64
+	Exp *int
 	Fct []FactModel
 	Nnc *string
-	Nbf *uint64
+	Nbf *int
 }
 
 type CapabilityModel struct {

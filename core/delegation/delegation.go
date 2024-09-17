@@ -88,7 +88,7 @@ func (d *delegation) Capabilities() []ucan.Capability[any] {
 	return d.Data().Capabilities()
 }
 
-func (d *delegation) Expiration() ucan.UTCUnixTimestamp {
+func (d *delegation) Expiration() *ucan.UTCUnixTimestamp {
 	return d.Data().Expiration()
 }
 

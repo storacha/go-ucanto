@@ -15,25 +15,38 @@ import (
 type Option func(cfg *delegationConfig) error
 
 type delegationConfig struct {
-	exp uint64
-	nbf uint64
-	nnc string
-	fct []ucan.FactBuilder
-	prf Proofs
+	exp   *int
+	noexp bool
+	nbf   int
+	nnc   string
+	fct   []ucan.FactBuilder
+	prf   Proofs
 }
 
 // WithExpiration configures the expiration time in UTC seconds since Unix
-// epoch. Set this to -1 for no expiration.
-func WithExpiration(exp uint64) Option {
+// epoch.
+func WithExpiration(exp int) Option {
 	return func(cfg *delegationConfig) error {
-		cfg.exp = exp
+		cfg.exp = &exp
+		cfg.noexp = false
+		return nil
+	}
+}
+
+// WithNoExpiration configures the UCAN to never expire.
+//
+// WARNING: this will cause the delegation to be valid FOREVER, unless revoked.
+func WithNoExpiration() Option {
+	return func(cfg *delegationConfig) error {
+		cfg.exp = nil
+		cfg.noexp = true
 		return nil
 	}
 }
 
 // WithNotBefore configures the time in UTC seconds since Unix epoch when the
 // UCAN will become valid.
-func WithNotBefore(nbf uint64) Option {
+func WithNotBefore(nbf int) Option {
 	return func(cfg *delegationConfig) error {
 		cfg.nbf = nbf
 		return nil
@@ -97,16 +110,20 @@ func Delegate[C ucan.CaveatBuilder](issuer ucan.Signer, audience ucan.Principal,
 		return nil, err
 	}
 
-	data, err := ucan.Issue(
-		issuer,
-		audience,
-		capabilities,
-		ucan.WithExpiration(cfg.exp),
+	opts := []ucan.Option{
 		ucan.WithFacts(cfg.fct),
 		ucan.WithNonce(cfg.nnc),
 		ucan.WithNotBefore(cfg.nbf),
 		ucan.WithProofs(links),
-	)
+	}
+	if cfg.noexp {
+		opts = append(opts, ucan.WithNoExpiration())
+	}
+	if cfg.exp != nil {
+		opts = append(opts, ucan.WithExpiration(*cfg.exp))
+	}
+
+	data, err := ucan.Issue(issuer, audience, capabilities, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("issuing UCAN: %s", err)
 	}

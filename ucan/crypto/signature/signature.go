@@ -86,6 +86,18 @@ func NewSignature(code uint64, raw []byte) Signature {
 	return sig
 }
 
+func NewNonStandard(name string, raw []byte) Signature {
+	code := uint64(NON_STANDARD)
+	cl := varint.UvarintSize(code)
+	rl := varint.UvarintSize(uint64(len(raw)))
+	sig := make(signature, cl+rl+len(raw)+len(name))
+	varint.PutUvarint(sig, code)
+	varint.PutUvarint(sig[cl:], uint64(len(raw)))
+	copy(sig[cl+rl:], raw)
+	copy(sig[cl+rl+len(raw):], name)
+	return sig
+}
+
 func Encode(s Signature) []byte {
 	return s.Bytes()
 }

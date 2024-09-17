@@ -23,6 +23,7 @@ import (
 	"github.com/storacha-network/go-ucanto/principal/ed25519/verifier"
 	"github.com/storacha-network/go-ucanto/principal/signer"
 	"github.com/storacha-network/go-ucanto/testing/fixtures"
+	"github.com/storacha-network/go-ucanto/testing/helpers"
 	"github.com/storacha-network/go-ucanto/ucan"
 	udm "github.com/storacha-network/go-ucanto/ucan/datamodel/ucan"
 	"github.com/stretchr/testify/require"
@@ -49,39 +50,34 @@ func (c storeAddCaveats) Build() (ipld.Node, error) {
 	return nb.Build(), nil
 }
 
-func newStoreAddCapability(t *testing.T) CapabilityParser[storeAddCaveats] {
-	t.Helper()
+var storeAddTyp = helpers.Must(ipld.LoadSchemaBytes([]byte(`
+	type StoreAddCaveats struct {
+		link Link
+		origin optional Link
+	}
+`)))
 
-	typ, err := ipld.LoadSchemaBytes([]byte(`
-		type StoreAddCaveats struct {
-			link Link
-			origin optional Link
+var storeAdd = NewCapability(
+	"store/add",
+	schema.DIDString(),
+	schema.Struct[storeAddCaveats](storeAddTyp.TypeByName("StoreAddCaveats"), nil),
+	func(claimed, delegated ucan.Capability[storeAddCaveats]) failure.Failure {
+		if claimed.With() != delegated.With() {
+			err := fmt.Errorf("Expected 'with: \"%s\"' instead got '%s'", delegated.With(), claimed.With())
+			return failure.FromError(err)
 		}
-	`))
-	require.NoError(t, err)
-
-	return NewCapability(
-		"store/add",
-		schema.DIDString(),
-		schema.Struct[storeAddCaveats](typ.TypeByName("StoreAddCaveats"), nil),
-		func(claimed, delegated ucan.Capability[storeAddCaveats]) failure.Failure {
-			if claimed.With() != delegated.With() {
-				err := fmt.Errorf("Expected 'with: \"%s\"' instead got '%s'", delegated.With(), claimed.With())
-				return failure.FromError(err)
+		if delegated.Nb().Link != nil && delegated.Nb().Link != claimed.Nb().Link {
+			var err error
+			if claimed.Nb().Link == nil {
+				err = fmt.Errorf("Link violates imposed %s constraint", delegated.Nb().Link)
+			} else {
+				err = fmt.Errorf("Link %s violates imposed %s constraint", claimed.Nb().Link, delegated.Nb().Link)
 			}
-			if delegated.Nb().Link != nil && delegated.Nb().Link != claimed.Nb().Link {
-				var err error
-				if claimed.Nb().Link == nil {
-					err = fmt.Errorf("Link violates imposed %s constraint", delegated.Nb().Link)
-				} else {
-					err = fmt.Errorf("Link %s violates imposed %s constraint", claimed.Nb().Link, delegated.Nb().Link)
-				}
-				return failure.FromError(err)
-			}
-			return nil
-		},
-	)
-}
+			return failure.FromError(err)
+		}
+		return nil
+	},
+)
 
 var testLink = cidlink.Link{Cid: cid.MustParse("bafkqaaa")}
 var validateAuthOk = func(auth Authorization[any]) Revoked { return nil }
@@ -90,8 +86,6 @@ var parseEdPrincipal = func(str string) (principal.Verifier, error) {
 }
 
 func TestAccess(t *testing.T) {
-	storeAdd := newStoreAddCapability(t)
-
 	t.Run("authorized", func(t *testing.T) {
 		t.Run("self-issued invocation", func(t *testing.T) {
 			inv, err := storeAdd.Invoke(
@@ -517,6 +511,7 @@ func TestAccess(t *testing.T) {
 			// to create a UCAN model, manually setting the signature to something bad
 			// and then encode it as the root block of the delegation.
 			nb, _ := storeAddCaveats{Link: testLink}.Build()
+			exp := ucan.Now() + 30
 			model := udm.UCANModel{
 				V:   "0.9.1",
 				S:   fixtures.Alice.Sign([]byte{}).Bytes(),
@@ -529,7 +524,7 @@ func TestAccess(t *testing.T) {
 						Nb:   nb,
 					},
 				},
-				Exp: ucan.Now() + 30,
+				Exp: &exp,
 			}
 
 			rt, err := block.Encode(&model, udm.Type(), cbor.Codec, sha256.Hasher)
@@ -938,8 +933,6 @@ func TestAccess(t *testing.T) {
 }
 
 func TestClaim(t *testing.T) {
-	storeAdd := newStoreAddCapability(t)
-
 	t.Run("without a proof", func(t *testing.T) {
 		dlg, err := storeAdd.Delegate(
 			fixtures.Alice,
