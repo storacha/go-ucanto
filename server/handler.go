@@ -1,49 +1,43 @@
 package server
 
 import (
-	"fmt"
-
 	"github.com/storacha-network/go-ucanto/core/invocation"
 	"github.com/storacha-network/go-ucanto/core/ipld"
+	"github.com/storacha-network/go-ucanto/core/receipt"
 	"github.com/storacha-network/go-ucanto/core/result"
-	"github.com/storacha-network/go-ucanto/did"
+	"github.com/storacha-network/go-ucanto/core/result/failure"
 	"github.com/storacha-network/go-ucanto/server/transaction"
 	"github.com/storacha-network/go-ucanto/ucan"
 	"github.com/storacha-network/go-ucanto/validator"
 )
 
-type HandlerFunc[C any, O, X ipld.Builder] func(capability ucan.Capability[C], invocation invocation.Invocation, context InvocationContext) (transaction.Transaction[O, X], error)
+type HandlerFunc[C any, O ipld.Builder] func(capability ucan.Capability[C], invocation invocation.Invocation, context InvocationContext) (out O, fx receipt.Effects, err error)
 
 // Provide is used to define given capability provider. It decorates the passed
 // handler and takes care of UCAN validation. It only calls the handler
 // when validation succeeds.
-func Provide[C any, O, X ipld.Builder](capability validator.CapabilityParser[C], handler HandlerFunc[C, O, X]) ServiceMethod[O, X] {
-	return func(invocation invocation.Invocation, context InvocationContext) (transaction.Transaction[O, X], error) {
-		canIssue := func(capability ucan.Capability[C], issuer did.DID) bool {
-			anycap := ucan.NewCapability(capability.Can(), capability.With(), any(capability.Nb()))
-			return context.CanIssue(anycap, issuer)
+func Provide[C any, O ipld.Builder](capability validator.CapabilityParser[C], handler HandlerFunc[C, O]) ServiceMethod[O] {
+	return func(invocation invocation.Invocation, context InvocationContext) (transaction.Transaction[O, ipld.Builder], error) {
+		vctx := validator.NewValidationContext(
+			context.ID().Verifier(),
+			capability,
+			context.CanIssue,
+			context.ValidateAuthorization,
+			context.ResolveProof,
+			context.ParsePrincipal,
+			context.ResolveDIDKey,
+		)
+
+		auth, aerr := validator.Access(invocation, vctx)
+		if aerr != nil {
+			return transaction.NewTransaction(result.Error[O, ipld.Builder](failure.FromError(aerr))), nil
 		}
 
-		validateAuthorization := func(auth validator.Authorization[C]) result.Failure {
-			anycap := ucan.NewCapability(auth.Capability().Can(), auth.Capability().With(), any(auth.Capability().Nb()))
-			anyauth := validator.NewAuthorization(anycap)
-			return context.ValidateAuthorization(anyauth)
+		o, fx, herr := handler(auth.Capability(), invocation, context)
+		if herr != nil {
+			return nil, herr
 		}
 
-		vctx := validator.NewValidationContext(capability, canIssue, validateAuthorization)
-
-		authorization, err := validator.Access(invocation, vctx)
-		if err != nil {
-			return nil, err
-		}
-
-		return result.MatchResultR2(authorization, func(ok validator.Authorization[C]) (transaction.Transaction[O, X], error) {
-			return handler(ok.Capability(), invocation, context)
-		}, func(err result.Failure) (transaction.Transaction[O, X], error) {
-			if failure, ok := err.(X); ok {
-				return transaction.NewTransaction(result.Error[O](failure)), nil
-			}
-			return nil, fmt.Errorf("error was not an IPLD builder")
-		})
+		return transaction.NewTransaction(result.Ok[O, ipld.Builder](o), transaction.WithEffects(fx)), nil
 	}
 }

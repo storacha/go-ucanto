@@ -1,33 +1,58 @@
 package schema
 
 import (
-	"github.com/storacha-network/go-ucanto/core/result"
+	"fmt"
+	"strings"
+
+	"github.com/storacha-network/go-ucanto/core/result/failure"
 	"github.com/storacha-network/go-ucanto/did"
 )
 
-var didreader = reader[string, did.DID]{
-	readFunc: func(input string) result.Result[did.DID, result.Failure] {
-		d, err := did.Parse(input)
-		if err != nil {
-			return result.Error[did.DID](NewSchemaError(err.Error()))
-		}
-		return result.Ok[did.DID, result.Failure](d)
-	},
+type didConfig struct {
+	method string
 }
 
-func DID() Reader[string, did.DID] {
-	return &didreader
+type DIDOption func(*didConfig)
+
+func WithMethod(method string) DIDOption {
+	return func(c *didConfig) {
+		c.method = method
+	}
+}
+
+func DID(opts ...DIDOption) Reader[string, did.DID] {
+	c := &didConfig{}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return reader[string, did.DID]{
+		readFunc: func(input string) (did.DID, failure.Failure) {
+			pfx := "did:"
+			if c.method != "" {
+				pfx = fmt.Sprintf("%s%s:", pfx, c.method)
+			}
+			if !strings.HasPrefix(input, pfx) {
+				return did.Undef, NewSchemaError(fmt.Sprintf(`Expected a "%s" but got "%s" instead`, pfx, input))
+			}
+			d, err := did.Parse(input)
+			if err != nil {
+				return did.Undef, NewSchemaError(err.Error())
+			}
+			return d, nil
+		},
+	}
 }
 
 // DIDString read a string that is in DID format.
-func DIDString() Reader[string, string] {
-	return &didstrreader
-}
-
-var didstrreader = reader[string, string]{
-	readFunc: func(input string) result.Result[string, result.Failure] {
-		return result.MapOk(DID().Read(input), func(id did.DID) string {
-			return id.String()
-		})
-	},
+func DIDString(opts ...DIDOption) Reader[string, string] {
+	rdr := DID(opts...)
+	return reader[string, string]{
+		readFunc: func(input string) (string, failure.Failure) {
+			d, err := rdr.Read(input)
+			if err != nil {
+				return "", err
+			}
+			return d.String(), nil
+		},
+	}
 }

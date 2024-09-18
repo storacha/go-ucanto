@@ -38,8 +38,8 @@ type PayloadModel struct {
 	Aud string
 	Att []udm.CapabilityModel
 	Prf []string
-	Exp uint64
+	Exp *int
 	Fct []udm.FactModel
 	Nnc *string
-	Nbf *uint64
+	Nbf *int
 }

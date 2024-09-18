@@ -6,7 +6,7 @@ type Payload struct {
   att [Capability]
   # String representation of a link to a UCAN.
   prf [String] (implied [])
-  exp Int
+  exp nullable Int
   fct optional [Fact]
   nnc optional String
   nbf optional Int

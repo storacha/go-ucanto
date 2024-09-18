@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
+	"github.com/storacha-network/go-ucanto/core/delegation"
 	"github.com/storacha-network/go-ucanto/core/invocation"
 	"github.com/storacha-network/go-ucanto/core/invocation/ran"
 	"github.com/storacha-network/go-ucanto/core/ipld"
@@ -29,17 +30,19 @@ import (
 type InvocationContext interface {
 	validator.RevocationChecker[any]
 	validator.CanIssuer[any]
+	validator.ProofResolver
+	validator.PrincipalParser
+	validator.PrincipalResolver
 	// ID is the DID of the service the invocation was sent to.
 	ID() principal.Signer
-	Principal() validator.PrincipalParser
 }
 
 // ServiceMethod is an invocation handler.
-type ServiceMethod[O, X ipld.Builder] func(input invocation.Invocation, context InvocationContext) (transaction.Transaction[O, X], error)
+type ServiceMethod[O ipld.Builder] func(input invocation.Invocation, context InvocationContext) (transaction.Transaction[O, ipld.Builder], error)
 
 // Service is a mapping of service names to handlers, used to define a
 // service implementation.
-type Service = map[string]ServiceMethod[ipld.Builder, ipld.Builder]
+type Service = map[ucan.Ability]ServiceMethod[ipld.Builder]
 
 type ServiceInvocation = invocation.IssuedInvocation
 
@@ -95,48 +98,68 @@ func NewServer(id principal.Signer, options ...Option) (ServerView, error) {
 
 	validateAuthorization := cfg.validateAuthorization
 	if validateAuthorization == nil {
-		validateAuthorization = func(auth validator.Authorization[any]) result.Failure {
+		validateAuthorization = func(auth validator.Authorization[any]) validator.Revoked {
 			return nil
 		}
 	}
 
-	ctx := &context{id: id, canIssue: canIssue, principal: &principalParser{}}
-	svr := &server{id: id, service: cfg.service, context: ctx, codec: codec, catch: catch}
+	resolveProof := cfg.resolveProof
+	if resolveProof == nil {
+		resolveProof = validator.ProofUnavailable
+	}
+
+	parsePrincipal := cfg.parsePrincipal
+	if parsePrincipal == nil {
+		parsePrincipal = ParsePrincipal
+	}
+
+	resolveDIDKey := cfg.resolveDIDKey
+	if resolveDIDKey == nil {
+		resolveDIDKey = validator.FailDIDKeyResolution
+	}
+
+	ctx := context{id, canIssue, validateAuthorization, resolveProof, parsePrincipal, resolveDIDKey}
+	svr := &server{id, cfg.service, ctx, codec, catch}
 	return svr, nil
 }
 
-type principalParser struct{}
-
-func (p *principalParser) Parse(str string) (principal.Verifier, error) {
+func ParsePrincipal(str string) (principal.Verifier, error) {
+	// TODO: Ed or RSA
 	return verifier.Parse(str)
 }
-
-var _ validator.PrincipalParser = (*principalParser)(nil)
 
 type context struct {
 	id                    principal.Signer
 	canIssue              validator.CanIssueFunc[any]
-	principal             validator.PrincipalParser
 	validateAuthorization validator.RevocationCheckerFunc[any]
+	resolveProof          validator.ProofResolverFunc
+	parsePrincipal        validator.PrincipalParserFunc
+	resolveDIDKey         validator.PrincipalResolverFunc
 }
 
-func (ctx *context) ID() principal.Signer {
+func (ctx context) ID() principal.Signer {
 	return ctx.id
 }
 
-func (ctx *context) CanIssue(capability ucan.Capability[any], issuer did.DID) bool {
+func (ctx context) CanIssue(capability ucan.Capability[any], issuer did.DID) bool {
 	return ctx.canIssue(capability, issuer)
 }
 
-func (ctx *context) Principal() validator.PrincipalParser {
-	return ctx.principal
-}
-
-func (ctx *context) ValidateAuthorization(auth validator.Authorization[any]) result.Failure {
+func (ctx context) ValidateAuthorization(auth validator.Authorization[any]) validator.Revoked {
 	return ctx.validateAuthorization(auth)
 }
 
-var _ InvocationContext = (*context)(nil)
+func (ctx context) ResolveProof(proof ucan.Link) (delegation.Delegation, validator.UnavailableProof) {
+	return ctx.resolveProof(proof)
+}
+
+func (ctx context) ParsePrincipal(str string) (principal.Verifier, error) {
+	return ctx.parsePrincipal(str)
+}
+
+func (ctx context) ResolveDIDKey(did did.DID) (did.DID, validator.UnresolvedDID) {
+	return ctx.resolveDIDKey(did)
+}
 
 type server struct {
 	id      principal.Signer
@@ -254,20 +277,20 @@ func Run(server Server, invocation ServiceInvocation) (receipt.AnyReceipt, error
 		return receipt.Issue(server.ID(), result.NewFailure(err), ran.FromInvocation(invocation))
 	}
 
-	outcome, err := handle(invocation, server.Context())
+	tx, err := handle(invocation, server.Context())
 	if err != nil {
 		herr := NewHandlerExecutionError(err, cap)
 		server.Catch(herr)
 		return receipt.Issue(server.ID(), result.NewFailure(herr), ran.FromInvocation(invocation))
 	}
 
-	fx := outcome.Fx()
+	fx := tx.Fx()
 	var opts []receipt.Option
 	if fx != nil {
 		opts = append(opts, receipt.WithJoin(fx.Join()), receipt.WithForks(fx.Fork()))
 	}
 
-	rcpt, err := receipt.Issue(server.ID(), outcome.Out(), ran.FromInvocation(invocation), opts...)
+	rcpt, err := receipt.Issue(server.ID(), tx.Out(), ran.FromInvocation(invocation), opts...)
 	if err != nil {
 		herr := NewHandlerExecutionError(err, cap)
 		server.Catch(herr)

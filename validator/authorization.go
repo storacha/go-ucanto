@@ -2,106 +2,76 @@ package validator
 
 import (
 	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/go-ucanto/core/invocation"
-	"github.com/storacha-network/go-ucanto/core/result"
-	"github.com/storacha-network/go-ucanto/did"
-	"github.com/storacha-network/go-ucanto/principal"
 	"github.com/storacha-network/go-ucanto/ucan"
 )
 
-// PrincipalParser provides verifier instances that can validate UCANs issued
-// by a given principal.
-type PrincipalParser interface {
-	Parse(str string) (principal.Verifier, error)
-}
-
-type CanIssuer[Caveats any] interface {
-	// CanIssue informs validator whether given capability can be issued by a
-	// given DID or whether it needs to be delegated to the issuer.
-	CanIssue(capability ucan.Capability[Caveats], issuer did.DID) bool
-}
-
-// CanIssue informs validator whether given capability can be issued by a
-// given DID or whether it needs to be delegated to the issuer.
-type CanIssueFunc[Caveats any] func(capability ucan.Capability[Caveats], issuer did.DID) bool
-
-type RevocationChecker[Caveats any] interface {
-	// ValidateAuthorization validates that the passed authorization has not been
-	// revoked.
-	ValidateAuthorization(auth Authorization[Caveats]) result.Failure
-}
-
-// RevocationCheckerFunc validates the passed authorization and returns
-// a result indicating validity.
-type RevocationCheckerFunc[Caveats any] func(auth Authorization[Caveats]) result.Failure
-
-type ValidationContext[Caveats any] interface {
-	RevocationChecker[Caveats]
-	CanIssuer[Caveats]
-	Capability() CapabilityParser[Caveats]
-}
-
 type Authorization[Caveats any] interface {
+	Audience() ucan.Principal
 	Capability() ucan.Capability[Caveats]
+	Delegation() delegation.Delegation
+	Issuer() ucan.Principal
+	Proofs() []Authorization[Caveats]
 }
 
 type authorization[Caveats any] struct {
-	capability ucan.Capability[Caveats]
+	match  Match[Caveats]
+	proofs []Authorization[Caveats]
 }
 
-func (a *authorization[Caveats]) Capability() ucan.Capability[Caveats] {
-	return a.capability
+func (a authorization[Caveats]) Audience() ucan.Principal {
+	return a.Delegation().Audience()
 }
 
-func NewAuthorization[Caveats any](capability ucan.Capability[Caveats]) Authorization[Caveats] {
-	return &authorization[Caveats]{capability: capability}
+func (a authorization[Caveats]) Capability() ucan.Capability[Caveats] {
+	return a.match.Value()
 }
 
-type source struct {
-	capability ucan.Capability[any]
+func (a authorization[Caveats]) Delegation() delegation.Delegation {
+	return a.match.Source()[0].Delegation()
 }
 
-func (s *source) Capability() ucan.Capability[any] {
-	return s.capability
+func (a authorization[Caveats]) Issuer() ucan.Principal {
+	return a.Delegation().Issuer()
 }
 
-func (s *source) Delegation() delegation.Delegation {
-	return nil
+func (a authorization[Caveats]) Proofs() []Authorization[Caveats] {
+	return a.proofs
 }
 
-type validationContext[Caveats any] struct {
-	capability            CapabilityParser[Caveats]
-	canIssue              CanIssueFunc[Caveats]
-	validateAuthorization RevocationCheckerFunc[Caveats]
+func NewAuthorization[Caveats any](match Match[Caveats], proofs []Authorization[Caveats]) Authorization[Caveats] {
+	return authorization[Caveats]{match, proofs}
 }
 
-func (vc *validationContext[Caveats]) CanIssue(capability ucan.Capability[Caveats], issuer did.DID) bool {
-	return vc.canIssue(capability, issuer)
+type unknownauth[C any] struct {
+	auth Authorization[C]
 }
 
-func (vc *validationContext[Caveats]) ValidateAuthorization(auth Authorization[Caveats]) result.Failure {
-	return vc.validateAuthorization(auth)
+func (a unknownauth[C]) Audience() ucan.Principal {
+	return a.auth.Audience()
 }
 
-func (vc *validationContext[Caveats]) Capability() CapabilityParser[Caveats] {
-	return vc.capability
+func (a unknownauth[C]) Capability() ucan.Capability[any] {
+	cap := a.auth.Capability()
+	return ucan.NewCapability[any](cap.Can(), cap.With(), cap.Nb())
 }
 
-var _ ValidationContext[any] = (*validationContext[any])(nil)
-
-func NewValidationContext[Caveats any](capability CapabilityParser[Caveats], canIssue CanIssueFunc[Caveats], validateAuthorization RevocationCheckerFunc[Caveats]) ValidationContext[Caveats] {
-	vc := validationContext[Caveats]{capability, canIssue, validateAuthorization}
-	return &vc
+func (a unknownauth[C]) Delegation() delegation.Delegation {
+	return a.auth.Delegation()
 }
 
-func Access[Caveats any](invocation invocation.Invocation, context ValidationContext[Caveats]) (result.Result[Authorization[Caveats], result.Failure], error) {
-	cap := invocation.Capabilities()[0]
-	src := source{capability: cap}
+func (a unknownauth[C]) Issuer() ucan.Principal {
+	return a.Delegation().Issuer()
+}
 
-	// TODO: parser.Select()
-	match := context.Capability().Match(&src)
+func (a unknownauth[C]) Proofs() []Authorization[any] {
+	var prf []Authorization[any]
+	for _, p := range a.auth.Proofs() {
+		prf = append(prf, ConvertUnknownAuthorization(p))
+	}
+	return prf
+}
 
-	return result.MapOk(match, func(o ucan.Capability[Caveats]) Authorization[Caveats] {
-		return &authorization[Caveats]{capability: o}
-	}), nil
+// ConvertUnknownAuthorization converts an Authorization[Caveats] to Authorization[any]
+func ConvertUnknownAuthorization[Caveats any](auth Authorization[Caveats]) Authorization[any] {
+	return unknownauth[Caveats]{auth}
 }

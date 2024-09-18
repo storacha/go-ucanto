@@ -11,7 +11,7 @@ type UCAN struct {
   # All proofs are links, however you could still inline proof
   # by using CID with identity hashing algorithm
   prf optional [&UCAN]
-  exp Int
+  exp nullable Int
 
   fct optional [Fact]
   nnc optional String

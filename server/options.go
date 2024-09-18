@@ -14,29 +14,24 @@ type Option func(cfg *srvConfig) error
 
 type srvConfig struct {
 	codec                 transport.InboundCodec
-	service               map[string]ServiceMethod[ipld.Builder, ipld.Builder]
+	service               Service
 	validateAuthorization validator.RevocationCheckerFunc[any]
 	canIssue              validator.CanIssueFunc[any]
+	resolveProof          validator.ProofResolverFunc
+	parsePrincipal        validator.PrincipalParserFunc
+	resolveDIDKey         validator.PrincipalResolverFunc
 	catch                 ErrorHandlerFunc
 }
 
-func WithServiceMethod[O, X ipld.Builder](can string, handleFunc ServiceMethod[O, X]) Option {
+func WithServiceMethod[O ipld.Builder](can string, handleFunc ServiceMethod[O]) Option {
 	return func(cfg *srvConfig) error {
 		cfg.service[can] = func(input invocation.Invocation, context InvocationContext) (transaction.Transaction[ipld.Builder, ipld.Builder], error) {
 			tx, err := handleFunc(input, context)
 			if err != nil {
 				return nil, err
 			}
-			out := result.MapResultR0(
-				tx.Out(),
-				func(o O) ipld.Builder { return o },
-				func(x X) ipld.Builder { return x },
-			)
-			var opts []transaction.Option
-			if tx.Fx() != nil {
-				opts = append(opts, transaction.WithForks(tx.Fx().Fork()), transaction.WithJoin(tx.Fx().Join()))
-			}
-			return transaction.NewTransaction(out, opts...), nil
+			out := result.MapOk(tx.Out(), func(o O) ipld.Builder { return o })
+			return transaction.NewTransaction(out, transaction.WithEffects(tx.Fx())), nil
 		}
 		return nil
 	}
@@ -75,6 +70,34 @@ func WithErrorHandler(fn ErrorHandlerFunc) Option {
 func WithCanIssue(fn validator.CanIssueFunc[any]) Option {
 	return func(cfg *srvConfig) error {
 		cfg.canIssue = fn
+		return nil
+	}
+}
+
+// WithProofResolver configures a function that finds delegations corresponding
+// to a given link. If a resolver is not provided the validator may not be able
+// to explore corresponding path within a proof chain.
+func WithProofResolver(fn validator.ProofResolverFunc) Option {
+	return func(cfg *srvConfig) error {
+		cfg.resolveProof = fn
+		return nil
+	}
+}
+
+// WithPrincipalParser configures a function that provides verifier instances
+// that can validate UCANs issued by a given principal.
+func WithPrincipalParser(fn validator.PrincipalParserFunc) Option {
+	return func(cfg *srvConfig) error {
+		cfg.parsePrincipal = fn
+		return nil
+	}
+}
+
+// WithPrincipalResolver configures a function that resolves the key of a
+// principal that is identified by DID different from did:key method.
+func WithPrincipalResolver(fn validator.PrincipalResolverFunc) Option {
+	return func(cfg *srvConfig) error {
+		cfg.resolveDIDKey = fn
 		return nil
 	}
 }

@@ -49,6 +49,11 @@ func (d DID) String() string {
 	return "did:" + d.str[MethodOffset:]
 }
 
+// GoString formats the decentralized identity document (DID) as a string.
+func (d DID) GoString() string {
+	return d.String()
+}
+
 func Decode(bytes []byte) (DID, error) {
 	code, _, err := varint.FromUvarint(bytes)
 	if err != nil {
