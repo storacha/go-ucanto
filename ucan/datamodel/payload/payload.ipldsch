@@ -6,7 +6,7 @@ type Payload struct {
   att [Capability]
   # String representation of a link to a UCAN.
   prf [String] (implied [])
-  exp Int
+  exp nullable Int
   fct optional [Fact]
   nnc optional String
   nbf optional Int
@@ -18,7 +18,7 @@ type Capability struct {
   # Must be all lower-case `/` delimeted with at least one path segment.
   can String
   # Any additional domain specific details and/or restrictions of the capability
-  nb { String: Any }
+  nb Any
 }
 
 type Fact { String: Any }

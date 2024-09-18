@@ -1,7 +1,7 @@
 package transport
 
 import (
-	"github.com/storacha-network/go-ucanto/core/message"
+	"github.com/storacha/go-ucanto/core/message"
 )
 
 type RequestEncoder interface {

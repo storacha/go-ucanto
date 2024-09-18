@@ -3,7 +3,7 @@ package http
 import (
 	nethttp "net/http"
 
-	"github.com/storacha-network/go-ucanto/transport"
+	"github.com/storacha/go-ucanto/transport"
 )
 
 type httpError struct {

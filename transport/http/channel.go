@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/storacha-network/go-ucanto/transport"
+	"github.com/storacha/go-ucanto/transport"
 )
 
 type channel struct {

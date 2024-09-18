@@ -7,7 +7,7 @@ import (
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/schema"
-	udm "github.com/storacha-network/go-ucanto/ucan/datamodel/ucan"
+	udm "github.com/storacha/go-ucanto/ucan/datamodel/ucan"
 )
 
 //go:embed payload.ipldsch
@@ -38,8 +38,8 @@ type PayloadModel struct {
 	Aud string
 	Att []udm.CapabilityModel
 	Prf []string
-	Exp uint64
+	Exp *int
 	Fct []udm.FactModel
 	Nnc *string
-	Nbf *uint64
+	Nbf *int
 }

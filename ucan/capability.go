@@ -1,5 +1,15 @@
 package ucan
 
+import (
+	"encoding/json"
+)
+
+type jsonModel struct {
+	Can  Ability     `json:"can"`
+	With Resource    `json:"with"`
+	Nb   interface{} `json:"nb,omitempty"`
+}
+
 type capability[T any] struct {
 	can  Ability
 	nb   T
@@ -18,6 +28,14 @@ func (c *capability[T]) Nb() T {
 
 func (c *capability[T]) With() Resource {
 	return c.with
+}
+
+func (c *capability[T]) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonModel{
+		Can:  c.can,
+		With: c.with,
+		Nb:   c.nb,
+	})
 }
 
 func NewCapability[Caveats any](can Ability, with Resource, nb Caveats) Capability[Caveats] {

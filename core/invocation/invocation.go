@@ -1,10 +1,10 @@
 package invocation
 
 import (
-	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/ucan"
 )
 
 // Invocation represents a UCAN that can be presented to a service provider to
@@ -33,6 +33,5 @@ type IssuedInvocation interface {
 }
 
 func Invoke[C ucan.CaveatBuilder](issuer ucan.Signer, audience ucan.Principal, capability ucan.Capability[C], options ...delegation.Option) (IssuedInvocation, error) {
-	bcap := ucan.NewCapability(capability.Can(), capability.With(), ucan.CaveatBuilder(capability.Nb()))
-	return delegation.Delegate(issuer, audience, []ucan.Capability[ucan.CaveatBuilder]{bcap}, options...)
+	return delegation.Delegate(issuer, audience, []ucan.Capability[C]{capability}, options...)
 }

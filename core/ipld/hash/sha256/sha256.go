@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 
 	"github.com/multiformats/go-multihash"
-	"github.com/storacha-network/go-ucanto/core/ipld/hash"
+	"github.com/storacha/go-ucanto/core/ipld/hash"
 )
 
 // sha2-256

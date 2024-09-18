@@ -9,11 +9,11 @@ import (
 	"fmt"
 
 	"github.com/multiformats/go-multibase"
-	"github.com/storacha-network/go-ucanto/did"
-	"github.com/storacha-network/go-ucanto/principal"
-	"github.com/storacha-network/go-ucanto/principal/multiformat"
-	"github.com/storacha-network/go-ucanto/principal/rsa/verifier"
-	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
+	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/go-ucanto/principal"
+	"github.com/storacha/go-ucanto/principal/multiformat"
+	"github.com/storacha/go-ucanto/principal/rsa/verifier"
+	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 )
 
 const Code = 0x1300

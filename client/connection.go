@@ -4,14 +4,14 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"hash"
+	"iter"
 
-	"github.com/storacha-network/go-ucanto/core/invocation"
-	"github.com/storacha-network/go-ucanto/core/ipld/block"
-	"github.com/storacha-network/go-ucanto/core/iterable"
-	"github.com/storacha-network/go-ucanto/core/message"
-	"github.com/storacha-network/go-ucanto/transport"
-	"github.com/storacha-network/go-ucanto/transport/car"
-	"github.com/storacha-network/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/ipld/block"
+	"github.com/storacha/go-ucanto/core/message"
+	"github.com/storacha/go-ucanto/transport"
+	"github.com/storacha/go-ucanto/transport/car"
+	"github.com/storacha/go-ucanto/ucan"
 )
 
 type Connection interface {
@@ -96,7 +96,7 @@ func (c *conn) Hasher() hash.Hash {
 type ExecutionResponse interface {
 	// Blocks returns an iterator of all the IPLD blocks that are included in
 	// the response.
-	Blocks() iterable.Iterator[block.Block]
+	Blocks() iter.Seq2[block.Block, error]
 	// Get returns a link to a receipt, given an invocation link.
 	Get(inv ucan.Link) (ucan.Link, bool)
 }

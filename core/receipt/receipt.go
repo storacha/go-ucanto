@@ -4,23 +4,24 @@ import (
 	// for go:embed
 	_ "embed"
 	"fmt"
+	"iter"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/schema"
-	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/go-ucanto/core/invocation"
-	"github.com/storacha-network/go-ucanto/core/invocation/ran"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/ipld/block"
-	"github.com/storacha-network/go-ucanto/core/ipld/codec/cbor"
-	"github.com/storacha-network/go-ucanto/core/ipld/hash/sha256"
-	"github.com/storacha-network/go-ucanto/core/iterable"
-	rdm "github.com/storacha-network/go-ucanto/core/receipt/datamodel"
-	"github.com/storacha-network/go-ucanto/core/result"
-	"github.com/storacha-network/go-ucanto/did"
-	"github.com/storacha-network/go-ucanto/ucan"
-	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/invocation/ran"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/ipld/block"
+	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
+	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
+	"github.com/storacha/go-ucanto/core/iterable"
+	rdm "github.com/storacha/go-ucanto/core/receipt/datamodel"
+	"github.com/storacha/go-ucanto/core/result"
+	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 )
 
 type Effects interface {
@@ -77,8 +78,8 @@ type receipt[O, X any] struct {
 
 var _ Receipt[any, any] = (*receipt[any, any])(nil)
 
-func (r *receipt[O, X]) Blocks() iterable.Iterator[block.Block] {
-	var iterators []iterable.Iterator[block.Block]
+func (r *receipt[O, X]) Blocks() iter.Seq2[block.Block, error] {
+	var iterators []iter.Seq2[block.Block, error]
 	iterators = append(iterators, r.Ran().Blocks())
 
 	for _, prf := range r.Proofs() {
@@ -87,9 +88,9 @@ func (r *receipt[O, X]) Blocks() iterable.Iterator[block.Block] {
 		}
 	}
 
-	iterators = append(iterators, iterable.From([]block.Block{r.Root()}))
+	iterators = append(iterators, func(yield func(block.Block, error) bool) { yield(r.Root(), nil) })
 
-	return iterable.Concat(iterators...)
+	return iterable.Concat2(iterators...)
 }
 
 func (r *receipt[O, X]) Fx() Effects {
@@ -165,14 +166,14 @@ func NewReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, typ sch
 }
 
 type ReceiptReader[O, X any] interface {
-	Read(rcpt ipld.Link, blks iterable.Iterator[block.Block]) (Receipt[O, X], error)
+	Read(rcpt ipld.Link, blks iter.Seq2[block.Block, error]) (Receipt[O, X], error)
 }
 
 type receiptReader[O, X any] struct {
 	typ schema.Type
 }
 
-func (rr *receiptReader[O, X]) Read(rcpt ipld.Link, blks iterable.Iterator[block.Block]) (Receipt[O, X], error) {
+func (rr *receiptReader[O, X]) Read(rcpt ipld.Link, blks iter.Seq2[block.Block, error]) (Receipt[O, X], error) {
 	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(blks))
 	if err != nil {
 		return nil, fmt.Errorf("creating block reader: %s", err)
@@ -280,9 +281,9 @@ func Issue[O, X ipld.Builder](issuer ucan.Signer, out result.Result[O, X], ran r
 	}
 
 	nodeResult, err := result.MapResultR1(out, func(b O) (ipld.Node, error) {
-		return b.Build()
+		return b.ToIPLD()
 	}, func(b X) (ipld.Node, error) {
-		return b.Build()
+		return b.ToIPLD()
 	})
 	if err != nil {
 		return nil, err

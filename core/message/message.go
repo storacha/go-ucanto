@@ -2,16 +2,16 @@ package message
 
 import (
 	"fmt"
+	"iter"
 
-	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
-	"github.com/storacha-network/go-ucanto/core/invocation"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/ipld/block"
-	"github.com/storacha-network/go-ucanto/core/ipld/codec/cbor"
-	"github.com/storacha-network/go-ucanto/core/ipld/hash/sha256"
-	"github.com/storacha-network/go-ucanto/core/iterable"
-	mdm "github.com/storacha-network/go-ucanto/core/message/datamodel"
-	"github.com/storacha-network/go-ucanto/core/receipt"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/ipld/block"
+	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
+	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
+	mdm "github.com/storacha/go-ucanto/core/message/datamodel"
+	"github.com/storacha/go-ucanto/core/receipt"
 )
 
 type AgentMessage interface {
@@ -38,7 +38,7 @@ func (m *message) Root() ipld.Block {
 	return m.root
 }
 
-func (m *message) Blocks() iterable.Iterator[ipld.Block] {
+func (m *message) Blocks() iter.Seq2[ipld.Block, error] {
 	return m.blks.Iterator()
 }
 

@@ -2,16 +2,15 @@ package blockstore
 
 import (
 	"fmt"
-	"io"
+	"iter"
 	"sync"
 
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/iterable"
+	"github.com/storacha/go-ucanto/core/ipld"
 )
 
 type BlockReader interface {
 	Get(link ipld.Link) (ipld.Block, bool, error)
-	Iterator() iterable.Iterator[ipld.Block]
+	Iterator() iter.Seq2[ipld.Block, error]
 }
 
 type BlockWriter interface {
@@ -33,20 +32,19 @@ func (br *blockreader) Get(link ipld.Link) (ipld.Block, bool, error) {
 	return b, ok, nil
 }
 
-func (br *blockreader) Iterator() iterable.Iterator[ipld.Block] {
-	i := 0
-	return iterable.NewIterator(func() (ipld.Block, error) {
-		if len(br.keys) <= i {
-			return nil, io.EOF
+func (br *blockreader) Iterator() iter.Seq2[ipld.Block, error] {
+	return func(yield func(ipld.Block, error) bool) {
+		for _, k := range br.keys {
+			v, ok := br.blks[k]
+			var err error
+			if !ok {
+				err = fmt.Errorf("missing block for key: %s", k)
+			}
+			if !yield(v, err) {
+				return
+			}
 		}
-		k := br.keys[i]
-		v, ok := br.blks[k]
-		if !ok {
-			return nil, fmt.Errorf("missing block for key: %s", k)
-		}
-		i++
-		return v, nil
-	})
+	}
 }
 
 type blockstore struct {
@@ -75,23 +73,21 @@ func (bs *blockstore) Get(link ipld.Link) (ipld.Block, bool, error) {
 	return bs.blockreader.Get(link)
 }
 
-func (bs *blockstore) Iterator() iterable.Iterator[ipld.Block] {
+func (bs *blockstore) Iterator() iter.Seq2[ipld.Block, error] {
 	bs.Lock()
 	defer bs.Unlock()
-	keys := bs.keys[:]
-	i := 0
-	return iterable.NewIterator(func() (ipld.Block, error) {
-		if len(keys) <= i {
-			return nil, io.EOF
+	return func(yield func(ipld.Block, error) bool) {
+		for _, k := range bs.keys {
+			v, ok := bs.blks[k]
+			var err error
+			if !ok {
+				err = fmt.Errorf("missing block for key: %s", k)
+			}
+			if !yield(v, err) {
+				return
+			}
 		}
-		k := keys[i]
-		v, ok := bs.blks[k]
-		if !ok {
-			return nil, fmt.Errorf("missing block for key: %s", k)
-		}
-		i++
-		return v, nil
-	})
+	}
 }
 
 // Option is an option configuring a block reader/writer.
@@ -99,7 +95,7 @@ type Option func(cfg *bsConfig) error
 
 type bsConfig struct {
 	blks     []ipld.Block
-	blksiter iterable.Iterator[ipld.Block]
+	blksiter iter.Seq2[ipld.Block, error]
 }
 
 // WithBlocks configures the blocks the blockstore should contain.
@@ -111,7 +107,7 @@ func WithBlocks(blks []ipld.Block) Option {
 }
 
 // WithBlocksIterator configures the blocks the blockstore should contain.
-func WithBlocksIterator(blks iterable.Iterator[ipld.Block]) Option {
+func WithBlocksIterator(blks iter.Seq2[ipld.Block, error]) Option {
 	return func(cfg *bsConfig) error {
 		cfg.blksiter = blks
 		return nil
@@ -138,15 +134,11 @@ func NewBlockStore(options ...Option) (BlockStore, error) {
 		}
 	}
 	if cfg.blksiter != nil {
-		for {
-			b, err := cfg.blksiter.Next()
+		for b, err := range cfg.blksiter {
 			if err != nil {
-				if err == io.EOF {
-					break
-				}
 				return nil, err
 			}
-			err = bs.Put(b)
+			err := bs.Put(b)
 			if err != nil {
 				return nil, err
 			}
@@ -175,12 +167,8 @@ func NewBlockReader(options ...Option) (BlockReader, error) {
 		keys = append(keys, b.Link().String())
 	}
 	if cfg.blksiter != nil {
-		for {
-			b, err := cfg.blksiter.Next()
+		for b, err := range cfg.blksiter {
 			if err != nil {
-				if err == io.EOF {
-					break
-				}
 				return nil, err
 			}
 			_, ok := blks[b.Link().String()]
@@ -196,16 +184,8 @@ func NewBlockReader(options ...Option) (BlockReader, error) {
 }
 
 func WriteInto(view ipld.View, bs BlockWriter) error {
-	blks := view.Blocks()
-	for {
-		b, err := blks.Next()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return fmt.Errorf("reading proof blocks: %s", err)
-		}
-		err = bs.Put(b)
+	for b := range view.Blocks() {
+		err := bs.Put(b)
 		if err != nil {
 			return fmt.Errorf("putting proof block: %s", err)
 		}

@@ -1,10 +1,10 @@
 package ran
 
 import (
-	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
-	"github.com/storacha-network/go-ucanto/core/invocation"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/ucan"
 )
 
 type Ran struct {

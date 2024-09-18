@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
-	hdm "github.com/storacha-network/go-ucanto/ucan/datamodel/header"
-	pdm "github.com/storacha-network/go-ucanto/ucan/datamodel/payload"
-	udm "github.com/storacha-network/go-ucanto/ucan/datamodel/ucan"
-	"github.com/storacha-network/go-ucanto/ucan/formatter"
+	"github.com/storacha/go-ucanto/ucan/crypto/signature"
+	pdm "github.com/storacha/go-ucanto/ucan/datamodel/payload"
+	udm "github.com/storacha/go-ucanto/ucan/datamodel/ucan"
+	"github.com/storacha/go-ucanto/ucan/formatter"
 )
 
 const version = "0.9.1"
@@ -17,25 +17,38 @@ const version = "0.9.1"
 type Option func(cfg *ucanConfig) error
 
 type ucanConfig struct {
-	exp uint64
-	nbf uint64
-	nnc string
-	fct []FactBuilder
-	prf []Link
+	exp   *UTCUnixTimestamp
+	noexp bool
+	nbf   UTCUnixTimestamp
+	nnc   string
+	fct   []FactBuilder
+	prf   []Link
 }
 
 // WithExpiration configures the expiration time in UTC seconds since Unix
 // epoch.
-func WithExpiration(exp uint64) Option {
+func WithExpiration(exp UTCUnixTimestamp) Option {
 	return func(cfg *ucanConfig) error {
-		cfg.exp = exp
+		cfg.exp = &exp
+		cfg.noexp = false
+		return nil
+	}
+}
+
+// WithNoExpiration configures the UCAN to never expire.
+//
+// WARNING: this will cause the delegation to be valid FOREVER, unless revoked.
+func WithNoExpiration() Option {
+	return func(cfg *ucanConfig) error {
+		cfg.exp = nil
+		cfg.noexp = true
 		return nil
 	}
 }
 
 // WithNotBefore configures the time in UTC seconds since Unix epoch when the
 // UCAN will become valid.
-func WithNotBefore(nbf uint64) Option {
+func WithNotBefore(nbf int) Option {
 	return func(cfg *ucanConfig) error {
 		cfg.nbf = nbf
 		return nil
@@ -68,15 +81,19 @@ func WithProofs(prf []Link) Option {
 
 // MapBuilder builds a map of string => datamodel.Node from the underlying data.
 type MapBuilder interface {
-	Build() (map[string]datamodel.Node, error)
+	ToIPLD() (map[string]datamodel.Node, error)
 }
 
-type CaveatBuilder = MapBuilder
 type FactBuilder = MapBuilder
+
+// CaveatBuilder builds a datamodel.Node from the underlying data.
+type CaveatBuilder interface {
+	ToIPLD() (datamodel.Node, error)
+}
 
 // Issue creates a new signed token with a given issuer. If expiration is
 // not set it defaults to 30 seconds from now.
-func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBuilder], options ...Option) (UCANView, error) {
+func Issue[C CaveatBuilder](issuer Signer, audience Principal, capabilities []Capability[C], options ...Option) (View, error) {
 	cfg := ucanConfig{}
 	for _, opt := range options {
 		if err := opt(&cfg); err != nil {
@@ -84,27 +101,26 @@ func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBu
 		}
 	}
 
-	if cfg.exp == 0 {
-		cfg.exp = Now() + 30
+	var exp *int
+	if !cfg.noexp {
+		if cfg.exp == nil {
+			in30s := int(Now() + 30)
+			exp = &in30s
+		} else {
+			exp = cfg.exp
+		}
 	}
 
 	var capsmdl []udm.CapabilityModel
 	for _, cap := range capabilities {
-		vals, err := cap.Nb().Build()
+		nb, err := cap.Nb().ToIPLD()
 		if err != nil {
 			return nil, fmt.Errorf("building caveats: %s", err)
-		}
-		var keys []string
-		for k := range vals {
-			keys = append(keys, k)
 		}
 		m := udm.CapabilityModel{
 			With: cap.With(),
 			Can:  cap.Can(),
-			Nb: udm.NbModel{
-				Keys:   keys,
-				Values: vals,
-			},
+			Nb:   nb,
 		}
 		capsmdl = append(capsmdl, m)
 	}
@@ -116,7 +132,7 @@ func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBu
 
 	var fctsmdl []udm.FactModel
 	for _, f := range cfg.fct {
-		vals, err := f.Build()
+		vals, err := f.ToIPLD()
 		if err != nil {
 			return nil, fmt.Errorf("building fact: %s", err)
 		}
@@ -130,17 +146,12 @@ func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBu
 		})
 	}
 
-	header := hdm.HeaderModel{
-		Alg: issuer.SignatureAlgorithm(),
-		Ucv: version,
-		Typ: "JWT",
-	}
 	payload := pdm.PayloadModel{
 		Iss: issuer.DID().String(),
 		Aud: audience.DID().String(),
 		Att: capsmdl,
 		Prf: prfstrs,
-		Exp: cfg.exp,
+		Exp: exp,
 		Fct: fctsmdl,
 	}
 	if cfg.nnc != "" {
@@ -149,7 +160,7 @@ func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBu
 	if cfg.nbf != 0 {
 		payload.Nbf = &cfg.nbf
 	}
-	bytes, err := encodeSignaturePayload(&header, &payload)
+	bytes, err := encodeSignaturePayload(payload, version, issuer.SignatureAlgorithm())
 	if err != nil {
 		return nil, fmt.Errorf("encoding signature payload: %s", err)
 	}
@@ -161,7 +172,7 @@ func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBu
 		Aud: audience.DID().Bytes(),
 		Att: capsmdl,
 		Prf: cfg.prf,
-		Exp: cfg.exp,
+		Exp: exp,
 		Fct: fctsmdl,
 	}
 	if cfg.nnc != "" {
@@ -170,30 +181,62 @@ func Issue(issuer Signer, audience Principal, capabilities []Capability[CaveatBu
 	if cfg.nbf != 0 {
 		model.Nbf = &cfg.nbf
 	}
-	return NewUCANView(&model)
+	return NewUCAN(&model)
 }
 
-func encodeSignaturePayload(header *hdm.HeaderModel, payload *pdm.PayloadModel) ([]byte, error) {
-	str, err := formatter.FormatSignPayload(header, payload)
+func encodeSignaturePayload(payload pdm.PayloadModel, version string, algorithm string) ([]byte, error) {
+	str, err := formatter.FormatSignPayload(payload, version, algorithm)
 	if err != nil {
 		return nil, err
 	}
 	return []byte(str), nil
 }
 
+func VerifySignature(ucan View, verifier Verifier) (bool, error) {
+	alg, err := signature.CodeName(ucan.Signature().Code())
+	if err != nil {
+		return false, err
+	}
+
+	var prfstrs []string
+	for _, link := range ucan.Proofs() {
+		prfstrs = append(prfstrs, link.String())
+	}
+
+	payload := pdm.PayloadModel{
+		Iss: ucan.Issuer().DID().String(),
+		Aud: ucan.Audience().DID().String(),
+		Att: ucan.Model().Att,
+		Prf: prfstrs,
+		Exp: ucan.Expiration(),
+		Fct: ucan.Model().Fct,
+	}
+
+	msg, err := encodeSignaturePayload(payload, ucan.Version(), alg)
+	if err != nil {
+		return false, err
+	}
+
+	return ucan.Issuer().DID() == verifier.DID() && verifier.Verify(msg, ucan.Signature()), nil
+}
+
 // IsExpired checks if a UCAN is expired.
-func IsExpired(ucan UCANView) bool {
-	return ucan.Expiration() <= Now()
+func IsExpired(ucan UCAN) bool {
+	exp := ucan.Expiration()
+	if exp == nil {
+		return false
+	}
+	return *exp <= Now()
 }
 
 // IsTooEarly checks if a UCAN is not active yet.
-func IsTooEarly(ucan UCANView) bool {
+func IsTooEarly(ucan UCAN) bool {
 	nbf := ucan.NotBefore()
 	return nbf != 0 && Now() <= nbf
 }
 
 // Now returns a UTC Unix timestamp for comparing it against time window of the
 // UCAN.
-func Now() uint64 {
-	return uint64(time.Now().Unix())
+func Now() UTCUnixTimestamp {
+	return UTCUnixTimestamp(time.Now().Unix())
 }

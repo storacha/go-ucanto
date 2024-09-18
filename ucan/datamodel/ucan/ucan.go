@@ -40,21 +40,16 @@ type UCANModel struct {
 	S   []byte
 	Att []CapabilityModel
 	Prf []ipld.Link
-	Exp uint64
+	Exp *int
 	Fct []FactModel
 	Nnc *string
-	Nbf *uint64
+	Nbf *int
 }
 
 type CapabilityModel struct {
 	With string
 	Can  string
-	Nb   NbModel
-}
-
-type NbModel struct {
-	Keys   []string
-	Values map[string]datamodel.Node
+	Nb   datamodel.Node
 }
 
 type FactModel struct {
