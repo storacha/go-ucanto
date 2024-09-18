@@ -5,7 +5,7 @@ Ucanto UCAN RPC in Golang.
 ## Install
 
 ```console
-go get github.com/storacha-network/go-ucanto
+go get github.com/storacha/go-ucanto
 ```
 
 ## Usage
@@ -35,18 +35,27 @@ audience := servicePrincipal
 
 type StoreAddCaveats struct {
 	Link ipld.Link
-	Size uint64
+	Size int
 }
 
-func (c *StoreAddCaveats) Build() (datamodel.Node, error) {
-	n := bindnode.Wrap(c, typ)
-	return n.Representation(), nil
+func (c StoreAddCaveats) ToIPLD() (datamodel.Node, error) {
+	return ipld.WrapWithRecovery(&c, StoreAddType())
+}
+
+func StoreAddType() ipldschema.Type {
+	ts, _ := ipldprime.LoadSchemaBytes([]byte(`
+		type StoreAdd struct {
+			link Link
+			size Int
+		}
+	`))
+	return ts.TypeByName("StoreAdd")
 }
 
 capability := ucan.NewCapability(
 	"store/add",
 	did.Parse("did:key:z6MkwDuRThQcyWjqNsK54yKAmzfsiH6BTkASyiucThMtHt1T").String(),
-	&StoreAddCaveats{
+	StoreAddCaveats{
 		// TODO
 	},
 )
@@ -104,14 +113,8 @@ type TestEcho struct {
 	Echo string
 }
 
-func (c *TestEcho) Build() (ipld.Node, error) {
-	np := basicnode.Prototype.Any
-	nb := np.NewBuilder()
-	ma, _ := nb.BeginMap(1)
-	ma.AssembleKey().AssignString("echo")
-	ma.AssembleValue().AssignString(c.Echo)
-	ma.Finish()
-	return nb.Build(), nil
+func (c TestEcho) ToIPLD() (ipld.Node, error) {
+	return ipld.WrapWithRecovery(&c, EchoType())
 }
 
 func EchoType() ipldschema.Type {
@@ -128,16 +131,22 @@ func createServer(signer principal.Signer) (server.ServerView, error) {
 	testecho := validator.NewCapability(
 		"test/echo",
 		schema.DIDString(),
-		schema.Struct[*TestEcho](EchoType()),
+		schema.Struct[TestEcho](EchoType(), nil),
+		validator.DefaultDerives,
 	)
 
 	return server.NewServer(
 		signer,
 		// Handler definitions
-		server.WithServiceMethod(testecho.Can(), server.Provide(testecho, func(cap ucan.Capability[*TestEcho], inv invocation.Invocation, ctx server.InvocationContext) (transaction.Transaction[*TestEcho, ipld.Builder], error) {
-			r := result.Ok[*TestEcho, ipld.Builder](&TestEcho{Echo: cap.Nb().Echo})
-			return transaction.NewTransaction(r), nil
-		})),
+		server.WithServiceMethod(
+			testecho.Can(),
+			server.Provide(
+				testecho,
+				func(cap ucan.Capability[TestEcho], inv invocation.Invocation, ctx server.InvocationContext) (TestEcho, receipt.Effects, error) {
+					return TestEcho{Echo: cap.Nb().Echo}, nil, nil
+				},
+			),
+		),
 	)
 }
 
@@ -172,15 +181,15 @@ func main() {
 
 ## API
 
-[pkg.go.dev Reference](https://pkg.go.dev/github.com/storacha-network/go-ucanto)
+[pkg.go.dev Reference](https://pkg.go.dev/github.com/storacha/go-ucanto)
 
 ## Related
 
-* [Ucanto in Javascript](https://github.com/storacha-network/ucanto)
+* [Ucanto in Javascript](https://github.com/storacha/ucanto)
 
 ## Contributing
 
-Feel free to join in. All welcome. Please [open an issue](https://github.com/storacha-network/go-ucanto/issues)!
+Feel free to join in. All welcome. Please [open an issue](https://github.com/storacha/go-ucanto/issues)!
 
 ## License
 

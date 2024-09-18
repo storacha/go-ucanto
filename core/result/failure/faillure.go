@@ -5,8 +5,8 @@ import (
 	"runtime"
 
 	"github.com/pkg/errors"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/result/failure/datamodel"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/result/failure/datamodel"
 )
 
 // Named is an error that you can read a name from
@@ -68,8 +68,8 @@ func NamedWithCurrentStackTrace(name string) NamedWithStackTrace {
 }
 
 type failure struct {
-	model datamodel.FailureModel
-	build func() (ipld.Node, error)
+	model  datamodel.FailureModel
+	toIPLD func() (ipld.Node, error)
 }
 
 func (f failure) Name() string {
@@ -88,11 +88,11 @@ func (f failure) Stack() string {
 	return *f.model.Stack
 }
 
-func (f failure) Build() (ipld.Node, error) {
-	if f.build != nil {
-		return f.build()
+func (f failure) ToIPLD() (ipld.Node, error) {
+	if f.toIPLD != nil {
+		return f.toIPLD()
 	}
-	return f.model.Build()
+	return f.model.ToIPLD()
 }
 
 func FromError(err error) IPLDBuilderFailure {
@@ -107,7 +107,7 @@ func FromError(err error) IPLDBuilderFailure {
 	}
 	fail := failure{model: model}
 	if builder, ok := err.(ipld.Builder); ok {
-		fail.build = builder.Build
+		fail.toIPLD = builder.ToIPLD
 	}
 	return fail
 }

@@ -4,7 +4,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/storacha-network/go-ucanto/transport"
+	"github.com/storacha/go-ucanto/transport"
 )
 
 type request struct {

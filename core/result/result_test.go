@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/storacha-network/go-ucanto/core/result"
+	"github.com/storacha/go-ucanto/core/result"
 	"github.com/stretchr/testify/require"
 )
 

@@ -1,8 +1,8 @@
 package validator
 
 import (
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/ucan"
 )
 
 type Authorization[Caveats any] interface {

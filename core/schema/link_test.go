@@ -12,9 +12,9 @@ import (
 	basicnode "github.com/ipld/go-ipld-prime/node/basic"
 	"github.com/multiformats/go-base32"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/storacha-network/go-ucanto/core/iterable"
-	"github.com/storacha-network/go-ucanto/core/schema"
-	"github.com/storacha-network/go-ucanto/testing/helpers"
+	"github.com/storacha/go-ucanto/core/iterable"
+	"github.com/storacha/go-ucanto/core/schema"
+	"github.com/storacha/go-ucanto/testing/helpers"
 	"github.com/stretchr/testify/require"
 )
 

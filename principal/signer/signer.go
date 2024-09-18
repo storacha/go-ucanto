@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/storacha-network/go-ucanto/did"
-	"github.com/storacha-network/go-ucanto/principal"
-	"github.com/storacha-network/go-ucanto/principal/verifier"
-	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
+	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/go-ucanto/principal"
+	"github.com/storacha/go-ucanto/principal/verifier"
+	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 )
 
 type Unwrapper interface {

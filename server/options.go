@@ -1,12 +1,12 @@
 package server
 
 import (
-	"github.com/storacha-network/go-ucanto/core/invocation"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/result"
-	"github.com/storacha-network/go-ucanto/server/transaction"
-	"github.com/storacha-network/go-ucanto/transport"
-	"github.com/storacha-network/go-ucanto/validator"
+	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/result"
+	"github.com/storacha/go-ucanto/server/transaction"
+	"github.com/storacha/go-ucanto/transport"
+	"github.com/storacha/go-ucanto/validator"
 )
 
 // Option is an option configuring a ucanto server.

@@ -6,9 +6,9 @@ import (
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagjson"
-	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
-	hdm "github.com/storacha-network/go-ucanto/ucan/datamodel/header"
-	pdm "github.com/storacha-network/go-ucanto/ucan/datamodel/payload"
+	"github.com/storacha/go-ucanto/ucan/crypto/signature"
+	hdm "github.com/storacha/go-ucanto/ucan/datamodel/header"
+	pdm "github.com/storacha/go-ucanto/ucan/datamodel/payload"
 )
 
 func FormatSignPayload(payload pdm.PayloadModel, version string, algorithm string) (string, error) {

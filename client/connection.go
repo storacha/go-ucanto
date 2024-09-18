@@ -6,12 +6,12 @@ import (
 	"hash"
 	"iter"
 
-	"github.com/storacha-network/go-ucanto/core/invocation"
-	"github.com/storacha-network/go-ucanto/core/ipld/block"
-	"github.com/storacha-network/go-ucanto/core/message"
-	"github.com/storacha-network/go-ucanto/transport"
-	"github.com/storacha-network/go-ucanto/transport/car"
-	"github.com/storacha-network/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/ipld/block"
+	"github.com/storacha/go-ucanto/core/message"
+	"github.com/storacha/go-ucanto/transport"
+	"github.com/storacha/go-ucanto/transport/car"
+	"github.com/storacha/go-ucanto/ucan"
 )
 
 type Connection interface {

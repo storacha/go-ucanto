@@ -3,10 +3,10 @@ package server
 import (
 	"fmt"
 
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/result/failure"
-	sdm "github.com/storacha-network/go-ucanto/server/datamodel"
-	"github.com/storacha-network/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/result/failure"
+	sdm "github.com/storacha/go-ucanto/server/datamodel"
+	"github.com/storacha/go-ucanto/ucan"
 )
 
 type HandlerNotFoundError[Caveats any] interface {
@@ -30,7 +30,7 @@ func (h handlerNotFoundError[C]) Name() string {
 	return "HandlerNotFoundError"
 }
 
-func (h handlerNotFoundError[C]) Build() (ipld.Node, error) {
+func (h handlerNotFoundError[C]) ToIPLD() (ipld.Node, error) {
 	name := h.Name()
 
 	mdl := sdm.HandlerNotFoundErrorModel{
@@ -85,7 +85,7 @@ func (h handlerExecutionError[C]) Stack() string {
 	return stack
 }
 
-func (h handlerExecutionError[C]) Build() (ipld.Node, error) {
+func (h handlerExecutionError[C]) ToIPLD() (ipld.Node, error) {
 	name := h.Name()
 	stack := h.Stack()
 
@@ -142,7 +142,7 @@ func (i invocationCapabilityError) Name() string {
 	return "InvocationCapabilityError"
 }
 
-func (i invocationCapabilityError) Build() (ipld.Node, error) {
+func (i invocationCapabilityError) ToIPLD() (ipld.Node, error) {
 	name := i.Name()
 	var capmdls []sdm.CapabilityModel
 	for _, cap := range i.Capabilities() {

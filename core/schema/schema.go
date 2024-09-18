@@ -2,8 +2,8 @@ package schema
 
 import (
 	"github.com/ipld/go-ipld-prime/node/basicnode"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/result/failure"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/result/failure"
 )
 
 type Reader[I, O any] interface {
@@ -30,7 +30,7 @@ func (se schemaerr) Error() string {
 	return se.message
 }
 
-func (se schemaerr) Build() (ipld.Node, error) {
+func (se schemaerr) ToIPLD() (ipld.Node, error) {
 	np := basicnode.Prototype.Any
 	nb := np.NewBuilder()
 	ma, err := nb.BeginMap(2)

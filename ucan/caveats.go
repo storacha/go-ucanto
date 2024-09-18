@@ -9,7 +9,7 @@ import (
 // details and/or restrictions.
 type NoCaveats struct{}
 
-func (c NoCaveats) Build() (datamodel.Node, error) {
+func (c NoCaveats) ToIPLD() (datamodel.Node, error) {
 	np := basicnode.Prototype.Any
 	nb := np.NewBuilder()
 	ma, err := nb.BeginMap(0)

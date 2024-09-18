@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/storacha-network/go-ucanto/core/result/failure"
+	"github.com/storacha/go-ucanto/core/result/failure"
 )
 
 type uriConfig struct {

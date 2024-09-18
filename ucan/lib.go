@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
-	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
-	pdm "github.com/storacha-network/go-ucanto/ucan/datamodel/payload"
-	udm "github.com/storacha-network/go-ucanto/ucan/datamodel/ucan"
-	"github.com/storacha-network/go-ucanto/ucan/formatter"
+	"github.com/storacha/go-ucanto/ucan/crypto/signature"
+	pdm "github.com/storacha/go-ucanto/ucan/datamodel/payload"
+	udm "github.com/storacha/go-ucanto/ucan/datamodel/ucan"
+	"github.com/storacha/go-ucanto/ucan/formatter"
 )
 
 const version = "0.9.1"
@@ -81,14 +81,14 @@ func WithProofs(prf []Link) Option {
 
 // MapBuilder builds a map of string => datamodel.Node from the underlying data.
 type MapBuilder interface {
-	Build() (map[string]datamodel.Node, error)
+	ToIPLD() (map[string]datamodel.Node, error)
 }
 
 type FactBuilder = MapBuilder
 
 // CaveatBuilder builds a datamodel.Node from the underlying data.
 type CaveatBuilder interface {
-	Build() (datamodel.Node, error)
+	ToIPLD() (datamodel.Node, error)
 }
 
 // Issue creates a new signed token with a given issuer. If expiration is
@@ -113,7 +113,7 @@ func Issue[C CaveatBuilder](issuer Signer, audience Principal, capabilities []Ca
 
 	var capsmdl []udm.CapabilityModel
 	for _, cap := range capabilities {
-		nb, err := cap.Nb().Build()
+		nb, err := cap.Nb().ToIPLD()
 		if err != nil {
 			return nil, fmt.Errorf("building caveats: %s", err)
 		}
@@ -132,7 +132,7 @@ func Issue[C CaveatBuilder](issuer Signer, audience Principal, capabilities []Ca
 
 	var fctsmdl []udm.FactModel
 	for _, f := range cfg.fct {
-		vals, err := f.Build()
+		vals, err := f.ToIPLD()
 		if err != nil {
 			return nil, fmt.Errorf("building fact: %s", err)
 		}

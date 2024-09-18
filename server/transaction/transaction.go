@@ -1,9 +1,9 @@
 package transaction
 
 import (
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/receipt"
-	"github.com/storacha-network/go-ucanto/core/result"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/receipt"
+	"github.com/storacha/go-ucanto/core/result"
 )
 
 // Transaction defines a result & effect pair, used by provider that wishes to

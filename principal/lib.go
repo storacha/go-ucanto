@@ -1,7 +1,7 @@
 package principal
 
 import (
-	"github.com/storacha-network/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/ucan"
 )
 
 // Signer is the principal that can issue UCANs (and sign payloads). While it's

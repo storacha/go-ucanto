@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/result/failure"
-	"github.com/storacha-network/go-ucanto/did"
-	"github.com/storacha-network/go-ucanto/ucan"
-	vdm "github.com/storacha-network/go-ucanto/validator/datamodel"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/result/failure"
+	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/go-ucanto/ucan"
+	vdm "github.com/storacha/go-ucanto/validator/datamodel"
 )
 
 // go hack for union type -- unexported method cannot be implemented outside module limiting satisfying types
@@ -372,7 +372,7 @@ func (ee ExpiredError) Error() string {
 		time.Unix(int64(*exp), 0).Format(time.RFC3339))
 }
 
-func (ee ExpiredError) Build() (datamodel.Node, error) {
+func (ee ExpiredError) ToIPLD() (datamodel.Node, error) {
 	name := ee.Name()
 	stack := ee.Stack()
 	exp := ee.delegation.Expiration()
@@ -427,7 +427,7 @@ func (nvbe NotValidBeforeError) Error() string {
 		time.Unix(int64(nvbe.delegation.NotBefore()), 0).Format(time.RFC3339))
 }
 
-func (nvbe NotValidBeforeError) Build() (datamodel.Node, error) {
+func (nvbe NotValidBeforeError) ToIPLD() (datamodel.Node, error) {
 	name := nvbe.Name()
 	stack := nvbe.Stack()
 	notValidBeforeModel := vdm.NotValidBeforeModel{

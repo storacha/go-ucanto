@@ -7,16 +7,16 @@ import (
 	"iter"
 	"sync"
 
-	"github.com/storacha-network/go-ucanto/core/car"
-	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
-	adm "github.com/storacha-network/go-ucanto/core/delegation/datamodel"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/ipld/block"
-	"github.com/storacha-network/go-ucanto/core/ipld/codec/cbor"
-	"github.com/storacha-network/go-ucanto/core/ipld/hash/sha256"
-	"github.com/storacha-network/go-ucanto/ucan"
-	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
-	udm "github.com/storacha-network/go-ucanto/ucan/datamodel/ucan"
+	"github.com/storacha/go-ucanto/core/car"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	adm "github.com/storacha/go-ucanto/core/delegation/datamodel"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/ipld/block"
+	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
+	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
+	"github.com/storacha/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/ucan/crypto/signature"
+	udm "github.com/storacha/go-ucanto/ucan/datamodel/ucan"
 )
 
 // Delagation is a materialized view of a UCAN delegation, which can be encoded

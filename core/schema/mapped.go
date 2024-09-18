@@ -1,6 +1,6 @@
 package schema
 
-import "github.com/storacha-network/go-ucanto/core/result/failure"
+import "github.com/storacha/go-ucanto/core/result/failure"
 
 type mapped[I, O, O2 any] struct {
 	reader    Reader[I, O]

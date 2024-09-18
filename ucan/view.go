@@ -3,9 +3,9 @@ package ucan
 import (
 	"fmt"
 
-	"github.com/storacha-network/go-ucanto/did"
-	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
-	udm "github.com/storacha-network/go-ucanto/ucan/datamodel/ucan"
+	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/go-ucanto/ucan/crypto/signature"
+	udm "github.com/storacha/go-ucanto/ucan/datamodel/ucan"
 )
 
 type UCAN interface {

@@ -1,9 +1,9 @@
 package result
 
 import (
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/result/failure"
-	"github.com/storacha-network/go-ucanto/core/result/failure/datamodel"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/result/failure"
+	"github.com/storacha/go-ucanto/core/result/failure/datamodel"
 )
 
 // Result is a golang compatible generic result type

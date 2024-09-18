@@ -3,7 +3,7 @@ package schema
 import (
 	"fmt"
 
-	"github.com/storacha-network/go-ucanto/core/result/failure"
+	"github.com/storacha/go-ucanto/core/result/failure"
 )
 
 func Literal(expected string) Reader[string, string] {

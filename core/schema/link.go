@@ -7,8 +7,8 @@ import (
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/multiformats/go-base32"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/result/failure"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/result/failure"
 )
 
 type linkReader struct {
@@ -22,7 +22,7 @@ func (lr linkReader) Read(input any) (ipld.Link, failure.Failure) {
 		if !asNode {
 			// If input is not an IPLD node, can it be converted to one?
 			if builder, ok := input.(ipld.Builder); ok {
-				n, err := builder.Build()
+				n, err := builder.ToIPLD()
 				if err != nil {
 					return nil, NewSchemaError(err.Error())
 				}

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/go-ucanto/core/invocation"
-	"github.com/storacha-network/go-ucanto/core/result/failure"
-	"github.com/storacha-network/go-ucanto/core/schema"
-	"github.com/storacha-network/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/result/failure"
+	"github.com/storacha/go-ucanto/core/schema"
+	"github.com/storacha/go-ucanto/ucan"
 )
 
 type Source interface {

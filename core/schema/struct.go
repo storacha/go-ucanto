@@ -2,8 +2,8 @@ package schema
 
 import (
 	"github.com/ipld/go-ipld-prime/schema"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/result/failure"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/ucan-wg/go-ucan/capability/policy"
 )
 
@@ -18,7 +18,7 @@ func (s strukt[T]) Read(input any) (T, failure.Failure) {
 	if !ok {
 		// If input is not an IPLD node, can it be converted to one?
 		if builder, ok := input.(ipld.Builder); ok {
-			n, err := builder.Build()
+			n, err := builder.ToIPLD()
 			if err != nil {
 				return bind, NewSchemaError(err.Error())
 			}

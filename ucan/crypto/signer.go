@@ -1,7 +1,7 @@
 package crypto
 
 import (
-	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
+	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 )
 
 // Signer is an entity that can sign a payload.

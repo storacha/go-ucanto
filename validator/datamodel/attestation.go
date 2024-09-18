@@ -6,7 +6,7 @@ import (
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/schema"
-	ucanipld "github.com/storacha-network/go-ucanto/core/ipld"
+	ucanipld "github.com/storacha/go-ucanto/core/ipld"
 )
 
 //go:embed attestation.ipldsch
@@ -29,6 +29,6 @@ type AttestationModel struct {
 	Proof ipld.Link
 }
 
-func (m AttestationModel) Build() (ipld.Node, error) {
+func (m AttestationModel) ToIPLD() (ipld.Node, error) {
 	return ucanipld.WrapWithRecovery(&m, AttestationType())
 }

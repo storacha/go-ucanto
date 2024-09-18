@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/storacha-network/go-ucanto/core/result/failure"
+	"github.com/storacha/go-ucanto/core/result/failure"
 )
 
 type unionError struct {

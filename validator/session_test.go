@@ -8,15 +8,15 @@ import (
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/node/basicnode"
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/go-ucanto/core/result/failure"
-	"github.com/storacha-network/go-ucanto/core/schema"
-	"github.com/storacha-network/go-ucanto/did"
-	"github.com/storacha-network/go-ucanto/principal/absentee"
-	"github.com/storacha-network/go-ucanto/principal/ed25519/signer"
-	"github.com/storacha-network/go-ucanto/testing/fixtures"
-	"github.com/storacha-network/go-ucanto/testing/helpers"
-	"github.com/storacha-network/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/result/failure"
+	"github.com/storacha/go-ucanto/core/schema"
+	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/go-ucanto/principal/absentee"
+	"github.com/storacha/go-ucanto/principal/ed25519/signer"
+	"github.com/storacha/go-ucanto/testing/fixtures"
+	"github.com/storacha/go-ucanto/testing/helpers"
+	"github.com/storacha/go-ucanto/ucan"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +24,7 @@ type debugEchoCaveats struct {
 	Message *string
 }
 
-func (c debugEchoCaveats) Build() (ipld.Node, error) {
+func (c debugEchoCaveats) ToIPLD() (ipld.Node, error) {
 	np := basicnode.Prototype.Any
 	nb := np.NewBuilder()
 	ma, _ := nb.BeginMap(1)
@@ -59,7 +59,7 @@ type attestCaveats struct {
 	Proof ipld.Link
 }
 
-func (c attestCaveats) Build() (ipld.Node, error) {
+func (c attestCaveats) ToIPLD() (ipld.Node, error) {
 	np := basicnode.Prototype.Any
 	nb := np.NewBuilder()
 	ma, _ := nb.BeginMap(1)

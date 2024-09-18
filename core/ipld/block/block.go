@@ -8,8 +8,8 @@ import (
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipld/go-ipld-prime/schema"
-	"github.com/storacha-network/go-ucanto/core/ipld/codec"
-	"github.com/storacha-network/go-ucanto/core/ipld/hash"
+	"github.com/storacha/go-ucanto/core/ipld/codec"
+	"github.com/storacha/go-ucanto/core/ipld/hash"
 )
 
 type Block interface {

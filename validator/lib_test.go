@@ -10,22 +10,22 @@ import (
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipld/go-ipld-prime/node/basicnode"
-	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/go-ucanto/core/invocation"
-	"github.com/storacha-network/go-ucanto/core/ipld/block"
-	"github.com/storacha-network/go-ucanto/core/ipld/codec/cbor"
-	"github.com/storacha-network/go-ucanto/core/ipld/hash/sha256"
-	"github.com/storacha-network/go-ucanto/core/result/failure"
-	"github.com/storacha-network/go-ucanto/core/schema"
-	"github.com/storacha-network/go-ucanto/did"
-	"github.com/storacha-network/go-ucanto/principal"
-	"github.com/storacha-network/go-ucanto/principal/ed25519/verifier"
-	"github.com/storacha-network/go-ucanto/principal/signer"
-	"github.com/storacha-network/go-ucanto/testing/fixtures"
-	"github.com/storacha-network/go-ucanto/testing/helpers"
-	"github.com/storacha-network/go-ucanto/ucan"
-	udm "github.com/storacha-network/go-ucanto/ucan/datamodel/ucan"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/ipld/block"
+	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
+	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
+	"github.com/storacha/go-ucanto/core/result/failure"
+	"github.com/storacha/go-ucanto/core/schema"
+	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/go-ucanto/principal"
+	"github.com/storacha/go-ucanto/principal/ed25519/verifier"
+	"github.com/storacha/go-ucanto/principal/signer"
+	"github.com/storacha/go-ucanto/testing/fixtures"
+	"github.com/storacha/go-ucanto/testing/helpers"
+	"github.com/storacha/go-ucanto/ucan"
+	udm "github.com/storacha/go-ucanto/ucan/datamodel/ucan"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,7 +34,7 @@ type storeAddCaveats struct {
 	Origin ipld.Link
 }
 
-func (c storeAddCaveats) Build() (ipld.Node, error) {
+func (c storeAddCaveats) ToIPLD() (ipld.Node, error) {
 	np := basicnode.Prototype.Any
 	nb := np.NewBuilder()
 	ma, _ := nb.BeginMap(2)
@@ -510,7 +510,7 @@ func TestAccess(t *testing.T) {
 			// In order to mess up the signature we need to reach deep in UCAN library
 			// to create a UCAN model, manually setting the signature to something bad
 			// and then encode it as the root block of the delegation.
-			nb, _ := storeAddCaveats{Link: testLink}.Build()
+			nb, _ := storeAddCaveats{Link: testLink}.ToIPLD()
 			exp := ucan.Now() + 30
 			model := udm.UCANModel{
 				V:   "0.9.1",

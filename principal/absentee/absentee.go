@@ -1,9 +1,9 @@
 package absentee
 
 import (
-	"github.com/storacha-network/go-ucanto/did"
-	"github.com/storacha-network/go-ucanto/ucan"
-	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
+	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 )
 
 type absentee struct {

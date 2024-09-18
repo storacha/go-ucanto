@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/storacha-network/go-ucanto/core/result/failure"
-	"github.com/storacha-network/go-ucanto/did"
+	"github.com/storacha/go-ucanto/core/result/failure"
+	"github.com/storacha/go-ucanto/did"
 )
 
 type didConfig struct {

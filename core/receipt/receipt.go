@@ -8,20 +8,20 @@ import (
 
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/schema"
-	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/go-ucanto/core/invocation"
-	"github.com/storacha-network/go-ucanto/core/invocation/ran"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/ipld/block"
-	"github.com/storacha-network/go-ucanto/core/ipld/codec/cbor"
-	"github.com/storacha-network/go-ucanto/core/ipld/hash/sha256"
-	"github.com/storacha-network/go-ucanto/core/iterable"
-	rdm "github.com/storacha-network/go-ucanto/core/receipt/datamodel"
-	"github.com/storacha-network/go-ucanto/core/result"
-	"github.com/storacha-network/go-ucanto/did"
-	"github.com/storacha-network/go-ucanto/ucan"
-	"github.com/storacha-network/go-ucanto/ucan/crypto/signature"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/invocation/ran"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/ipld/block"
+	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
+	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
+	"github.com/storacha/go-ucanto/core/iterable"
+	rdm "github.com/storacha/go-ucanto/core/receipt/datamodel"
+	"github.com/storacha/go-ucanto/core/result"
+	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 )
 
 type Effects interface {
@@ -281,9 +281,9 @@ func Issue[O, X ipld.Builder](issuer ucan.Signer, out result.Result[O, X], ran r
 	}
 
 	nodeResult, err := result.MapResultR1(out, func(b O) (ipld.Node, error) {
-		return b.Build()
+		return b.ToIPLD()
 	}, func(b X) (ipld.Node, error) {
-		return b.Build()
+		return b.ToIPLD()
 	})
 	if err != nil {
 		return nil, err

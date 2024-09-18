@@ -6,7 +6,7 @@ import (
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/node/basicnode"
-	"github.com/storacha-network/go-ucanto/testing/helpers"
+	"github.com/storacha/go-ucanto/testing/helpers"
 	"github.com/stretchr/testify/require"
 )
 

@@ -12,21 +12,21 @@ import (
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipld/go-ipld-prime/node/basicnode"
 	ipldschema "github.com/ipld/go-ipld-prime/schema"
-	"github.com/storacha-network/go-ucanto/client"
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/go-ucanto/core/invocation"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/receipt"
-	"github.com/storacha-network/go-ucanto/core/result"
-	fdm "github.com/storacha-network/go-ucanto/core/result/failure/datamodel"
-	"github.com/storacha-network/go-ucanto/core/schema"
-	"github.com/storacha-network/go-ucanto/testing/fixtures"
-	"github.com/storacha-network/go-ucanto/testing/helpers"
-	"github.com/storacha-network/go-ucanto/transport/car/request"
-	"github.com/storacha-network/go-ucanto/transport/car/response"
-	thttp "github.com/storacha-network/go-ucanto/transport/http"
-	"github.com/storacha-network/go-ucanto/ucan"
-	"github.com/storacha-network/go-ucanto/validator"
+	"github.com/storacha/go-ucanto/client"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/receipt"
+	"github.com/storacha/go-ucanto/core/result"
+	fdm "github.com/storacha/go-ucanto/core/result/failure/datamodel"
+	"github.com/storacha/go-ucanto/core/schema"
+	"github.com/storacha/go-ucanto/testing/fixtures"
+	"github.com/storacha/go-ucanto/testing/helpers"
+	"github.com/storacha/go-ucanto/transport/car/request"
+	"github.com/storacha/go-ucanto/transport/car/response"
+	thttp "github.com/storacha/go-ucanto/transport/http"
+	"github.com/storacha/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/validator"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,7 +34,7 @@ type uploadAddCaveats struct {
 	Root ipld.Link
 }
 
-func (c uploadAddCaveats) Build() (ipld.Node, error) {
+func (c uploadAddCaveats) ToIPLD() (ipld.Node, error) {
 	np := basicnode.Prototype.Any
 	nb := np.NewBuilder()
 	ma, _ := nb.BeginMap(1)
@@ -60,7 +60,7 @@ type uploadAddSuccess struct {
 	Status string
 }
 
-func (ok uploadAddSuccess) Build() (ipld.Node, error) {
+func (ok uploadAddSuccess) ToIPLD() (ipld.Node, error) {
 	np := basicnode.Prototype.Any
 	nb := np.NewBuilder()
 	ma, _ := nb.BeginMap(2)

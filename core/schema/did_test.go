@@ -3,7 +3,7 @@ package schema
 import (
 	"testing"
 
-	"github.com/storacha-network/go-ucanto/did"
+	"github.com/storacha/go-ucanto/did"
 	"github.com/stretchr/testify/require"
 )
 

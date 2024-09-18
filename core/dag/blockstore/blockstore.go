@@ -5,7 +5,7 @@ import (
 	"iter"
 	"sync"
 
-	"github.com/storacha-network/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/ipld"
 )
 
 type BlockReader interface {

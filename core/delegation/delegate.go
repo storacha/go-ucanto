@@ -3,12 +3,12 @@ package delegation
 import (
 	"fmt"
 
-	"github.com/storacha-network/go-ucanto/core/dag/blockstore"
-	"github.com/storacha-network/go-ucanto/core/ipld/block"
-	"github.com/storacha-network/go-ucanto/core/ipld/codec/cbor"
-	"github.com/storacha-network/go-ucanto/core/ipld/hash/sha256"
-	"github.com/storacha-network/go-ucanto/ucan"
-	udm "github.com/storacha-network/go-ucanto/ucan/datamodel/ucan"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/storacha/go-ucanto/core/ipld/block"
+	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
+	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
+	"github.com/storacha/go-ucanto/ucan"
+	udm "github.com/storacha/go-ucanto/ucan/datamodel/ucan"
 )
 
 // Option is an option configuring a UCAN delegation.

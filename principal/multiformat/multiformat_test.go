@@ -3,7 +3,7 @@ package multiformat
 import (
 	"testing"
 
-	"github.com/storacha-network/go-ucanto/testing/helpers"
+	"github.com/storacha/go-ucanto/testing/helpers"
 	"github.com/stretchr/testify/require"
 )
 

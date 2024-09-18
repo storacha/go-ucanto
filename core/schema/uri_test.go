@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/storacha-network/go-ucanto/core/schema"
+	"github.com/storacha/go-ucanto/core/schema"
 	"github.com/stretchr/testify/require"
 )
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/schema"
-	ucanipld "github.com/storacha-network/go-ucanto/core/ipld"
+	ucanipld "github.com/storacha/go-ucanto/core/ipld"
 )
 
 //go:embed failure.ipldsch
@@ -20,7 +20,7 @@ type FailureModel struct {
 	Stack   *string
 }
 
-func (f *FailureModel) Build() (ipld.Node, error) {
+func (f *FailureModel) ToIPLD() (ipld.Node, error) {
 	return ucanipld.WrapWithRecovery(f, typ)
 }
 
