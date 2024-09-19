@@ -1,5 +1,7 @@
 # go-ucanto
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/storacha/go-ucanto)](https://goreportcard.com/report/github.com/storacha/go-ucanto)
+
 Ucanto UCAN RPC in Golang.
 
 ## Install
