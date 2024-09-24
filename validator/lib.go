@@ -12,6 +12,7 @@ import (
 	"github.com/storacha/go-ucanto/core/schema"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
+	"github.com/storacha/go-ucanto/principal/verifier"
 	"github.com/storacha/go-ucanto/ucan"
 	vdm "github.com/storacha/go-ucanto/validator/datamodel"
 	"github.com/ucan-wg/go-ucan/capability/policy"
@@ -300,7 +301,8 @@ func VerifyAuthorization(dlg delegation.Delegation, prfs []delegation.Delegation
 		return VerifySignature(dlg, ctx.Authority())
 	}
 
-	// Attempt to resolve embedded authorization session from the authority
+	// If issuer is not a did:key principal nor configured authority, we
+	// attempt to resolve embedded authorization session from the authority
 	_, err := VerifySession(dlg, prfs, ctx)
 	if err != nil {
 		if len(err.FailedProofs()) > 0 {
@@ -319,7 +321,12 @@ func VerifyAuthorization(dlg delegation.Delegation, prfs []delegation.Delegation
 			return nil, NewUnverifiableSignatureError(dlg, perr)
 		}
 
-		return VerifySignature(dlg, vfr)
+		wvfr, werr := verifier.Wrap(vfr, issuer)
+		if werr != nil {
+			return nil, NewUnverifiableSignatureError(dlg, perr)
+		}
+
+		return VerifySignature(dlg, wvfr)
 	}
 
 	return dlg, nil

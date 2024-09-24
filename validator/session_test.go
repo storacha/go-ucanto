@@ -13,12 +13,16 @@ import (
 	"github.com/storacha/go-ucanto/core/schema"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal/absentee"
-	"github.com/storacha/go-ucanto/principal/ed25519/signer"
+	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
+	"github.com/storacha/go-ucanto/principal/signer"
 	"github.com/storacha/go-ucanto/testing/fixtures"
 	"github.com/storacha/go-ucanto/testing/helpers"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/stretchr/testify/require"
 )
+
+var serviceDID = helpers.Must(did.Parse("did:web:example.com"))
+var service = helpers.Must(signer.Wrap(fixtures.Service, serviceDID))
 
 type debugEchoCaveats struct {
 	Message *string
@@ -102,9 +106,9 @@ func TestSession(t *testing.T) {
 		require.NoError(t, err)
 
 		session, err := attest.Delegate(
-			fixtures.Service,
+			service,
 			agent,
-			fixtures.Service.DID().String(),
+			service.DID().String(),
 			attestCaveats{Proof: prf.Link()},
 		)
 		require.NoError(t, err)
@@ -113,7 +117,7 @@ func TestSession(t *testing.T) {
 		nb := debugEchoCaveats{Message: &msg}
 		inv, err := debugEcho.Invoke(
 			agent,
-			fixtures.Service,
+			service,
 			account.DID().String(),
 			nb,
 			delegation.WithProofs(delegation.Proofs{
@@ -124,7 +128,7 @@ func TestSession(t *testing.T) {
 		require.NoError(t, err)
 
 		context := NewValidationContext(
-			fixtures.Service.Verifier(),
+			service.Verifier(),
 			debugEcho,
 			IsSelfIssued,
 			validateAuthOk,
@@ -144,26 +148,26 @@ func TestSession(t *testing.T) {
 		agent := fixtures.Alice
 		account := absentee.From(helpers.Must(did.Parse("did:mailto:web.mail:alice")))
 
-		manager, err := signer.Generate()
+		manager, err := ed25519.Generate()
 		require.NoError(t, err)
-		worker, err := signer.Generate()
+		worker, err := ed25519.Generate()
 		require.NoError(t, err)
 
 		authority, err := delegation.Delegate(
 			manager,
 			worker,
 			[]ucan.Capability[ucan.NoCaveats]{
-				ucan.NewCapability("*", fixtures.Service.DID().String(), ucan.NoCaveats{}),
+				ucan.NewCapability("*", service.DID().String(), ucan.NoCaveats{}),
 			},
 			delegation.WithNoExpiration(),
 			delegation.WithProof(
 				delegation.FromDelegation(
 					helpers.Must(
 						delegation.Delegate(
-							fixtures.Service,
+							service,
 							manager,
 							[]ucan.Capability[ucan.NoCaveats]{
-								ucan.NewCapability("*", fixtures.Service.DID().String(), ucan.NoCaveats{}),
+								ucan.NewCapability("*", service.DID().String(), ucan.NoCaveats{}),
 							},
 						),
 					),
@@ -191,7 +195,7 @@ func TestSession(t *testing.T) {
 		session, err := attest.Delegate(
 			worker,
 			agent,
-			fixtures.Service.DID().String(),
+			service.DID().String(),
 			attestCaveats{Proof: prf.Link()},
 			delegation.WithProof(delegation.FromDelegation(authority)),
 		)
@@ -201,7 +205,7 @@ func TestSession(t *testing.T) {
 		nb := debugEchoCaveats{Message: &msg}
 		inv, err := debugEcho.Invoke(
 			agent,
-			fixtures.Service,
+			service,
 			account.DID().String(),
 			nb,
 			delegation.WithProofs(delegation.Proofs{
@@ -212,7 +216,7 @@ func TestSession(t *testing.T) {
 		require.NoError(t, err)
 
 		context := NewValidationContext(
-			fixtures.Service.Verifier(),
+			service.Verifier(),
 			debugEcho,
 			IsSelfIssued,
 			validateAuthOk,
@@ -235,14 +239,14 @@ func TestSession(t *testing.T) {
 		nb := debugEchoCaveats{Message: &msg}
 		inv, err := debugEcho.Invoke(
 			account,
-			fixtures.Service,
+			service,
 			account.DID().String(),
 			nb,
 		)
 		require.NoError(t, err)
 
 		context := NewValidationContext(
-			fixtures.Service.Verifier(),
+			service.Verifier(),
 			debugEcho,
 			IsSelfIssued,
 			validateAuthOk,
@@ -260,5 +264,149 @@ func TestSession(t *testing.T) {
 			fmt.Sprintf(`  - Unable to resolve '%s' key`, account.DID()),
 		}, "\n")
 		require.Equal(t, errmsg, x.Error())
+	})
+
+	t.Run("fail without session", func(t *testing.T) {
+		account := absentee.From(helpers.Must(did.Parse("did:mailto:web.mail:alice")))
+		agent := fixtures.Alice
+
+		prf, err := debugEcho.Delegate(
+			account,
+			agent,
+			account.DID().String(),
+			debugEchoCaveats{},
+			delegation.WithNoExpiration(),
+		)
+		require.NoError(t, err)
+
+		msg := "Hello World"
+		nb := debugEchoCaveats{Message: &msg}
+		inv, err := debugEcho.Invoke(
+			account,
+			service,
+			account.DID().String(),
+			nb,
+			delegation.WithProof(delegation.FromDelegation(prf)),
+		)
+		require.NoError(t, err)
+
+		context := NewValidationContext(
+			service.Verifier(),
+			debugEcho,
+			IsSelfIssued,
+			validateAuthOk,
+			ProofUnavailable,
+			parseEdPrincipal,
+			FailDIDKeyResolution,
+		)
+
+		a, x := Access(inv, context)
+		require.Nil(t, a)
+		require.Error(t, x)
+		require.Equal(t, x.Name(), "Unauthorized")
+		require.Contains(t, x.Error(), fmt.Sprintf(`Unable to resolve '%s'`, account.DID()))
+	})
+
+	t.Run("fail invalid ucan/attest proof", func(t *testing.T) {
+		account := absentee.From(helpers.Must(did.Parse("did:mailto:web.mail:alice")))
+		agent := fixtures.Alice
+		othersvc := helpers.Must(ed25519.Generate())
+
+		prf, err := debugEcho.Delegate(
+			account,
+			agent,
+			account.DID().String(),
+			debugEchoCaveats{},
+			delegation.WithNoExpiration(),
+		)
+		require.NoError(t, err)
+
+		session, err := attest.Delegate(
+			othersvc,
+			agent,
+			service.DID().String(),
+			attestCaveats{Proof: prf.Link()},
+			delegation.WithProof(
+				delegation.FromDelegation(
+					helpers.Must(
+						delegation.Delegate(
+							service,
+							othersvc,
+							[]ucan.Capability[ucan.NoCaveats]{
+								// Noting that this is a DID key, not did:web:example.com
+								// which is why session is invalid
+								ucan.NewCapability("*", service.Unwrap().DID().String(), ucan.NoCaveats{}),
+							},
+						),
+					),
+				),
+			),
+		)
+		require.NoError(t, err)
+
+		msg := "Hello World"
+		nb := debugEchoCaveats{Message: &msg}
+		inv, err := debugEcho.Invoke(
+			agent,
+			service,
+			account.DID().String(),
+			nb,
+			delegation.WithProofs(
+				delegation.Proofs{
+					delegation.FromDelegation(prf),
+					delegation.FromDelegation(session),
+				},
+			),
+		)
+		require.NoError(t, err)
+
+		context := NewValidationContext(
+			service.Verifier(),
+			debugEcho,
+			IsSelfIssued,
+			validateAuthOk,
+			ProofUnavailable,
+			parseEdPrincipal,
+			FailDIDKeyResolution,
+		)
+
+		a, x := Access(inv, context)
+		require.Nil(t, a)
+		require.Error(t, x)
+		require.Equal(t, x.Name(), "Unauthorized")
+		require.Contains(t, x.Error(), "has an invalid session")
+	})
+
+	t.Run("resolve key", func(t *testing.T) {
+		accountDID := helpers.Must(did.Parse("did:mailto:web.mail:alice"))
+		account := helpers.Must(signer.Wrap(fixtures.Alice, accountDID))
+
+		msg := "Hello World"
+		nb := debugEchoCaveats{Message: &msg}
+		inv, err := debugEcho.Invoke(
+			account,
+			service,
+			account.DID().String(),
+			nb,
+		)
+		require.NoError(t, err)
+
+		context := NewValidationContext(
+			service.Verifier(),
+			debugEcho,
+			IsSelfIssued,
+			validateAuthOk,
+			ProofUnavailable,
+			parseEdPrincipal,
+			func(d did.DID) (did.DID, UnresolvedDID) {
+				return fixtures.Alice.DID(), nil
+			},
+		)
+
+		a, x := Access(inv, context)
+		require.NoError(t, x)
+		require.Equal(t, debugEcho.Can(), a.Capability().Can())
+		require.Equal(t, account.DID().String(), a.Capability().With())
+		require.Equal(t, nb, a.Capability().Nb())
 	})
 }
