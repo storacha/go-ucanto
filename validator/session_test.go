@@ -409,4 +409,212 @@ func TestSession(t *testing.T) {
 		require.Equal(t, account.DID().String(), a.Capability().With())
 		require.Equal(t, nb, a.Capability().Nb())
 	})
+
+	t.Run("service can not delegate access to account", func(t *testing.T) {
+		accountDID := helpers.Must(did.Parse("did:mailto:web.mail:alice"))
+		account := absentee.From(accountDID)
+
+		// service should not be able to delegate access to account resource
+		auth, err := debugEcho.Delegate(
+			service,
+			fixtures.Alice,
+			account.DID().String(),
+			debugEchoCaveats{},
+		)
+		require.NoError(t, err)
+
+		session, err := attest.Delegate(
+			service,
+			fixtures.Alice,
+			service.DID().String(),
+			attestCaveats{Proof: auth.Link()},
+			delegation.WithProof(delegation.FromDelegation(auth)),
+		)
+		require.NoError(t, err)
+
+		msg := "Hello World"
+		nb := debugEchoCaveats{Message: &msg}
+		inv, err := debugEcho.Invoke(
+			fixtures.Alice,
+			service,
+			account.DID().String(),
+			nb,
+			delegation.WithProofs(
+				delegation.Proofs{
+					delegation.FromDelegation(auth),
+					delegation.FromDelegation(session),
+				},
+			),
+		)
+		require.NoError(t, err)
+
+		context := NewValidationContext(
+			service.Verifier(),
+			debugEcho,
+			IsSelfIssued,
+			validateAuthOk,
+			ProofUnavailable,
+			parseEdPrincipal,
+			FailDIDKeyResolution,
+		)
+
+		a, x := Access(inv, context)
+		require.Nil(t, a)
+		require.Error(t, x)
+	})
+
+	t.Run("attest with an account DID", func(t *testing.T) {
+		accountDID := helpers.Must(did.Parse("did:mailto:web.mail:alice"))
+		account := absentee.From(accountDID)
+
+		// service should not be able to delegate access to account resource
+		auth, err := debugEcho.Delegate(
+			service,
+			fixtures.Alice,
+			account.DID().String(),
+			debugEchoCaveats{},
+		)
+		require.NoError(t, err)
+
+		session, err := attest.Delegate(
+			service,
+			fixtures.Alice,
+			// this should be an service did instead
+			account.DID().String(),
+			attestCaveats{Proof: auth.Link()},
+			delegation.WithProof(delegation.FromDelegation(auth)),
+		)
+		require.NoError(t, err)
+
+		msg := "Hello World"
+		nb := debugEchoCaveats{Message: &msg}
+		inv, err := debugEcho.Invoke(
+			fixtures.Alice,
+			service,
+			account.DID().String(),
+			nb,
+			delegation.WithProofs(
+				delegation.Proofs{
+					delegation.FromDelegation(auth),
+					delegation.FromDelegation(session),
+				},
+			),
+		)
+		require.NoError(t, err)
+
+		context := NewValidationContext(
+			service.Verifier(),
+			debugEcho,
+			IsSelfIssued,
+			validateAuthOk,
+			ProofUnavailable,
+			parseEdPrincipal,
+			FailDIDKeyResolution,
+		)
+
+		a, x := Access(inv, context)
+		require.Nil(t, a)
+		require.Error(t, x)
+	})
+
+	t.Run("service cannot delegate account resource", func(t *testing.T) {
+		accountDID := helpers.Must(did.Parse("did:mailto:web.mail:alice"))
+		account := absentee.From(accountDID)
+
+		prf, err := debugEcho.Delegate(
+			service,
+			fixtures.Alice,
+			account.DID().String(),
+			debugEchoCaveats{},
+		)
+		require.NoError(t, err)
+
+		msg := "Hello World"
+		nb := debugEchoCaveats{Message: &msg}
+		inv, err := debugEcho.Invoke(
+			fixtures.Alice,
+			service,
+			account.DID().String(),
+			nb,
+			delegation.WithProof(delegation.FromDelegation(prf)),
+		)
+		require.NoError(t, err)
+
+		context := NewValidationContext(
+			service.Verifier(),
+			debugEcho,
+			IsSelfIssued,
+			validateAuthOk,
+			ProofUnavailable,
+			parseEdPrincipal,
+			FailDIDKeyResolution,
+		)
+
+		a, x := Access(inv, context)
+		require.Nil(t, a)
+		require.Error(t, x)
+	})
+
+	t.Run("redundant proofs have no impact", func(t *testing.T) {
+		accountDID := helpers.Must(did.Parse("did:mailto:web.mail:alice"))
+		account := absentee.From(accountDID)
+
+		var logins delegation.Proofs
+		for i := range 6 {
+			dlg, err := delegation.Delegate(
+				account,
+				fixtures.Alice,
+				[]ucan.Capability[ucan.NoCaveats]{
+					ucan.NewCapability("*", "ucan:*", ucan.NoCaveats{}),
+				},
+				delegation.WithNoExpiration(),
+				delegation.WithNonce(fmt.Sprint(i)),
+			)
+			require.NoError(t, err)
+			logins = append(logins, delegation.FromDelegation(dlg))
+		}
+
+		exp := ucan.Now() + 60*60*24*365 // 1 year
+		var attestations delegation.Proofs
+		for _, login := range logins {
+			dlg, err := attest.Delegate(
+				service,
+				fixtures.Alice,
+				service.DID().String(),
+				attestCaveats{Proof: login.Link()},
+				delegation.WithExpiration(exp),
+			)
+			require.NoError(t, err)
+			attestations = append(attestations, delegation.FromDelegation(dlg))
+		}
+
+		var prfs delegation.Proofs
+		prfs = append(prfs, logins...)
+		prfs = append(prfs, attestations...)
+
+		msg := "Hello World"
+		nb := debugEchoCaveats{Message: &msg}
+		inv, err := debugEcho.Invoke(
+			fixtures.Alice,
+			service,
+			account.DID().String(),
+			nb,
+			delegation.WithProofs(prfs),
+		)
+		require.NoError(t, err)
+
+		context := NewValidationContext(
+			service.Verifier(),
+			debugEcho,
+			IsSelfIssued,
+			validateAuthOk,
+			ProofUnavailable,
+			parseEdPrincipal,
+			FailDIDKeyResolution,
+		)
+
+		a, x := Access(inv, context)
+		require.NotEmpty(t, a)
+		require.NoError(t, x)
+	})
 }
