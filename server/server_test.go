@@ -192,7 +192,7 @@ func TestExecute(t *testing.T) {
 		require.NoError(t, err)
 
 		prfs := []delegation.Proof{delegation.FromDelegation(dgl)}
-		inv, err := invocation.Invoke(fixtures.Alice, fixtures.Service, cap, delegation.WithProofs(prfs))
+		inv, err := invocation.Invoke(fixtures.Alice, fixtures.Service, cap, delegation.WithProof(prfs...))
 		require.NoError(t, err)
 
 		resp, err := client.Execute([]invocation.Invocation{inv}, conn)

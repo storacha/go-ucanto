@@ -120,10 +120,10 @@ func TestSession(t *testing.T) {
 			service,
 			account.DID().String(),
 			nb,
-			delegation.WithProofs(delegation.Proofs{
+			delegation.WithProof(
 				delegation.FromDelegation(prf),
 				delegation.FromDelegation(session),
-			}),
+			),
 		)
 		require.NoError(t, err)
 
@@ -208,10 +208,10 @@ func TestSession(t *testing.T) {
 			service,
 			account.DID().String(),
 			nb,
-			delegation.WithProofs(delegation.Proofs{
+			delegation.WithProof(
 				delegation.FromDelegation(session),
 				delegation.FromDelegation(prf),
-			}),
+			),
 		)
 		require.NoError(t, err)
 
@@ -351,11 +351,9 @@ func TestSession(t *testing.T) {
 			service,
 			account.DID().String(),
 			nb,
-			delegation.WithProofs(
-				delegation.Proofs{
-					delegation.FromDelegation(prf),
-					delegation.FromDelegation(session),
-				},
+			delegation.WithProof(
+				delegation.FromDelegation(prf),
+				delegation.FromDelegation(session),
 			),
 		)
 		require.NoError(t, err)
@@ -439,11 +437,9 @@ func TestSession(t *testing.T) {
 			service,
 			account.DID().String(),
 			nb,
-			delegation.WithProofs(
-				delegation.Proofs{
-					delegation.FromDelegation(auth),
-					delegation.FromDelegation(session),
-				},
+			delegation.WithProof(
+				delegation.FromDelegation(auth),
+				delegation.FromDelegation(session),
 			),
 		)
 		require.NoError(t, err)
@@ -493,11 +489,9 @@ func TestSession(t *testing.T) {
 			service,
 			account.DID().String(),
 			nb,
-			delegation.WithProofs(
-				delegation.Proofs{
-					delegation.FromDelegation(auth),
-					delegation.FromDelegation(session),
-				},
+			delegation.WithProof(
+				delegation.FromDelegation(auth),
+				delegation.FromDelegation(session),
 			),
 		)
 		require.NoError(t, err)
@@ -599,7 +593,7 @@ func TestSession(t *testing.T) {
 			service,
 			account.DID().String(),
 			nb,
-			delegation.WithProofs(prfs),
+			delegation.WithProof(prfs...),
 		)
 		require.NoError(t, err)
 
