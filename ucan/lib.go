@@ -71,8 +71,8 @@ func WithFacts(fct []FactBuilder) Option {
 	}
 }
 
-// WithProofs configures the proofs for the UCAN.
-func WithProofs(prf []Link) Option {
+// WithProof configures the proofs for the UCAN.
+func WithProof(prf ...Link) Option {
 	return func(cfg *ucanConfig) error {
 		cfg.prf = prf
 		return nil

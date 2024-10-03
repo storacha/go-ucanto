@@ -69,22 +69,13 @@ func WithFacts(fct []ucan.FactBuilder) Option {
 	}
 }
 
-// WithProofs configures the proofs for the UCAN. If the `issuer` of this
+// WithProof configures the proof(s) for the UCAN. If the `issuer` of this
 // `Delegation` is not the resource owner / service provider, for the delegated
 // capabilities, the `proofs` must contain valid `Proof`s containing
 // delegations to the `issuer`.
-func WithProofs(prf Proofs) Option {
+func WithProof(prf ...Proof) Option {
 	return func(cfg *delegationConfig) error {
 		cfg.prf = prf
-		return nil
-	}
-}
-
-// WithProof configures the proofs for the UCAN in the case where there is only
-// a single proof.
-func WithProof(prf Proof) Option {
-	return func(cfg *delegationConfig) error {
-		cfg.prf = Proofs{prf}
 		return nil
 	}
 }
@@ -114,7 +105,7 @@ func Delegate[C ucan.CaveatBuilder](issuer ucan.Signer, audience ucan.Principal,
 		ucan.WithFacts(cfg.fct),
 		ucan.WithNonce(cfg.nnc),
 		ucan.WithNotBefore(cfg.nbf),
-		ucan.WithProofs(links),
+		ucan.WithProof(links...),
 	}
 	if cfg.noexp {
 		opts = append(opts, ucan.WithNoExpiration())
