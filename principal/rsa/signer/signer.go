@@ -111,6 +111,11 @@ func (s rsasigner) Encode() []byte {
 	return s.bytes
 }
 
+func (s rsasigner) Raw() []byte {
+	b, _ := multiformat.UntagWith(Code, s.bytes, 0)
+	return b
+}
+
 func (s rsasigner) Sign(msg []byte) signature.SignatureView {
 	hash := sha256.New()
 	hash.Write(msg)
