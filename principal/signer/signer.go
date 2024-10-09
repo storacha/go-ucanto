@@ -37,6 +37,10 @@ func (w wrapsgn) Encode() []byte {
 	return w.key.Encode()
 }
 
+func (w wrapsgn) Raw() []byte {
+	return w.key.Raw()
+}
+
 func (w wrapsgn) Sign(msg []byte) signature.SignatureView {
 	return w.key.Sign(msg)
 }

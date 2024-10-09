@@ -112,9 +112,13 @@ func (s Ed25519Signer) Encode() []byte {
 	return s
 }
 
-func (s Ed25519Signer) Sign(msg []byte) signature.SignatureView {
+func (s Ed25519Signer) Raw() []byte {
 	pk := make(ed25519.PrivateKey, ed25519.PrivateKeySize)
 	copy(pk[0:ed25519.PublicKeySize], s[privateTagSize:pubKeyOffset])
 	copy(pk[ed25519.PrivateKeySize-ed25519.PublicKeySize:ed25519.PrivateKeySize], s[pubKeyOffset+publicTagSize:pubKeyOffset+publicTagSize+keySize])
-	return signature.NewSignatureView(signature.NewSignature(signature.EdDSA, ed25519.Sign(pk, msg)))
+	return pk
+}
+
+func (s Ed25519Signer) Sign(msg []byte) signature.SignatureView {
+	return signature.NewSignatureView(signature.NewSignature(signature.EdDSA, ed25519.Sign(s.Raw(), msg)))
 }

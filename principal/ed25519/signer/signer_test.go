@@ -1,8 +1,11 @@
 package signer
 
 import (
+	"crypto/ed25519"
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateEncodeDecode(t *testing.T) {
@@ -65,4 +68,15 @@ func TestVerify(t *testing.T) {
 	if res != true {
 		t.Fatalf("verify failed")
 	}
+}
+
+func TestSignerRaw(t *testing.T) {
+	s, err := Generate()
+	require.NoError(t, err)
+
+	msg := []byte{1, 2, 3}
+	raw := s.Raw()
+	sig := ed25519.Sign(raw, msg)
+
+	require.Equal(t, s.Sign(msg).Raw(), sig)
 }

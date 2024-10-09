@@ -12,6 +12,8 @@ type Signer interface {
 	Code() uint64
 	Verifier() Verifier
 	Encode() []byte
+	// Raw encodes the bytes of the private key without multiformats tags.
+	Raw() []byte
 }
 
 // Verifier is the principal that issued a UCAN. In usually represents remote
