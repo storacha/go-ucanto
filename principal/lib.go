@@ -22,4 +22,6 @@ type Verifier interface {
 	ucan.Verifier
 	Code() uint64
 	Encode() []byte
+	// Raw encodes the bytes of the public key without multiformats tags.
+	Raw() []byte
 }

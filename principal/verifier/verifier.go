@@ -36,6 +36,10 @@ func (w wrapvf) Encode() []byte {
 	return w.key.Encode()
 }
 
+func (w wrapvf) Raw() []byte {
+	return w.key.Raw()
+}
+
 func (w wrapvf) Verify(msg []byte, sig signature.Signature) bool {
 	return w.key.Verify(msg, sig)
 }

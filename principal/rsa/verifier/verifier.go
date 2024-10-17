@@ -71,3 +71,8 @@ func (v rsaverifier) DID() did.DID {
 func (v rsaverifier) Encode() []byte {
 	return v.bytes
 }
+
+func (v rsaverifier) Raw() []byte {
+	b, _ := multiformat.UntagWith(Code, v.bytes, 0)
+	return b
+}

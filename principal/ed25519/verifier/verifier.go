@@ -79,3 +79,9 @@ func (v Ed25519Verifier) DID() did.DID {
 func (v Ed25519Verifier) Encode() []byte {
 	return v
 }
+
+func (s Ed25519Verifier) Raw() []byte {
+	k := make(ed25519.PublicKey, ed25519.PublicKeySize)
+	copy(k, s[publicTagSize:])
+	return k
+}
