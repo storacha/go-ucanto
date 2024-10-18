@@ -8,7 +8,9 @@ import (
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/ipld/go-ipld-prime/node/bindnode"
 	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRebind(t *testing.T) {
@@ -228,4 +230,28 @@ func TestRebindNonCompatibleSchema(t *testing.T) {
 		t.Fatalf("expected error rebinding")
 	}
 	fmt.Println(err)
+}
+
+func TestRebindTypedNode(t *testing.T) {
+	type Target struct {
+		Astring string
+		Aint    int
+	}
+
+	ts, err := ipld.LoadSchemaBytes([]byte(`
+		type Target struct {
+			astring String
+			aint Int
+		} representation tuple
+	`))
+	require.NoError(t, err)
+
+	typ := ts.TypeByName("Target")
+
+	target := Target{Astring: "hello", Aint: 1}
+	nd := bindnode.Wrap(&target, typ)
+
+	rebindTarget, err := Rebind[Target](nd, typ)
+	require.NoError(t, err)
+	fmt.Printf("%+v\n", rebindTarget)
 }

@@ -22,6 +22,10 @@ func Rebind[T any](nd datamodel.Node, typ schema.Type) (ptrVal T, err error) {
 		}
 	}()
 
+	if typedNode, ok := nd.(schema.TypedNode); ok {
+		nd = typedNode.Representation()
+	}
+
 	var nilbind T
 	np := bindnode.Prototype(&nilbind, typ)
 	nb := np.Representation().NewBuilder()
