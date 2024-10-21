@@ -129,5 +129,5 @@ func Delegate[C ucan.CaveatBuilder](issuer ucan.Signer, audience ucan.Principal,
 		return nil, fmt.Errorf("adding delegation root to store: %s", err)
 	}
 
-	return NewDelegation(rt, bs), nil
+	return NewDelegation(rt, bs)
 }
