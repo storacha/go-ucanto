@@ -111,3 +111,7 @@ func FromError(err error) IPLDBuilderFailure {
 	}
 	return fail
 }
+
+func FromFailureModel(model datamodel.FailureModel) IPLDBuilderFailure {
+	return failure{model: model}
+}

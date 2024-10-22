@@ -171,6 +171,16 @@ func Wrap[O any, X comparable](inner func() (O, X)) Result[O, X] {
 	return Ok[O, X](o)
 }
 
+func Unwrap[O any, X any](result Result[O, X]) (O, X) {
+	return MatchResultR2(result, func(ok O) (O, X) {
+		var err X
+		return ok, err
+	}, func(err X) (O, X) {
+		var ok O
+		return ok, err
+	})
+}
+
 func NewFailure(err error) Result[ipld.Builder, ipld.Builder] {
 	if ipldConvertableError, ok := err.(failure.IPLDConvertableError); ok {
 		return Error[ipld.Builder, ipld.Builder](ipldConvertableError)

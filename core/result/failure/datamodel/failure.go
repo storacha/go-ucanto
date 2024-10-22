@@ -34,6 +34,10 @@ func init() {
 	typ = ts.TypeByName("Failure")
 }
 
+func FailureType() schema.Type {
+	return typ
+}
+
 func Schema() []byte {
 	return failureSchema
 }
