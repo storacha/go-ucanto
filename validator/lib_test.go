@@ -533,7 +533,8 @@ func TestAccess(t *testing.T) {
 			bs, err := blockstore.NewBlockStore(blockstore.WithBlocks([]block.Block{rt}))
 			require.NoError(t, err)
 
-			dlg := delegation.NewDelegation(rt, bs)
+			dlg, err := delegation.NewDelegation(rt, bs)
+			require.NoError(t, err)
 
 			inv, err := storeAdd.Invoke(
 				fixtures.Bob,

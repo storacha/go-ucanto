@@ -14,6 +14,7 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld/block"
 	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
 	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
+	"github.com/storacha/go-ucanto/core/iterable"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 	udm "github.com/storacha/go-ucanto/ucan/datamodel/ucan"
@@ -30,13 +31,18 @@ type Delegation interface {
 	Link() ucan.Link
 	// Archive writes the delegation to a Content Addressed aRchive (CAR).
 	Archive() io.Reader
+	// Attach a block to the delegation DAG so it will be included in the block
+	// iterator. You should only attach blocks that are referenced from
+	// `Capabilities` or `Facts`.
+	Attach(block block.Block) error
 }
 
 type delegation struct {
-	rt   ipld.Block
-	blks blockstore.BlockReader
-	ucan ucan.View
-	once sync.Once
+	rt       ipld.Block
+	blks     blockstore.BlockReader
+	atchblks blockstore.BlockStore
+	ucan     ucan.View
+	once     sync.Once
 }
 
 var _ Delegation = (*delegation)(nil)
@@ -65,7 +71,7 @@ func (d *delegation) Link() ucan.Link {
 }
 
 func (d *delegation) Blocks() iter.Seq2[ipld.Block, error] {
-	return d.blks.Iterator()
+	return iterable.Concat2(d.blks.Iterator(), d.atchblks.Iterator())
 }
 
 func (d *delegation) Archive() io.Reader {
@@ -112,8 +118,16 @@ func (d *delegation) Signature() signature.SignatureView {
 	return d.Data().Signature()
 }
 
-func NewDelegation(root ipld.Block, bs blockstore.BlockReader) Delegation {
-	return &delegation{rt: root, blks: bs}
+func (d *delegation) Attach(b block.Block) error {
+	return d.atchblks.Put(b)
+}
+
+func NewDelegation(root ipld.Block, bs blockstore.BlockReader) (Delegation, error) {
+	attachments, err := blockstore.NewBlockStore()
+	if err != nil {
+		return nil, err
+	}
+	return &delegation{rt: root, blks: bs, atchblks: attachments}, nil
 }
 
 func NewDelegationView(root ipld.Link, bs blockstore.BlockReader) (Delegation, error) {
@@ -124,7 +138,7 @@ func NewDelegationView(root ipld.Link, bs blockstore.BlockReader) (Delegation, e
 	if !ok {
 		return nil, fmt.Errorf("missing delegation root block: %s", root)
 	}
-	return NewDelegation(blk, bs), nil
+	return NewDelegation(blk, bs)
 }
 
 func Archive(d Delegation) io.Reader {

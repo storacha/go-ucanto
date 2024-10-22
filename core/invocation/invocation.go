@@ -20,7 +20,7 @@ type Invocation interface {
 	delegation.Delegation
 }
 
-func NewInvocation(root ipld.Block, bs blockstore.BlockReader) Invocation {
+func NewInvocation(root ipld.Block, bs blockstore.BlockReader) (Invocation, error) {
 	return delegation.NewDelegation(root, bs)
 }
 
