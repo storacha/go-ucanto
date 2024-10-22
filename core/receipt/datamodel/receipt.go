@@ -3,11 +3,14 @@ package datamodel
 import (
 	"bytes"
 	_ "embed"
+	"errors"
 	"fmt"
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/schema"
+	schemadmt "github.com/ipld/go-ipld-prime/schema/dmt"
+	schemadsl "github.com/ipld/go-ipld-prime/schema/dsl"
 )
 
 //go:embed receipt.ipldsch
@@ -79,6 +82,24 @@ func NewReceiptModelType(resultschema []byte) (schema.Type, error) {
 	ts, err := ipld.LoadSchemaBytes(sch)
 	if err != nil {
 		return nil, err
+	}
+	return ts.TypeByName("Receipt"), nil
+}
+
+func NewReceiptModelFromTypes(successType schema.Type, errType schema.Type) (schema.Type, error) {
+	ts := new(schema.TypeSystem)
+	ts.Init()
+	schema.SpawnDefaultBasicTypes(ts)
+	schema.MergeTypeSystem(ts, successType.TypeSystem(), true)
+	schema.MergeTypeSystem(ts, errType.TypeSystem(), true)
+	ts.Accumulate(schema.SpawnUnion("Result", []schema.TypeName{successType.Name(), errType.Name()}, schema.SpawnUnionRepresentationKeyed(map[string]schema.TypeName{"ok": successType.Name(), "error": errType.Name()})))
+	sch, err := schemadsl.Parse("", bytes.NewReader(receipt))
+	if err != nil {
+		return nil, err
+	}
+	schemadmt.SpawnSchemaTypes(ts, sch)
+	if errs := ts.ValidateGraph(); errs != nil {
+		return nil, errors.Join(errs...)
 	}
 	return ts.TypeByName("Receipt"), nil
 }
