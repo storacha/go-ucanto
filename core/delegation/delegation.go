@@ -7,6 +7,10 @@ import (
 	"iter"
 	"sync"
 
+	"github.com/ipfs/go-cid"
+	"github.com/multiformats/go-multibase"
+	"github.com/multiformats/go-multicodec"
+	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	adm "github.com/storacha/go-ucanto/core/delegation/datamodel"
@@ -205,4 +209,36 @@ func Extract(b []byte) (Delegation, error) {
 	}
 
 	return NewDelegationView(model.Ucan0_9_1, br)
+}
+
+func Format(dlg Delegation) (string, error) {
+	bytes, err := io.ReadAll(dlg.Archive())
+	if err != nil {
+		return "", fmt.Errorf("archiving delegation: %w", err)
+	}
+	digest, err := multihash.Sum(bytes, uint64(multicodec.Identity), -1)
+	if err != nil {
+		return "", fmt.Errorf("creating multihash: %w", err)
+	}
+	return cid.NewCidV1(uint64(multicodec.Car), digest).StringOfBase(multibase.Base64pad)
+}
+
+func Parse(input string) (Delegation, error) {
+	cid, err := cid.Decode(input)
+	if err != nil {
+		return nil, fmt.Errorf("decoding CID: %w", err)
+	}
+	codec := multicodec.Code(cid.Prefix().Codec)
+	if codec != multicodec.Car {
+		return nil, fmt.Errorf("non CAR codec found: %s", codec.String())
+	}
+	mhinfo, err := multihash.Decode(cid.Hash())
+	if err != nil {
+		return nil, fmt.Errorf("decoding multihash: %w", err)
+	}
+	mhcodec := multicodec.Code(mhinfo.Code)
+	if mhcodec != multicodec.Identity {
+		return nil, fmt.Errorf("non identity multihash: %s", mhcodec.String())
+	}
+	return Extract(mhinfo.Digest)
 }
