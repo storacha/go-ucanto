@@ -158,15 +158,30 @@ func TestWrap(t *testing.T) {
 	require.Equal(t,
 		result.Error[int](errors.New("bad")),
 		result.Wrap(func() (int, error) { return 0, errors.New("bad") }),
-		"string (no error)")
+		"int (error)")
 	require.Equal(t,
 		result.Ok[string, error]("apple"),
 		result.Wrap(func() (string, error) { return "apple", nil }),
-		"int (no error)")
+		"string (no error)")
 	require.Equal(t,
 		result.Error[string](errors.New("bad")),
 		result.Wrap(func() (string, error) { return "", errors.New("bad") }),
 		"string (error present)")
+}
+
+func TestWrapUnwrap(t *testing.T) {
+	val, err := result.Unwrap(result.Wrap(func() (int, error) { return 5, nil }))
+	require.Equal(t, 5, val, "int (no error)")
+	require.NoError(t, err, "int (no error)")
+	val, err = result.Unwrap(result.Wrap(func() (int, error) { return 0, errors.New("bad") }))
+	require.EqualError(t, err, "bad", "int (error)")
+	require.Equal(t, 0, val, "int (error)")
+	str, err := result.Unwrap(result.Wrap(func() (string, error) { return "apple", nil }))
+	require.Equal(t, "apple", str, "string (no error)")
+	require.NoError(t, err, "string (no error)")
+	str, err = result.Unwrap(result.Wrap(func() (string, error) { return "", errors.New("bad") }))
+	require.EqualError(t, err, "bad", "string (error)")
+	require.Equal(t, "", str, "string (error)")
 }
 
 func TestAndOr(t *testing.T) {

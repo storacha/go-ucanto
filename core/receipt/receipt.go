@@ -189,6 +189,14 @@ func NewReceiptReader[O, X any](resultschema []byte) (ReceiptReader[O, X], error
 	return &receiptReader[O, X]{typ}, nil
 }
 
+func NewReceiptReaderFromTypes[O, X any](successType schema.Type, errType schema.Type) (ReceiptReader[O, X], error) {
+	typ, err := rdm.NewReceiptModelFromTypes(successType, errType)
+	if err != nil {
+		return nil, fmt.Errorf("loading receipt data model: %s", err)
+	}
+	return &receiptReader[O, X]{typ}, nil
+}
+
 type AnyReceipt Receipt[ipld.Node, ipld.Node]
 
 // Option is an option configuring a UCAN delegation.
