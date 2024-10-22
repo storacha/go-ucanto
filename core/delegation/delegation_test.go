@@ -1,6 +1,7 @@
 package delegation
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/storacha/go-ucanto/core/ipld/block"
@@ -33,4 +34,25 @@ func TestAttach(t *testing.T) {
 		}
 	}
 	require.True(t, found)
+}
+
+func TestFormatParse(t *testing.T) {
+	dlg, err := Delegate(
+		fixtures.Alice,
+		fixtures.Bob,
+		[]ucan.Capability[ucan.NoCaveats]{
+			ucan.NewCapability("test/proof", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+		},
+	)
+	require.NoError(t, err)
+
+	formatted, err := Format(dlg)
+	require.NoError(t, err)
+
+	fmt.Println(formatted)
+
+	parsed, err := Parse(formatted)
+	require.NoError(t, err)
+
+	require.Equal(t, dlg.Link(), parsed.Link())
 }
