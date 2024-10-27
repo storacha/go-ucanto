@@ -53,7 +53,7 @@ type HandlerExecutionErrorModel struct {
 }
 
 func InvocationCapabilityErrorType() schema.Type {
-	return errorTypeSystem.TypeByName("HandlerExecutionError")
+	return errorTypeSystem.TypeByName("InvocationCapabilityError")
 }
 
 type InvocationCapabilityErrorModel struct {
