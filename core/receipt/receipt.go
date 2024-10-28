@@ -100,7 +100,7 @@ func (r *receipt[O, X]) Fx() fx.Effects {
 		}
 	}
 
-	return fx.NewEffects(fork, join)
+	return fx.NewEffects(fx.WithFork(fork...), fx.WithJoin(join))
 }
 
 func (r *receipt[O, X]) Issuer() ucan.Principal {

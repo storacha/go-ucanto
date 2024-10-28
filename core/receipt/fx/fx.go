@@ -23,8 +23,31 @@ func (fx effects) Join() Effect {
 	return fx.join
 }
 
-func NewEffects(fork []Effect, join Effect) Effects {
-	return effects{fork, join}
+// Option is an option configuring effects.
+type Option func(fx *effects) error
+
+// WithFork configures the forks for the receipt.
+func WithFork(forks ...Effect) Option {
+	return func(fx *effects) error {
+		fx.fork = forks
+		return nil
+	}
+}
+
+// WithJoin configures the join for the receipt.
+func WithJoin(join Effect) Option {
+	return func(fx *effects) error {
+		fx.join = join
+		return nil
+	}
+}
+
+func NewEffects(opts ...Option) Effects {
+	var fx effects
+	for _, opt := range opts {
+		opt(&fx)
+	}
+	return fx
 }
 
 // Effect is either an invocation or a link to one.
