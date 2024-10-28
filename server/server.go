@@ -287,7 +287,7 @@ func Run(server Server, invocation ServiceInvocation) (receipt.AnyReceipt, error
 	fx := tx.Fx()
 	var opts []receipt.Option
 	if fx != nil {
-		opts = append(opts, receipt.WithJoin(fx.Join()), receipt.WithForks(fx.Fork()))
+		opts = append(opts, receipt.WithJoin(fx.Join()), receipt.WithFork(fx.Fork()...))
 	}
 
 	rcpt, err := receipt.Issue(server.ID(), tx.Out(), ran.FromInvocation(invocation), opts...)

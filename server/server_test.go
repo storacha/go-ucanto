@@ -17,6 +17,7 @@ import (
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/receipt"
+	"github.com/storacha/go-ucanto/core/receipt/fx"
 	"github.com/storacha/go-ucanto/core/result"
 	fdm "github.com/storacha/go-ucanto/core/result/failure/datamodel"
 	"github.com/storacha/go-ucanto/core/schema"
@@ -127,7 +128,7 @@ func TestExecute(t *testing.T) {
 			fixtures.Service,
 			WithServiceMethod(
 				uploadadd.Can(),
-				Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (uploadAddSuccess, receipt.Effects, error) {
+				Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
 					return uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}, nil, nil
 				}),
 			),
@@ -173,7 +174,7 @@ func TestExecute(t *testing.T) {
 			fixtures.Service,
 			WithServiceMethod(
 				uploadadd.Can(),
-				Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (uploadAddSuccess, receipt.Effects, error) {
+				Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
 					return uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}, nil, nil
 				}),
 			),
@@ -257,7 +258,7 @@ func TestExecute(t *testing.T) {
 			fixtures.Service,
 			WithServiceMethod(
 				uploadadd.Can(),
-				Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (uploadAddSuccess, receipt.Effects, error) {
+				Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
 					return uploadAddSuccess{}, nil, fmt.Errorf("test error")
 				}),
 			),
