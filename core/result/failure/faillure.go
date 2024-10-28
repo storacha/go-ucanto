@@ -73,6 +73,9 @@ type failure struct {
 }
 
 func (f failure) Name() string {
+	if f.model.Name == nil {
+		return ""
+	}
 	return *f.model.Name
 }
 
@@ -85,6 +88,9 @@ func (f failure) Error() string {
 }
 
 func (f failure) Stack() string {
+	if f.model.Stack == nil {
+		return ""
+	}
 	return *f.model.Stack
 }
 
