@@ -18,16 +18,12 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
 	"github.com/storacha/go-ucanto/core/iterable"
 	rdm "github.com/storacha/go-ucanto/core/receipt/datamodel"
+	"github.com/storacha/go-ucanto/core/receipt/fx"
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 )
-
-type Effects interface {
-	Fork() []ipld.Link
-	Join() ipld.Link
-}
 
 // Receipt represents a view of the invocation receipt. This interface provides
 // an ergonomic API and allows you to reference linked IPLD objects if they are
@@ -36,7 +32,7 @@ type Receipt[O, X any] interface {
 	ipld.View
 	Ran() invocation.Invocation
 	Out() result.Result[O, X]
-	Fx() Effects
+	Fx() fx.Effects
 	Meta() map[string]any
 	Issuer() ucan.Principal
 	Proofs() delegation.Proofs
@@ -56,18 +52,6 @@ func fromResultModel[O, X any](resultModel rdm.ResultModel[O, X]) result.Result[
 		return result.Ok[O, X](*resultModel.Ok)
 	}
 	return result.Error[O, X](*resultModel.Err)
-}
-
-type effects struct {
-	model rdm.EffectsModel
-}
-
-func (fx effects) Fork() []ipld.Link {
-	return fx.model.Fork
-}
-
-func (fx effects) Join() ipld.Link {
-	return fx.model.Join
 }
 
 type receipt[O, X any] struct {
@@ -93,8 +77,30 @@ func (r *receipt[O, X]) Blocks() iter.Seq2[block.Block, error] {
 	return iterable.Concat2(iterators...)
 }
 
-func (r *receipt[O, X]) Fx() Effects {
-	return effects{r.data.Ocm.Fx}
+func (r *receipt[O, X]) Fx() fx.Effects {
+	var fork []fx.Effect
+	var join fx.Effect
+	for _, l := range r.data.Ocm.Fx.Fork {
+		b, _, _ := r.blks.Get(l)
+		if b != nil {
+			inv, _ := delegation.NewDelegation(b, r.blks)
+			fork = append(fork, fx.FromInvocation(inv))
+		} else {
+			fork = append(fork, fx.FromLink(l))
+		}
+	}
+
+	if r.data.Ocm.Fx.Join != nil {
+		b, _, _ := r.blks.Get(r.data.Ocm.Fx.Join)
+		if b != nil {
+			inv, _ := delegation.NewDelegation(b, r.blks)
+			join = fx.FromInvocation(inv)
+		} else {
+			join = fx.FromLink(r.data.Ocm.Fx.Join)
+		}
+	}
+
+	return fx.NewEffects(fork, join)
 }
 
 func (r *receipt[O, X]) Issuer() ucan.Principal {
@@ -205,8 +211,8 @@ type Option func(cfg *receiptConfig) error
 type receiptConfig struct {
 	meta  map[string]any
 	prf   delegation.Proofs
-	forks []ipld.Link
-	join  ipld.Link
+	forks []fx.Effect
+	join  fx.Effect
 }
 
 // WithProofs configures the proofs for the receipt. If the `issuer` of this
@@ -228,8 +234,8 @@ func WithMeta(meta map[string]any) Option {
 	}
 }
 
-// WithForks configures the forks for the receipt.
-func WithForks(forks []ipld.Link) Option {
+// WithFork configures the forks for the receipt.
+func WithFork(forks ...fx.Effect) Option {
 	return func(cfg *receiptConfig) error {
 		cfg.forks = forks
 		return nil
@@ -237,7 +243,7 @@ func WithForks(forks []ipld.Link) Option {
 }
 
 // WithJoin configures the join for the receipt.
-func WithJoin(join ipld.Link) Option {
+func WithJoin(join fx.Effect) Option {
 	return func(cfg *receiptConfig) error {
 		cfg.join = join
 		return nil
@@ -269,9 +275,25 @@ func Issue[O, X ipld.Builder](issuer ucan.Signer, out result.Result[O, X], ran r
 		return nil, err
 	}
 
+	var forks []ipld.Link
+	for _, effect := range cfg.forks {
+		if inv, ok := effect.Invocation(); ok {
+			blockstore.WriteInto(inv, bs)
+		}
+		forks = append(forks, effect.Link())
+	}
+
+	var join ipld.Link
+	if cfg.join != (fx.Effect{}) {
+		if inv, ok := cfg.join.Invocation(); ok {
+			blockstore.WriteInto(inv, bs)
+		}
+		join = cfg.join.Link()
+	}
+
 	effectsModel := rdm.EffectsModel{
-		Fork: cfg.forks,
-		Join: cfg.join,
+		Fork: forks,
+		Join: join,
 	}
 
 	metaModel := rdm.MetaModel{}

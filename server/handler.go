@@ -3,7 +3,7 @@ package server
 import (
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/ipld"
-	"github.com/storacha/go-ucanto/core/receipt"
+	"github.com/storacha/go-ucanto/core/receipt/fx"
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/server/transaction"
@@ -11,7 +11,7 @@ import (
 	"github.com/storacha/go-ucanto/validator"
 )
 
-type HandlerFunc[C any, O ipld.Builder] func(capability ucan.Capability[C], invocation invocation.Invocation, context InvocationContext) (out O, fx receipt.Effects, err error)
+type HandlerFunc[C any, O ipld.Builder] func(capability ucan.Capability[C], invocation invocation.Invocation, context InvocationContext) (out O, fx fx.Effects, err error)
 
 // Provide is used to define given capability provider. It decorates the passed
 // handler and takes care of UCAN validation. It only calls the handler
