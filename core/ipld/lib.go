@@ -20,7 +20,7 @@ type Builder interface {
 }
 
 // WrapWithRecovery behaves like bindnode.Wrap but converts panics into errors
-func WrapWithRecovery(ptrVal interface{}, typ schema.Type) (nd Node, err error) {
+func WrapWithRecovery(ptrVal interface{}, typ schema.Type, opts ...bindnode.Option) (nd Node, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if asStr, ok := r.(string); ok {
@@ -32,6 +32,6 @@ func WrapWithRecovery(ptrVal interface{}, typ schema.Type) (nd Node, err error) 
 			}
 		}
 	}()
-	nd = bindnode.Wrap(ptrVal, typ)
+	nd = bindnode.Wrap(ptrVal, typ, opts...)
 	return
 }
