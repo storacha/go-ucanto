@@ -9,7 +9,7 @@ import (
 )
 
 // Rebind takes a Node and binds it to the Go type according to the passed schema.
-func Rebind[T any](nd datamodel.Node, typ schema.Type) (ptrVal T, err error) {
+func Rebind[T any](nd datamodel.Node, typ schema.Type, opts ...bindnode.Option) (ptrVal T, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if asStr, ok := r.(string); ok {
@@ -27,7 +27,7 @@ func Rebind[T any](nd datamodel.Node, typ schema.Type) (ptrVal T, err error) {
 	}
 
 	var nilbind T
-	np := bindnode.Prototype(&nilbind, typ)
+	np := bindnode.Prototype(&nilbind, typ, opts...)
 	nb := np.Representation().NewBuilder()
 	err = nb.AssignNode(nd)
 	if err != nil {
