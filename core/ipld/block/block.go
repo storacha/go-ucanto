@@ -7,6 +7,7 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/ipld/go-ipld-prime/node/bindnode"
 	"github.com/ipld/go-ipld-prime/schema"
 	"github.com/storacha/go-ucanto/core/ipld/codec"
 	"github.com/storacha/go-ucanto/core/ipld/hash"
@@ -34,8 +35,8 @@ func NewBlock(link ipld.Link, bytes []byte) Block {
 	return &block{link, bytes}
 }
 
-func Encode(value any, typ schema.Type, codec codec.Encoder, hasher hash.Hasher) (Block, error) {
-	b, err := codec.Encode(value, typ)
+func Encode(value any, typ schema.Type, codec codec.Encoder, hasher hash.Hasher, opts ...bindnode.Option) (Block, error) {
+	b, err := codec.Encode(value, typ, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -49,8 +50,8 @@ func Encode(value any, typ schema.Type, codec codec.Encoder, hasher hash.Hasher)
 	return NewBlock(l, b), nil
 }
 
-func Decode(block Block, bind any, typ schema.Type, codec codec.Decoder, hasher hash.Hasher) error {
-	err := codec.Decode(block.Bytes(), bind, typ)
+func Decode(block Block, bind any, typ schema.Type, codec codec.Decoder, hasher hash.Hasher, opts ...bindnode.Option) error {
+	err := codec.Decode(block.Bytes(), bind, typ, opts...)
 	if err != nil {
 		return err
 	}

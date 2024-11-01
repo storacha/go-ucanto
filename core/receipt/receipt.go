@@ -7,6 +7,7 @@ import (
 	"iter"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
+	"github.com/ipld/go-ipld-prime/node/bindnode"
 	"github.com/ipld/go-ipld-prime/schema"
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
@@ -147,7 +148,7 @@ func (r *receipt[O, X]) Signature() signature.SignatureView {
 	return signature.NewSignatureView(signature.Decode(r.data.Sig))
 }
 
-func NewReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, typ schema.Type) (Receipt[O, X], error) {
+func NewReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, typ schema.Type, opts ...bindnode.Option) (Receipt[O, X], error) {
 	rblock, ok, err := blocks.Get(root)
 	if err != nil {
 		return nil, fmt.Errorf("getting receipt root block: %s", err)
@@ -157,7 +158,7 @@ func NewReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, typ sch
 	}
 
 	rmdl := rdm.ReceiptModel[O, X]{}
-	err = block.Decode(rblock, &rmdl, typ, cbor.Codec, sha256.Hasher)
+	err = block.Decode(rblock, &rmdl, typ, cbor.Codec, sha256.Hasher, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("decoding receipt: %s", err)
 	}
@@ -176,7 +177,8 @@ type ReceiptReader[O, X any] interface {
 }
 
 type receiptReader[O, X any] struct {
-	typ schema.Type
+	typ  schema.Type
+	opts []bindnode.Option
 }
 
 func (rr *receiptReader[O, X]) Read(rcpt ipld.Link, blks iter.Seq2[block.Block, error]) (Receipt[O, X], error) {
@@ -184,26 +186,34 @@ func (rr *receiptReader[O, X]) Read(rcpt ipld.Link, blks iter.Seq2[block.Block, 
 	if err != nil {
 		return nil, fmt.Errorf("creating block reader: %s", err)
 	}
-	return NewReceipt[O, X](rcpt, br, rr.typ)
+	return NewReceipt[O, X](rcpt, br, rr.typ, rr.opts...)
 }
 
-func NewReceiptReader[O, X any](resultschema []byte) (ReceiptReader[O, X], error) {
+func NewReceiptReader[O, X any](resultschema []byte, opts ...bindnode.Option) (ReceiptReader[O, X], error) {
 	typ, err := rdm.NewReceiptModelType(resultschema)
 	if err != nil {
 		return nil, fmt.Errorf("loading receipt data model: %s", err)
 	}
-	return &receiptReader[O, X]{typ}, nil
+	return &receiptReader[O, X]{typ, opts}, nil
 }
 
-func NewReceiptReaderFromTypes[O, X any](successType schema.Type, errType schema.Type) (ReceiptReader[O, X], error) {
+func NewReceiptReaderFromTypes[O, X any](successType schema.Type, errType schema.Type, opts ...bindnode.Option) (ReceiptReader[O, X], error) {
 	typ, err := rdm.NewReceiptModelFromTypes(successType, errType)
 	if err != nil {
 		return nil, fmt.Errorf("loading receipt data model: %s", err)
 	}
-	return &receiptReader[O, X]{typ}, nil
+	return &receiptReader[O, X]{typ, opts}, nil
 }
 
 type AnyReceipt Receipt[ipld.Node, ipld.Node]
+
+func Rebind[O, X any](from AnyReceipt, successType schema.Type, errorType schema.Type, opts ...bindnode.Option) (Receipt[O, X], error) {
+	rdr, err := NewReceiptReaderFromTypes[O, X](successType, errorType, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return rdr.Read(from.Root().Link(), from.Blocks())
+}
 
 // Option is an option configuring a UCAN delegation.
 type Option func(cfg *receiptConfig) error
