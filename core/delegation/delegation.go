@@ -220,7 +220,7 @@ func Format(dlg Delegation) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("creating multihash: %w", err)
 	}
-	return cid.NewCidV1(uint64(multicodec.Car), digest).StringOfBase(multibase.Base64pad)
+	return cid.NewCidV1(uint64(multicodec.Car), digest).StringOfBase(multibase.Base64)
 }
 
 func Parse(input string) (Delegation, error) {
