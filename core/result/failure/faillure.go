@@ -119,5 +119,9 @@ func FromError(err error) IPLDBuilderFailure {
 }
 
 func FromFailureModel(model datamodel.FailureModel) IPLDBuilderFailure {
+	// treat a zero value failure as a non-error
+	if (model == datamodel.FailureModel{}) {
+		return nil
+	}
 	return failure{model: model}
 }
