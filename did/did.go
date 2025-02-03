@@ -11,11 +11,11 @@ import (
 const Prefix = "did:"
 const KeyPrefix = "did:key:"
 
-const DIDCore = 0x0d1d
-const Ed25519 = 0xed
-const RSA = 0x1205
+const DIDCore = uint64(0x0d1d)
+const Ed25519 = uint64(0xed)
+const RSA = uint64(0x1205)
 
-var MethodOffset = varint.UvarintSize(uint64(DIDCore))
+var MethodOffset = varint.UvarintSize(DIDCore)
 
 type DID struct {
 	key bool

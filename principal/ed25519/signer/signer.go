@@ -14,7 +14,7 @@ import (
 	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 )
 
-const Code = 0x1300
+const Code = uint64(0x1300)
 const Name = verifier.Name
 
 const SignatureCode = verifier.SignatureCode
@@ -82,6 +82,17 @@ func Decode(b []byte) (principal.Signer, error) {
 	s := make(Ed25519Signer, size)
 	copy(s, b)
 
+	return s, nil
+}
+
+// FromRaw takes raw ed25519 private key bytes and tags with the ed25519 signer
+// and verifier multiformat codes, returning an ed25519 signer.
+func FromRaw(b []byte) (principal.Signer, error) {
+	s := make(Ed25519Signer, size)
+	varint.PutUvarint(s, Code)
+	copy(s[privateTagSize:privateTagSize+keySize], b[:ed25519.PrivateKeySize-ed25519.PublicKeySize])
+	varint.PutUvarint(s[pubKeyOffset:], verifier.Code)
+	copy(s[pubKeyOffset+publicTagSize:], b[ed25519.PrivateKeySize-ed25519.PublicKeySize:ed25519.PrivateKeySize])
 	return s, nil
 }
 

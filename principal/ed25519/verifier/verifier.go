@@ -8,10 +8,11 @@ import (
 	"github.com/multiformats/go-varint"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
+	"github.com/storacha/go-ucanto/principal/multiformat"
 	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 )
 
-const Code = 0xed
+const Code = uint64(0xed)
 const Name = "Ed25519"
 
 const SignatureCode = signature.EdDSA
@@ -56,6 +57,12 @@ func Decode(b []byte) (principal.Verifier, error) {
 	copy(v, b)
 
 	return v, nil
+}
+
+// FromRaw takes raw ed25519 public key bytes and tags with the ed25519 verifier
+// multiformat code, returning an ed25519 verifier.
+func FromRaw(b []byte) (principal.Verifier, error) {
+	return Ed25519Verifier(multiformat.TagWith(Code, b)), nil
 }
 
 type Ed25519Verifier []byte

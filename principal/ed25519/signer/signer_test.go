@@ -80,3 +80,15 @@ func TestSignerRaw(t *testing.T) {
 
 	require.Equal(t, s.Sign(msg).Raw(), sig)
 }
+
+func TestFromRaw(t *testing.T) {
+	_, priv, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+
+	s, err := FromRaw(priv)
+	require.NoError(t, err)
+
+	fmt.Println(s.DID())
+
+	require.Equal(t, priv, ed25519.PrivateKey(s.Raw()))
+}

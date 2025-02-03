@@ -1,6 +1,9 @@
 package signer
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"fmt"
 	"testing"
 
@@ -39,4 +42,18 @@ func TestVerify(t *testing.T) {
 
 	res := s0.Verifier().Verify(msg, sig)
 	require.Equal(t, true, res)
+}
+
+func TestFromRaw(t *testing.T) {
+	priv, err := rsa.GenerateKey(rand.Reader, keySize)
+	require.NoError(t, err)
+
+	raw := x509.MarshalPKCS1PrivateKey(priv)
+
+	s, err := FromRaw(raw)
+	require.NoError(t, err)
+
+	fmt.Println(s.DID())
+
+	require.Equal(t, raw, s.Raw())
 }

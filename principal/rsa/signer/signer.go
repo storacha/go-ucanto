@@ -16,7 +16,7 @@ import (
 	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 )
 
-const Code = 0x1305
+const Code = uint64(0x1305)
 const Name = verifier.Name
 
 const SignatureCode = verifier.SignatureCode
@@ -45,7 +45,7 @@ func Generate() (principal.Signer, error) {
 	// create a RSASigner view.
 	prvbytes := multiformat.TagWith(Code, x509.MarshalPKCS1PrivateKey(priv))
 
-	return rsasigner{bytes: prvbytes, privKey: priv, verifier: verif}, nil
+	return RSASigner{bytes: prvbytes, privKey: priv, verifier: verif}, nil
 }
 
 func Parse(str string) (principal.Signer, error) {
@@ -78,45 +78,60 @@ func Decode(b []byte) (principal.Signer, error) {
 		return nil, fmt.Errorf("decoding public bytes: %s", err)
 	}
 
-	return rsasigner{bytes: b, privKey: priv, verifier: verif}, nil
+	return RSASigner{bytes: b, privKey: priv, verifier: verif}, nil
 }
 
-type rsasigner struct {
+// FromRaw takes raw RSA private key in PKCS #1, ASN.1 DER form and tags with
+// the RSA signer and verifier multiformat codes, returning an RSA signer.
+func FromRaw(b []byte) (principal.Signer, error) {
+	tb := multiformat.TagWith(Code, b)
+	priv, err := x509.ParsePKCS1PrivateKey(b)
+	if err != nil {
+		return nil, fmt.Errorf("parsing private key: %s", err)
+	}
+	verif, err := verifier.FromRaw(x509.MarshalPKCS1PublicKey(&priv.PublicKey))
+	if err != nil {
+		return nil, fmt.Errorf("decoding public bytes: %s", err)
+	}
+	return RSASigner{bytes: tb, privKey: priv, verifier: verif}, nil
+}
+
+type RSASigner struct {
 	bytes    []byte
 	privKey  *rsa.PrivateKey
 	verifier principal.Verifier
 }
 
-func (s rsasigner) Code() uint64 {
+func (s RSASigner) Code() uint64 {
 	return Code
 }
 
-func (s rsasigner) SignatureCode() uint64 {
+func (s RSASigner) SignatureCode() uint64 {
 	return SignatureCode
 }
 
-func (s rsasigner) SignatureAlgorithm() string {
+func (s RSASigner) SignatureAlgorithm() string {
 	return SignatureAlgorithm
 }
 
-func (s rsasigner) Verifier() principal.Verifier {
+func (s RSASigner) Verifier() principal.Verifier {
 	return s.verifier
 }
 
-func (s rsasigner) DID() did.DID {
+func (s RSASigner) DID() did.DID {
 	return s.verifier.DID()
 }
 
-func (s rsasigner) Encode() []byte {
+func (s RSASigner) Encode() []byte {
 	return s.bytes
 }
 
-func (s rsasigner) Raw() []byte {
+func (s RSASigner) Raw() []byte {
 	b, _ := multiformat.UntagWith(Code, s.bytes, 0)
 	return b
 }
 
-func (s rsasigner) Sign(msg []byte) signature.SignatureView {
+func (s RSASigner) Sign(msg []byte) signature.SignatureView {
 	hash := sha256.New()
 	hash.Write(msg)
 	digest := hash.Sum(nil)
