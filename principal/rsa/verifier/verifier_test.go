@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -29,8 +28,6 @@ func TestFromRaw(t *testing.T) {
 
 	v, err := FromRaw(raw)
 	require.NoError(t, err)
-
-	fmt.Println(v.DID())
 
 	require.Equal(t, raw, v.Raw())
 }

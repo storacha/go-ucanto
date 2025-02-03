@@ -53,7 +53,5 @@ func TestFromRaw(t *testing.T) {
 	s, err := FromRaw(raw)
 	require.NoError(t, err)
 
-	fmt.Println(s.DID())
-
 	require.Equal(t, raw, s.Raw())
 }
