@@ -62,6 +62,9 @@ func Decode(b []byte) (principal.Verifier, error) {
 // FromRaw takes raw ed25519 public key bytes and tags with the ed25519 verifier
 // multiformat code, returning an ed25519 verifier.
 func FromRaw(b []byte) (principal.Verifier, error) {
+	if len(b) != ed25519.PublicKeySize {
+		return nil, fmt.Errorf("invalid length: %d wanted: %d", len(b), ed25519.PublicKeySize)
+	}
 	return Ed25519Verifier(multiformat.TagWith(Code, b)), nil
 }
 
