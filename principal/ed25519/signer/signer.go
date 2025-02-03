@@ -14,7 +14,7 @@ import (
 	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 )
 
-const Code = uint64(0x1300)
+const Code = 0x1300
 const Name = verifier.Name
 
 const SignatureCode = verifier.SignatureCode

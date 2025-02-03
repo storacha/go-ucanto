@@ -12,7 +12,7 @@ import (
 	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 )
 
-const Code = uint64(0xed)
+const Code = 0xed
 const Name = "Ed25519"
 
 const SignatureCode = signature.EdDSA

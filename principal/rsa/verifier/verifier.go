@@ -13,7 +13,7 @@ import (
 	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 )
 
-const Code = uint64(0x1205)
+const Code = 0x1205
 const Name = "RSA"
 
 const SignatureCode = signature.RS256
