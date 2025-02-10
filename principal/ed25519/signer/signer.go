@@ -85,6 +85,20 @@ func Decode(b []byte) (principal.Signer, error) {
 	return s, nil
 }
 
+// FromRaw takes raw ed25519 private key bytes and tags with the ed25519 signer
+// and verifier multiformat codes, returning an ed25519 signer.
+func FromRaw(b []byte) (principal.Signer, error) {
+	if len(b) != ed25519.PrivateKeySize {
+		return nil, fmt.Errorf("invalid length: %d wanted: %d", len(b), ed25519.PrivateKeySize)
+	}
+	s := make(Ed25519Signer, size)
+	varint.PutUvarint(s, Code)
+	copy(s[privateTagSize:privateTagSize+keySize], b[:ed25519.PrivateKeySize-ed25519.PublicKeySize])
+	varint.PutUvarint(s[pubKeyOffset:], verifier.Code)
+	copy(s[pubKeyOffset+publicTagSize:], b[ed25519.PrivateKeySize-ed25519.PublicKeySize:ed25519.PrivateKeySize])
+	return s, nil
+}
+
 type Ed25519Signer []byte
 
 func (s Ed25519Signer) Code() uint64 {

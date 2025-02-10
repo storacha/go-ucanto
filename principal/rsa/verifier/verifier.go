@@ -38,19 +38,30 @@ func Decode(b []byte) (principal.Verifier, error) {
 		return nil, fmt.Errorf("parsing public key: %s", err)
 	}
 
-	return rsaverifier{bytes: b, pubKey: pub}, nil
+	return RSAVerifier{bytes: b, pubKey: pub}, nil
 }
 
-type rsaverifier struct {
+// FromRaw takes raw RSA public key in PKCS #1, ASN.1 DER form and tags with the
+// RSA verifier multiformat code, returning an RSA verifier.
+func FromRaw(b []byte) (principal.Verifier, error) {
+	tb := multiformat.TagWith(Code, b)
+	pub, err := x509.ParsePKCS1PublicKey(b)
+	if err != nil {
+		return nil, fmt.Errorf("parsing public key: %s", err)
+	}
+	return RSAVerifier{tb, pub}, nil
+}
+
+type RSAVerifier struct {
 	bytes  []byte
 	pubKey *rsa.PublicKey
 }
 
-func (v rsaverifier) Code() uint64 {
+func (v RSAVerifier) Code() uint64 {
 	return Code
 }
 
-func (v rsaverifier) Verify(msg []byte, sig signature.Signature) bool {
+func (v RSAVerifier) Verify(msg []byte, sig signature.Signature) bool {
 	if sig.Code() != signature.RS256 {
 		return false
 	}
@@ -63,16 +74,16 @@ func (v rsaverifier) Verify(msg []byte, sig signature.Signature) bool {
 	return err == nil
 }
 
-func (v rsaverifier) DID() did.DID {
+func (v RSAVerifier) DID() did.DID {
 	id, _ := did.Decode(v.bytes)
 	return id
 }
 
-func (v rsaverifier) Encode() []byte {
+func (v RSAVerifier) Encode() []byte {
 	return v.bytes
 }
 
-func (v rsaverifier) Raw() []byte {
+func (v RSAVerifier) Raw() []byte {
 	b, _ := multiformat.UntagWith(Code, v.bytes, 0)
 	return b
 }
