@@ -91,6 +91,11 @@ type RevocationChecker[Caveats any] interface {
 // revoked. It returns `nil` if not revoked.
 type RevocationCheckerFunc[Caveats any] func(auth Authorization[Caveats]) Revoked
 
+// AuthorityProver provides a set of proofs of authority
+type AuthorityProver interface {
+	AuthorityProofs() []delegation.Delegation
+}
+
 // Validator must provide a [principal.Verifier] corresponding to local authority.
 //
 // A capability provider service will use one corresponding to own DID or it's
@@ -109,6 +114,7 @@ type ClaimContext interface {
 	ProofResolver
 	PrincipalParser
 	PrincipalResolver
+	AuthorityProver
 }
 
 type ValidationContext[Caveats any] interface {
@@ -124,6 +130,7 @@ type validationContext[Caveats any] struct {
 	resolveProof          ProofResolverFunc
 	parsePrincipal        PrincipalParserFunc
 	resolveDIDKey         PrincipalResolverFunc
+	authorityProofs       []delegation.Delegation
 }
 
 func (vc validationContext[Caveats]) Authority() principal.Verifier {
@@ -154,6 +161,10 @@ func (vc validationContext[Caveats]) ResolveDIDKey(did did.DID) (did.DID, Unreso
 	return vc.resolveDIDKey(did)
 }
 
+func (vc validationContext[Caveats]) AuthorityProofs() []delegation.Delegation {
+	return vc.authorityProofs
+}
+
 func NewValidationContext[Caveats any](
 	authority principal.Verifier,
 	capability CapabilityParser[Caveats],
@@ -162,6 +173,7 @@ func NewValidationContext[Caveats any](
 	resolveProof ProofResolverFunc,
 	parsePrincipal PrincipalParserFunc,
 	resolveDIDKey PrincipalResolverFunc,
+	authorityProofs ...delegation.Delegation,
 ) ValidationContext[Caveats] {
 	return validationContext[Caveats]{
 		authority,
@@ -171,6 +183,7 @@ func NewValidationContext[Caveats any](
 		resolveProof,
 		parsePrincipal,
 		resolveDIDKey,
+		authorityProofs,
 	}
 }
 
@@ -350,10 +363,24 @@ func VerifySignature(dlg delegation.Delegation, vfr principal.Verifier) (delegat
 //
 // https://github.com/storacha-network/specs/blob/main/w3-session.md#authorization-session
 func VerifySession(dlg delegation.Delegation, prfs []delegation.Delegation, ctx ClaimContext) (Authorization[vdm.AttestationModel], Unauthorized) {
+	// Recognize attestations from all authorized principals, not just authority
+	var withSchemas []schema.Reader[string, string]
+	for _, p := range ctx.AuthorityProofs() {
+		if p.Capabilities()[0].Can() == "ucan/attest" && p.Capabilities()[0].With() == ctx.Authority().DID().String() {
+			withSchemas = append(withSchemas, schema.Literal(p.Audience().DID().String()))
+		}
+	}
+
+	withSchema := schema.Literal(ctx.Authority().DID().String())
+	if len(withSchemas) > 0 {
+		withSchemas = append(withSchemas, schema.Literal(ctx.Authority().DID().String()))
+		withSchema = schema.Or(withSchemas...)
+	}
+
 	// Create a schema that will match an authorization for this exact delegation
 	attestation := NewCapability(
 		"ucan/attest",
-		schema.Literal(ctx.Authority().DID().String()),
+		withSchema,
 		schema.Struct[vdm.AttestationModel](
 			vdm.AttestationType(),
 			policy.Policy{

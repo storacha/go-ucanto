@@ -144,6 +144,77 @@ func TestSession(t *testing.T) {
 		require.Equal(t, nb, a.Capability().Nb())
 	})
 
+	t.Run("validate mailto attested by another service", func(t *testing.T) {
+		agent := fixtures.Alice
+		account := absentee.From(helpers.Must(did.Parse("did:mailto:web.mail:alice")))
+		othersvc := helpers.Must(ed25519.Generate())
+		othersvc = helpers.Must(signer.Wrap(othersvc, helpers.Must(did.Parse("did:web:other.storage"))))
+
+		prf, err := debugEcho.Delegate(
+			account,
+			agent,
+			account.DID().String(),
+			debugEchoCaveats{},
+			delegation.WithNoExpiration(),
+		)
+		require.NoError(t, err)
+
+		session, err := attest.Delegate(
+			othersvc,
+			agent,
+			othersvc.DID().String(),
+			attestCaveats{Proof: prf.Link()},
+			delegation.WithNoExpiration(),
+		)
+		require.NoError(t, err)
+
+		msg := "Hello World"
+		inv, err := debugEcho.Invoke(
+			agent,
+			service,
+			account.DID().String(),
+			debugEchoCaveats{Message: &msg},
+			delegation.WithProof(
+				delegation.FromDelegation(prf),
+				delegation.FromDelegation(session),
+			),
+			delegation.WithNoExpiration(),
+		)
+		require.NoError(t, err)
+
+		auth, err := attest.Delegate(
+			service,
+			othersvc,
+			service.DID().String(),
+			attestCaveats{Proof: session.Link()},
+			delegation.WithNoExpiration(),
+		)
+		require.NoError(t, err)
+
+		context := NewValidationContext(
+			service.Verifier(),
+			debugEcho,
+			IsSelfIssued,
+			validateAuthOk,
+			ProofUnavailable,
+			parseEdPrincipal,
+			func(d did.DID) (did.DID, UnresolvedDID) {
+				if d == othersvc.DID() {
+					return othersvc.(signer.WrappedSigner).Unwrap().DID(), nil
+				}
+
+				return FailDIDKeyResolution(d)
+			},
+			auth,
+		)
+
+		a, x := Access(inv, context)
+		require.NoError(t, x)
+		require.Equal(t, debugEcho.Can(), a.Capability().Can())
+		require.Equal(t, account.DID().String(), a.Capability().With())
+		require.Equal(t, debugEchoCaveats{Message: &msg}, a.Capability().Nb())
+	})
+
 	t.Run("delegated ucan attest", func(t *testing.T) {
 		agent := fixtures.Alice
 		account := absentee.From(helpers.Must(did.Parse("did:mailto:web.mail:alice")))
