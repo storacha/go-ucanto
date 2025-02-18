@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/result"
@@ -20,6 +21,7 @@ type srvConfig struct {
 	resolveProof          validator.ProofResolverFunc
 	parsePrincipal        validator.PrincipalParserFunc
 	resolveDIDKey         validator.PrincipalResolverFunc
+	authorityProofs       []delegation.Delegation
 	catch                 ErrorHandlerFunc
 }
 
@@ -98,6 +100,15 @@ func WithPrincipalParser(fn validator.PrincipalParserFunc) Option {
 func WithPrincipalResolver(fn validator.PrincipalResolverFunc) Option {
 	return func(cfg *srvConfig) error {
 		cfg.resolveDIDKey = fn
+		return nil
+	}
+}
+
+// WithAuthorityProofs allows to provide a list of proofs that designate other
+// principals (beyond the service authority) whose attestations will be recognized as valid.
+func WithAuthorityProofs(proofs ...delegation.Delegation) Option {
+	return func(cfg *srvConfig) error {
+		cfg.authorityProofs = proofs
 		return nil
 	}
 }

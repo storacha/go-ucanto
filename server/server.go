@@ -33,6 +33,7 @@ type InvocationContext interface {
 	validator.ProofResolver
 	validator.PrincipalParser
 	validator.PrincipalResolver
+	validator.AuthorityProver
 	// ID is the DID of the service the invocation was sent to.
 	ID() principal.Signer
 }
@@ -118,7 +119,7 @@ func NewServer(id principal.Signer, options ...Option) (ServerView, error) {
 		resolveDIDKey = validator.FailDIDKeyResolution
 	}
 
-	ctx := context{id, canIssue, validateAuthorization, resolveProof, parsePrincipal, resolveDIDKey}
+	ctx := context{id, canIssue, validateAuthorization, resolveProof, parsePrincipal, resolveDIDKey, cfg.authorityProofs}
 	svr := &server{id, cfg.service, ctx, codec, catch}
 	return svr, nil
 }
@@ -135,6 +136,7 @@ type context struct {
 	resolveProof          validator.ProofResolverFunc
 	parsePrincipal        validator.PrincipalParserFunc
 	resolveDIDKey         validator.PrincipalResolverFunc
+	authorityProofs       []delegation.Delegation
 }
 
 func (ctx context) ID() principal.Signer {
@@ -159,6 +161,10 @@ func (ctx context) ParsePrincipal(str string) (principal.Verifier, error) {
 
 func (ctx context) ResolveDIDKey(did did.DID) (did.DID, validator.UnresolvedDID) {
 	return ctx.resolveDIDKey(did)
+}
+
+func (ctx context) AuthorityProofs() []delegation.Delegation {
+	return ctx.authorityProofs
 }
 
 type server struct {

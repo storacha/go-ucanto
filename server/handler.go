@@ -26,6 +26,7 @@ func Provide[C any, O ipld.Builder](capability validator.CapabilityParser[C], ha
 			context.ResolveProof,
 			context.ParsePrincipal,
 			context.ResolveDIDKey,
+			context.AuthorityProofs()...,
 		)
 
 		auth, aerr := validator.Access(invocation, vctx)
