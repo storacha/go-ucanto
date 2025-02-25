@@ -164,3 +164,29 @@ func (i invocationCapabilityError) ToIPLD() (ipld.Node, error) {
 func NewInvocationCapabilityError(capabilities []ucan.Capability[any]) InvocationCapabilityError {
 	return invocationCapabilityError{capabilities}
 }
+
+type InvalidAudienceError struct {
+	expected, actual string
+}
+
+func (i InvalidAudienceError) Error() string {
+	return fmt.Sprintf("Invalid audience: expected %s, got %s", i.expected, i.actual)
+}
+
+func (i InvalidAudienceError) Name() string {
+	return "InvalidAudienceError"
+}
+
+func (i InvalidAudienceError) ToIPLD() (ipld.Node, error) {
+	name := i.Name()
+	mdl := sdm.InvalidAudienceErrorModel{
+		Error:   true,
+		Name:    &name,
+		Message: i.Error(),
+	}
+	return ipld.WrapWithRecovery(&mdl, sdm.InvalidAudienceErrorType())
+}
+
+func NewInvalidAudienceError(expected, actual string) InvalidAudienceError {
+	return InvalidAudienceError{expected, actual}
+}

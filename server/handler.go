@@ -6,6 +6,7 @@ import (
 	"github.com/storacha/go-ucanto/core/receipt/fx"
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/core/result/failure"
+	"github.com/storacha/go-ucanto/core/schema"
 	"github.com/storacha/go-ucanto/server/transaction"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/go-ucanto/validator"
@@ -28,6 +29,13 @@ func Provide[C any, O ipld.Builder](capability validator.CapabilityParser[C], ha
 			context.ResolveDIDKey,
 			context.AuthorityProofs()...,
 		)
+
+		// confirm the audience of the invocation is this service
+		thisService := schema.Literal(context.ID().DID().String())
+		if _, err := thisService.Read(invocation.Audience().DID().String()); err != nil {
+			audErr := NewInvalidAudienceError(context.ID().DID().String(), invocation.Audience().DID().String())
+			return transaction.NewTransaction(result.Error[O, ipld.Builder](audErr)), nil
+		}
 
 		auth, aerr := validator.Access(invocation, vctx)
 		if aerr != nil {

@@ -19,9 +19,9 @@ type Failure struct {
 }
 
 type InvocationCapabilityError struct {
+	error Bool
 	name optional String
 	message String
-	error Bool
 	capabilities [Capability]
 }
 
@@ -30,4 +30,10 @@ type HandlerNotFoundError struct {
 	name optional String
 	message String
 	capability Capability
+}
+
+type InvalidAudienceError struct {
+	error Bool
+	name optional String
+	message String
 }
