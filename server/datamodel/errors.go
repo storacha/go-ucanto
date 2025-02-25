@@ -73,3 +73,13 @@ type HandlerNotFoundErrorModel struct {
 	Message    string
 	Capability CapabilityModel
 }
+
+func InvalidAudienceErrorType() schema.Type {
+	return errorTypeSystem.TypeByName("InvalidAudienceError")
+}
+
+type InvalidAudienceErrorModel struct {
+	Error   bool
+	Name    *string
+	Message string
+}
