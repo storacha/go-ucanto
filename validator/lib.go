@@ -374,8 +374,14 @@ func VerifySession(dlg delegation.Delegation, prfs []delegation.Delegation, ctx 
 
 	// We only consider attestations otherwise we will end up doing an
 	// exponential scan if there are other proofs that require attestations.
+	// Also filter any proofs that _are_ the delegation we're verifying so
+	// we don't recurse indefinitely.
 	var aprfs []delegation.Proof
 	for _, p := range prfs {
+		if p.Link().String() == dlg.Link().String() {
+			continue
+		}
+
 		if p.Capabilities()[0].Can() == "ucan/attest" {
 			aprfs = append(aprfs, delegation.FromDelegation(p))
 		}

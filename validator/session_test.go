@@ -375,6 +375,68 @@ func TestSession(t *testing.T) {
 		require.Contains(t, x.Error(), "has an invalid session")
 	})
 
+	t.Run("fail unknown ucan/attest proof", func(t *testing.T) {
+		account := absentee.From(helpers.Must(did.Parse("did:mailto:web.mail:alice")))
+		agent := fixtures.Alice
+		othersvc := helpers.Must(ed25519.Generate())
+		othersvc = helpers.Must(signer.Wrap(othersvc, helpers.Must(did.Parse("did:web:other.storage"))))
+
+		prf, err := debugEcho.Delegate(
+			account,
+			agent,
+			account.DID().String(),
+			debugEchoCaveats{},
+			delegation.WithNoExpiration(),
+		)
+		require.NoError(t, err)
+
+		session, err := attest.Delegate(
+			othersvc,
+			agent,
+			othersvc.DID().String(),
+			attestCaveats{Proof: prf.Link()},
+			delegation.WithNoExpiration(),
+		)
+		require.NoError(t, err)
+
+		msg := "Hello World"
+		inv, err := debugEcho.Invoke(
+			agent,
+			service,
+			account.DID().String(),
+			debugEchoCaveats{Message: &msg},
+			delegation.WithProof(
+				delegation.FromDelegation(prf),
+				delegation.FromDelegation(session),
+			),
+			delegation.WithNoExpiration(),
+		)
+		require.NoError(t, err)
+
+		// authority is service, but attestation was issued by othersvc
+		context := NewValidationContext(
+			service.Verifier(),
+			debugEcho,
+			IsSelfIssued,
+			validateAuthOk,
+			ProofUnavailable,
+			parseEdPrincipal,
+			func(d did.DID) (did.DID, UnresolvedDID) {
+				if d == othersvc.DID() {
+					return othersvc.(signer.WrappedSigner).Unwrap().DID(), nil
+				}
+
+				return FailDIDKeyResolution(d)
+			},
+		)
+
+		a, x := Access(inv, context)
+		require.Nil(t, a)
+		require.Error(t, x)
+		require.Equal(t, x.Name(), "Unauthorized")
+		require.Contains(t, x.Error(), "Unable to resolve 'did:mailto:web.mail:alice'")
+	})
+
 	t.Run("resolve key", func(t *testing.T) {
 		accountDID := helpers.Must(did.Parse("did:mailto:web.mail:alice"))
 		account := helpers.Must(signer.Wrap(fixtures.Alice, accountDID))
