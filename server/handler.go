@@ -42,13 +42,8 @@ func Provide[C any, O ipld.Builder](capability validator.CapabilityParser[C], ha
 		}
 
 		if _, err := acceptedAudiences.Read(invocation.Audience().DID().String()); err != nil {
-			accepted := make([]string, 0, len(context.AlternativeAudiences())+1)
-			accepted = append(accepted, context.ID().DID().String())
-			for _, a := range context.AlternativeAudiences() {
-				accepted = append(accepted, a.DID().String())
-			}
-
-			audErr := NewInvalidAudienceError(invocation.Audience().DID().String(), accepted...)
+			expectedAudiences := append([]ucan.Principal{context.ID()}, context.AlternativeAudiences()...)
+			audErr := NewInvalidAudienceError(invocation.Audience(), expectedAudiences...)
 			return transaction.NewTransaction(result.Error[O, ipld.Builder](audErr)), nil
 		}
 
