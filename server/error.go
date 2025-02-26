@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/result/failure"
@@ -166,11 +167,17 @@ func NewInvocationCapabilityError(capabilities []ucan.Capability[any]) Invocatio
 }
 
 type InvalidAudienceError struct {
-	expected, actual string
+	expected []ucan.Principal
+	actual   ucan.Principal
 }
 
 func (i InvalidAudienceError) Error() string {
-	return fmt.Sprintf("Invalid audience: expected %s, got %s", i.expected, i.actual)
+	expectedStr := make([]string, 0, len(i.expected))
+	for _, e := range i.expected {
+		expectedStr = append(expectedStr, e.DID().String())
+	}
+
+	return fmt.Sprintf("Invalid audience: expected %s, got %s", strings.Join(expectedStr, " or "), i.actual.DID().String())
 }
 
 func (i InvalidAudienceError) Name() string {
@@ -187,6 +194,6 @@ func (i InvalidAudienceError) ToIPLD() (ipld.Node, error) {
 	return ipld.WrapWithRecovery(&mdl, sdm.InvalidAudienceErrorType())
 }
 
-func NewInvalidAudienceError(expected, actual string) InvalidAudienceError {
+func NewInvalidAudienceError(actual ucan.Principal, expected ...ucan.Principal) InvalidAudienceError {
 	return InvalidAudienceError{expected, actual}
 }

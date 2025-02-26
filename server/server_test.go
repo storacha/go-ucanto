@@ -325,6 +325,50 @@ func TestExecute(t *testing.T) {
 			require.Equal(t, *f.Name, "InvalidAudienceError")
 		})
 	})
+
+	t.Run("alternative audience", func(t *testing.T) {
+		uploadadd := validator.NewCapability(
+			"upload/add",
+			schema.DIDString(),
+			schema.Struct[uploadAddCaveats](uploadAddCaveatsType(), nil),
+			nil,
+		)
+
+		server := helpers.Must(NewServer(
+			fixtures.Service,
+			WithServiceMethod(
+				uploadadd.Can(),
+				Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
+					return uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}, nil, nil
+				}),
+			),
+			WithAlternativeAudiences(fixtures.Bob),
+		))
+
+		conn := helpers.Must(client.NewConnection(fixtures.Service, server))
+		rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
+		cap := uploadadd.New(fixtures.Alice.DID().String(), uploadAddCaveats{Root: rt})
+
+		// invocation audience different from the service, but an accepted alternative audience
+		invs := []invocation.Invocation{helpers.Must(invocation.Invoke(fixtures.Alice, fixtures.Bob, cap))}
+
+		resp, err := client.Execute(invs, conn)
+		require.NoError(t, err)
+
+		rcptlnk, ok := resp.Get(invs[0].Link())
+		require.True(t, ok, "missing receipt for invocation: %s", invs[0].Link())
+
+		reader := helpers.Must(receipt.NewReceiptReader[uploadAddSuccess, ipld.Node](rcptsch))
+		rcpt := helpers.Must(reader.Read(rcptlnk, resp.Blocks()))
+
+		result.MatchResultR0(rcpt.Out(), func(ok uploadAddSuccess) {
+			require.Equal(t, ok.Root, rt)
+			require.Equal(t, ok.Status, "done")
+		}, func(x ipld.Node) {
+			f := asFailure(t, x)
+			t.Fatalf("expected no error but got %s", *f.Name)
+		})
+	})
 }
 
 func TestHandle(t *testing.T) {
