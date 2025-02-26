@@ -7,6 +7,7 @@ import (
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/server/transaction"
 	"github.com/storacha/go-ucanto/transport"
+	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/go-ucanto/validator"
 )
 
@@ -22,6 +23,7 @@ type srvConfig struct {
 	parsePrincipal        validator.PrincipalParserFunc
 	resolveDIDKey         validator.PrincipalResolverFunc
 	authorityProofs       []delegation.Delegation
+	altAudiences          []ucan.Principal
 	catch                 ErrorHandlerFunc
 }
 
@@ -109,6 +111,15 @@ func WithPrincipalResolver(fn validator.PrincipalResolverFunc) Option {
 func WithAuthorityProofs(proofs ...delegation.Delegation) Option {
 	return func(cfg *srvConfig) error {
 		cfg.authorityProofs = proofs
+		return nil
+	}
+}
+
+// WithAlternativeAudiences configures a set of alternative audiences that will be assumed by the service.
+// Invocations targeted to the service itself or any of the alternative audiences will be accepted.
+func WithAlternativeAudiences(audiences ...ucan.Principal) Option {
+	return func(cfg *srvConfig) error {
+		cfg.altAudiences = audiences
 		return nil
 	}
 }

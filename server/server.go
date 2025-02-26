@@ -36,6 +36,9 @@ type InvocationContext interface {
 	validator.AuthorityProver
 	// ID is the DID of the service the invocation was sent to.
 	ID() principal.Signer
+
+	// AlternativeAudiences are other audiences the service will accept for invocations.
+	AlternativeAudiences() []ucan.Principal
 }
 
 // ServiceMethod is an invocation handler.
@@ -119,7 +122,7 @@ func NewServer(id principal.Signer, options ...Option) (ServerView, error) {
 		resolveDIDKey = validator.FailDIDKeyResolution
 	}
 
-	ctx := context{id, canIssue, validateAuthorization, resolveProof, parsePrincipal, resolveDIDKey, cfg.authorityProofs}
+	ctx := context{id, canIssue, validateAuthorization, resolveProof, parsePrincipal, resolveDIDKey, cfg.authorityProofs, cfg.altAudiences}
 	svr := &server{id, cfg.service, ctx, codec, catch}
 	return svr, nil
 }
@@ -137,6 +140,7 @@ type context struct {
 	parsePrincipal        validator.PrincipalParserFunc
 	resolveDIDKey         validator.PrincipalResolverFunc
 	authorityProofs       []delegation.Delegation
+	altAudiences          []ucan.Principal
 }
 
 func (ctx context) ID() principal.Signer {
@@ -165,6 +169,10 @@ func (ctx context) ResolveDIDKey(did did.DID) (did.DID, validator.UnresolvedDID)
 
 func (ctx context) AuthorityProofs() []delegation.Delegation {
 	return ctx.authorityProofs
+}
+
+func (ctx context) AlternativeAudiences() []ucan.Principal {
+	return ctx.altAudiences
 }
 
 type server struct {

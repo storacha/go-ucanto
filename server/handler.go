@@ -30,10 +30,25 @@ func Provide[C any, O ipld.Builder](capability validator.CapabilityParser[C], ha
 			context.AuthorityProofs()...,
 		)
 
-		// confirm the audience of the invocation is this service
-		thisService := schema.Literal(context.ID().DID().String())
-		if _, err := thisService.Read(invocation.Audience().DID().String()); err != nil {
-			audErr := NewInvalidAudienceError(context.ID().DID().String(), invocation.Audience().DID().String())
+		// confirm the audience of the invocation is this service or any of the configured alternative audiences
+		acceptedAudiences := schema.Literal(context.ID().DID().String())
+		if len(context.AlternativeAudiences()) > 0 {
+			altAudiences := make([]schema.Reader[string, string], 0, len(context.AlternativeAudiences()))
+			for _, a := range context.AlternativeAudiences() {
+				altAudiences = append(altAudiences, schema.Literal(a.DID().String()))
+			}
+
+			acceptedAudiences = schema.Or(append(altAudiences, acceptedAudiences)...)
+		}
+
+		if _, err := acceptedAudiences.Read(invocation.Audience().DID().String()); err != nil {
+			accepted := make([]string, 0, len(context.AlternativeAudiences())+1)
+			accepted = append(accepted, context.ID().DID().String())
+			for _, a := range context.AlternativeAudiences() {
+				accepted = append(accepted, a.DID().String())
+			}
+
+			audErr := NewInvalidAudienceError(invocation.Audience().DID().String(), accepted...)
 			return transaction.NewTransaction(result.Error[O, ipld.Builder](audErr)), nil
 		}
 
