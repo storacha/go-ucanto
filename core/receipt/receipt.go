@@ -197,6 +197,11 @@ func NewReceiptReader[O, X any](resultschema []byte, opts ...bindnode.Option) (R
 	return &receiptReader[O, X]{typ, opts}, nil
 }
 
+func NewAnyReceiptReader(opts ...bindnode.Option) (ReceiptReader[ipld.Node, ipld.Node], error) {
+	anyReceiptType := rdm.TypeSystem().TypeByName("Receipt")
+	return &receiptReader[ipld.Node, ipld.Node]{anyReceiptType, opts}, nil
+}
+
 func NewReceiptReaderFromTypes[O, X any](successType schema.Type, errType schema.Type, opts ...bindnode.Option) (ReceiptReader[O, X], error) {
 	typ, err := rdm.NewReceiptModelFromTypes(successType, errType)
 	if err != nil {
