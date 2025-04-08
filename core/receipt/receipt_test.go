@@ -1,9 +1,12 @@
 package receipt
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
+	ipldprime "github.com/ipld/go-ipld-prime"
+	"github.com/ipld/go-ipld-prime/schema"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/invocation/ran"
 	"github.com/storacha/go-ucanto/core/ipld"
@@ -82,4 +85,67 @@ func TestEffects(t *testing.T) {
 		_, ok := effects.Join().Invocation()
 		require.True(t, ok)
 	})
+}
+
+var someTS = mustLoadTS()
+
+func mustLoadTS() *schema.TypeSystem {
+	someSchema := []byte(`
+		type someOkType struct {
+			someOkProperty String
+		}
+
+		type someErrorType struct {
+			someErrorProperty String
+		}
+	`)
+	ts, err := ipldprime.LoadSchemaBytes(someSchema)
+	if err != nil {
+		panic(fmt.Errorf("loading some schema: %w", err))
+	}
+
+	return ts
+}
+
+type someOkType struct {
+	SomeOkProperty string
+}
+
+func (s someOkType) ToIPLD() (ipld.Node, error) {
+	return ipld.WrapWithRecovery(&s, someTS.TypeByName("someOkType"))
+}
+
+type someErrorType struct {
+	SomeErrorProperty string
+}
+
+func (s someErrorType) ToIPLD() (ipld.Node, error) {
+	return ipld.WrapWithRecovery(&s, someTS.TypeByName("someErrorType"))
+}
+
+func TestAnyReceiptReader(t *testing.T) {
+	ranInv, err := invocation.Invoke(
+		fixtures.Alice,
+		fixtures.Bob,
+		ucan.NewCapability("ran/invoke", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+	)
+	require.NoError(t, err)
+	ran := ran.FromInvocation(ranInv)
+
+	out := result.Ok[someOkType, someErrorType](someOkType{SomeOkProperty: "some ok value"})
+
+	issuedRcpt, err := Issue(fixtures.Alice, out, ran)
+	require.NoError(t, err)
+
+	reader := NewAnyReceiptReader()
+	var anyRcpt AnyReceipt
+	anyRcpt, err = reader.Read(issuedRcpt.Root().Link(), issuedRcpt.Blocks())
+	require.NoError(t, err)
+
+	concreteRcpt, err := Rebind[*someOkType, *someErrorType](anyRcpt, someTS.TypeByName("someOkType"), someTS.TypeByName("someErrorType"))
+	require.NoError(t, err)
+
+	someOk, someErr := result.Unwrap(concreteRcpt.Out())
+	require.Equal(t, "some ok value", someOk.SomeOkProperty)
+	require.Nil(t, someErr)
 }

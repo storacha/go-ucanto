@@ -42,9 +42,9 @@ type Receipt[O, X any] interface {
 
 func toResultModel[O, X any](res result.Result[O, X]) rdm.ResultModel[O, X] {
 	return result.MatchResultR1(res, func(ok O) rdm.ResultModel[O, X] {
-		return rdm.ResultModel[O, X]{Ok: &ok, Err: nil}
+		return rdm.ResultModel[O, X]{Ok: &ok, Error: nil}
 	}, func(err X) rdm.ResultModel[O, X] {
-		return rdm.ResultModel[O, X]{Ok: nil, Err: &err}
+		return rdm.ResultModel[O, X]{Ok: nil, Error: &err}
 	})
 }
 
@@ -52,7 +52,7 @@ func fromResultModel[O, X any](resultModel rdm.ResultModel[O, X]) result.Result[
 	if resultModel.Ok != nil {
 		return result.Ok[O, X](*resultModel.Ok)
 	}
-	return result.Error[O, X](*resultModel.Err)
+	return result.Error[O, X](*resultModel.Error)
 }
 
 type receipt[O, X any] struct {
@@ -195,6 +195,11 @@ func NewReceiptReader[O, X any](resultschema []byte, opts ...bindnode.Option) (R
 		return nil, fmt.Errorf("loading receipt data model: %s", err)
 	}
 	return &receiptReader[O, X]{typ, opts}, nil
+}
+
+func NewAnyReceiptReader(opts ...bindnode.Option) ReceiptReader[ipld.Node, ipld.Node] {
+	anyReceiptType := rdm.TypeSystem().TypeByName("Receipt")
+	return &receiptReader[ipld.Node, ipld.Node]{anyReceiptType, opts}
 }
 
 func NewReceiptReaderFromTypes[O, X any](successType schema.Type, errType schema.Type, opts ...bindnode.Option) (ReceiptReader[O, X], error) {
