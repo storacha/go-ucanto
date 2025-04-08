@@ -57,7 +57,7 @@ func TestEncodeDecode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decoding receipt: %s", err)
 	}
-	if r1.Ocm.Out.Err != nil {
+	if r1.Ocm.Out.Error != nil {
 		t.Fatalf("result err was not nil")
 	}
 	if r1.Ocm.Out.Ok.Status != "done" {
@@ -68,7 +68,7 @@ func TestEncodeDecode(t *testing.T) {
 		Ocm: rdm.OutcomeModel[resultOk, resultErr]{
 			Ran: l,
 			Out: rdm.ResultModel[resultOk, resultErr]{
-				Err: &resultErr{Message: "boom"},
+				Error: &resultErr{Message: "boom"},
 			},
 		},
 	}
@@ -84,7 +84,7 @@ func TestEncodeDecode(t *testing.T) {
 	if r3.Ocm.Out.Ok != nil {
 		t.Fatalf("result ok was not nil")
 	}
-	if r3.Ocm.Out.Err.Message != "boom" {
+	if r3.Ocm.Out.Error.Message != "boom" {
 		t.Fatalf("error message was not boom")
 	}
 }
@@ -126,7 +126,7 @@ func TestEncodeDecoderFromTypes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decoding receipt: %s", err)
 	}
-	if r1.Ocm.Out.Err != nil {
+	if r1.Ocm.Out.Error != nil {
 		t.Fatalf("result err was not nil")
 	}
 	if r1.Ocm.Out.Ok.Status != "done" {
@@ -137,7 +137,7 @@ func TestEncodeDecoderFromTypes(t *testing.T) {
 		Ocm: rdm.OutcomeModel[resultOk, resultErr]{
 			Ran: l,
 			Out: rdm.ResultModel[resultOk, resultErr]{
-				Err: &resultErr{Message: "boom"},
+				Error: &resultErr{Message: "boom"},
 			},
 		},
 	}
@@ -153,7 +153,7 @@ func TestEncodeDecoderFromTypes(t *testing.T) {
 	if r3.Ocm.Out.Ok != nil {
 		t.Fatalf("result ok was not nil")
 	}
-	if r3.Ocm.Out.Err.Message != "boom" {
+	if r3.Ocm.Out.Error.Message != "boom" {
 		t.Fatalf("error message was not boom")
 	}
 }

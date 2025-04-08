@@ -1,7 +1,4 @@
-type Result union {
-  | Success "ok"
-  | Error   "error"
-} representation keyed
-
-type Success any
-type Error any
+type Result struct {
+	ok optional Any
+	error optional Any
+}
