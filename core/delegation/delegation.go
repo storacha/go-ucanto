@@ -159,13 +159,16 @@ func Archive(d Delegation) io.Reader {
 		return reader
 	}
 	// Create a new reader that contains the new block as well as the others.
-	blks, err := blockstore.NewBlockReader(
-		blockstore.WithBlocks([]ipld.Block{variant}),
-		blockstore.WithBlocksIterator(d.Blocks()),
-	)
+	blks, err := blockstore.NewBlockStore(blockstore.WithBlocksIterator(d.Blocks()))
 	if err != nil {
 		reader, _ := io.Pipe()
 		reader.CloseWithError(fmt.Errorf("creating new block reader: %s", err))
+		return reader
+	}
+	err = blks.Put(variant)
+	if err != nil {
+		reader, _ := io.Pipe()
+		reader.CloseWithError(fmt.Errorf("adding variant block: %s", err))
 		return reader
 	}
 	return car.Encode([]ipld.Link{variant.Link()}, blks.Iterator())
