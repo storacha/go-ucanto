@@ -8,18 +8,23 @@ import (
 
 // Result is a golang compatible generic result type
 type Result[O any, X any] interface {
-	isResult(ok O, err X)
+	Ok() *O
+	Err() *X
 }
 
 type okResult[O any, X any] struct {
 	value O
 }
+
+func (o *okResult[O, X]) Ok() *O  { return &o.value }
+func (o *okResult[O, X]) Err() *X { return nil }
+
 type errResult[O any, X any] struct {
 	value X
 }
 
-func (o *okResult[O, X]) isResult(ok O, err X)  {}
-func (e *errResult[O, X]) isResult(ok O, err X) {}
+func (e *errResult[O, X]) Ok() *O  { return nil }
+func (e *errResult[O, X]) Err() *X { return &e.value }
 
 // MatchResultR3 handles a result with functions returning 3 values
 func MatchResultR3[O any, X any, R0, R1, R2 any](
