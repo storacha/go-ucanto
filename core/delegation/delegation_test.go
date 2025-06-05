@@ -28,7 +28,11 @@ func TestExport(t *testing.T) {
 		[]ucan.Capability[ucan.NoCaveats]{
 			ucan.NewCapability("test/proof", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
 		},
-		WithProof(FromDelegation(prf)),
+		WithProof(
+			FromDelegation(prf),
+			// include an absent proof to prove things don't break - PUN INTENDED
+			FromLink(helpers.RandomCID()),
+		),
 	)
 	require.NoError(t, err)
 
