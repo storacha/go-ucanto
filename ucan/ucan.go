@@ -43,7 +43,7 @@ type Link = ipld.Link
 // It MUST have format `${number}.${number}.${number}`
 type Version = string
 
-// UTCUnixTimestamp is a timestamp in milliseconds since the Unix epoch.
+// UTCUnixTimestamp is a timestamp in seconds since the Unix epoch.
 type UTCUnixTimestamp = int
 
 // https://github.com/ucan-wg/spec/#324-nonce
