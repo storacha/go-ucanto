@@ -61,7 +61,7 @@ func (d *delegation) Link() ucan.Link {
 }
 
 func (d *delegation) Blocks() iter.Seq2[ipld.Block, error] {
-	return Export(d.Root(), d.blks, d.atchblks)
+	return export(d.ucan, d.rt, d.blks, d.atchblks)
 }
 
 func (d *delegation) Archive() io.Reader {
@@ -113,7 +113,7 @@ func (d *delegation) Attach(b block.Block) error {
 }
 
 func NewDelegation(root ipld.Block, bs blockstore.BlockReader) (Delegation, error) {
-	ucan, err := Decode(root)
+	ucan, err := decode(root)
 	if err != nil {
 		return nil, fmt.Errorf("decoding UCAN: %s", err)
 	}
@@ -135,18 +135,12 @@ func NewDelegationView(root ipld.Link, bs blockstore.BlockReader) (Delegation, e
 	return NewDelegation(blk, bs)
 }
 
-// Export the blocks that comprise the delegation, including all extra attached
+// export the blocks that comprise the delegation, including all extra attached
 // blocks.
-func Export(rt ipld.Block, blks blockstore.BlockReader, atchblks blockstore.BlockReader) iter.Seq2[ipld.Block, error] {
+func export(rt ucan.View, rtblk ipld.Block, blks blockstore.BlockReader, atchblks blockstore.BlockReader) iter.Seq2[ipld.Block, error] {
 	return func(yield func(ipld.Block, error) bool) {
-		ucan, err := Decode(rt)
-		if err != nil {
-			yield(nil, err)
-			return
-		}
-
-		for _, p := range ucan.Proofs() {
-			proofrt, ok, err := blks.Get(p)
+		for _, p := range rt.Proofs() {
+			proofblk, ok, err := blks.Get(p)
 			if err != nil {
 				yield(nil, err)
 				return
@@ -154,7 +148,12 @@ func Export(rt ipld.Block, blks blockstore.BlockReader, atchblks blockstore.Bloc
 			if !ok {
 				continue
 			}
-			for b, err := range Export(proofrt, blks, nil) {
+			prf, err := decode(proofblk)
+			if err != nil {
+				yield(nil, err)
+				return
+			}
+			for b, err := range export(prf, proofblk, blks, nil) {
 				if !yield(b, err) {
 					return
 				}
@@ -175,11 +174,11 @@ func Export(rt ipld.Block, blks blockstore.BlockReader, atchblks blockstore.Bloc
 			}
 		}
 
-		yield(rt, nil)
+		yield(rtblk, nil)
 	}
 }
 
-func Decode(root ipld.Block) (ucan.View, error) {
+func decode(root ipld.Block) (ucan.View, error) {
 	data := udm.UCANModel{}
 	err := block.Decode(root, &data, udm.Type(), cbor.Codec, sha256.Hasher)
 	if err != nil {

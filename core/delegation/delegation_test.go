@@ -61,7 +61,7 @@ func TestExport(t *testing.T) {
 
 	var exblks []ipld.Block
 	// export the delegation from the blockstore
-	for b, err := range Export(dlg.Root(), bs, nil) {
+	for b, err := range export(dlg.Data(), dlg.Root(), bs, nil) {
 		require.NoError(t, err)
 		exblks = append(exblks, b)
 	}
