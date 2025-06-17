@@ -31,7 +31,7 @@ var pubKeyOffset = privateTagSize + keySize
 func Generate() (principal.Signer, error) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		return nil, fmt.Errorf("generating Ed25519 key: %s", err)
+		return nil, fmt.Errorf("generating Ed25519 key: %w", err)
 	}
 	s := make(Ed25519Signer, size)
 	varint.PutUvarint(s, Code)
@@ -44,7 +44,7 @@ func Generate() (principal.Signer, error) {
 func Parse(str string) (principal.Signer, error) {
 	_, bytes, err := multibase.Decode(str)
 	if err != nil {
-		return nil, fmt.Errorf("decoding multibase string: %s", err)
+		return nil, fmt.Errorf("decoding multibase string: %w", err)
 	}
 	return Decode(bytes)
 }
@@ -60,7 +60,7 @@ func Decode(b []byte) (principal.Signer, error) {
 
 	prc, err := varint.ReadUvarint(bytes.NewReader(b))
 	if err != nil {
-		return nil, fmt.Errorf("reading private key codec: %s", err)
+		return nil, fmt.Errorf("reading private key codec: %w", err)
 	}
 	if prc != Code {
 		return nil, fmt.Errorf("invalid private key codec: %d", prc)
@@ -68,7 +68,7 @@ func Decode(b []byte) (principal.Signer, error) {
 
 	puc, err := varint.ReadUvarint(bytes.NewReader(b[pubKeyOffset:]))
 	if err != nil {
-		return nil, fmt.Errorf("reading public key codec: %s", err)
+		return nil, fmt.Errorf("reading public key codec: %w", err)
 	}
 	if puc != verifier.Code {
 		return nil, fmt.Errorf("invalid public key codec: %d", prc)
@@ -76,7 +76,7 @@ func Decode(b []byte) (principal.Signer, error) {
 
 	_, err = verifier.Decode(b[pubKeyOffset:])
 	if err != nil {
-		return nil, fmt.Errorf("decoding public key: %s", err)
+		return nil, fmt.Errorf("decoding public key: %w", err)
 	}
 
 	s := make(Ed25519Signer, size)

@@ -151,7 +151,7 @@ func (r *receipt[O, X]) Signature() signature.SignatureView {
 func NewReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, typ schema.Type, opts ...bindnode.Option) (Receipt[O, X], error) {
 	rblock, ok, err := blocks.Get(root)
 	if err != nil {
-		return nil, fmt.Errorf("getting receipt root block: %s", err)
+		return nil, fmt.Errorf("getting receipt root block: %w", err)
 	}
 	if !ok {
 		return nil, fmt.Errorf("missing receipt root block: %s", root)
@@ -160,7 +160,7 @@ func NewReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, typ sch
 	rmdl := rdm.ReceiptModel[O, X]{}
 	err = block.Decode(rblock, &rmdl, typ, cbor.Codec, sha256.Hasher, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("decoding receipt: %s", err)
+		return nil, fmt.Errorf("decoding receipt: %w", err)
 	}
 
 	rcpt := receipt[O, X]{
@@ -184,7 +184,7 @@ type receiptReader[O, X any] struct {
 func (rr *receiptReader[O, X]) Read(rcpt ipld.Link, blks iter.Seq2[block.Block, error]) (Receipt[O, X], error) {
 	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(blks))
 	if err != nil {
-		return nil, fmt.Errorf("creating block reader: %s", err)
+		return nil, fmt.Errorf("creating block reader: %w", err)
 	}
 	return NewReceipt[O, X](rcpt, br, rr.typ, rr.opts...)
 }
@@ -192,7 +192,7 @@ func (rr *receiptReader[O, X]) Read(rcpt ipld.Link, blks iter.Seq2[block.Block, 
 func NewReceiptReader[O, X any](resultschema []byte, opts ...bindnode.Option) (ReceiptReader[O, X], error) {
 	typ, err := rdm.NewReceiptModelType(resultschema)
 	if err != nil {
-		return nil, fmt.Errorf("loading receipt data model: %s", err)
+		return nil, fmt.Errorf("loading receipt data model: %w", err)
 	}
 	return &receiptReader[O, X]{typ, opts}, nil
 }
@@ -205,7 +205,7 @@ func NewAnyReceiptReader(opts ...bindnode.Option) ReceiptReader[ipld.Node, ipld.
 func NewReceiptReaderFromTypes[O, X any](successType schema.Type, errType schema.Type, opts ...bindnode.Option) (ReceiptReader[O, X], error) {
 	typ, err := rdm.NewReceiptModelFromTypes(successType, errType)
 	if err != nil {
-		return nil, fmt.Errorf("loading receipt data model: %s", err)
+		return nil, fmt.Errorf("loading receipt data model: %w", err)
 	}
 	return &receiptReader[O, X]{typ, opts}, nil
 }
@@ -357,12 +357,12 @@ func Issue[O, X ipld.Builder](issuer ucan.Signer, out result.Result[O, X], ran r
 
 	rt, err := block.Encode(&receiptModel, rdm.TypeSystem().TypeByName("Receipt"), cbor.Codec, sha256.Hasher)
 	if err != nil {
-		return nil, fmt.Errorf("encoding receipt: %s", err)
+		return nil, fmt.Errorf("encoding receipt: %w", err)
 	}
 
 	err = bs.Put(rt)
 	if err != nil {
-		return nil, fmt.Errorf("adding receipt root to store: %s", err)
+		return nil, fmt.Errorf("adding receipt root to store: %w", err)
 	}
 
 	return &receipt[ipld.Node, ipld.Node]{

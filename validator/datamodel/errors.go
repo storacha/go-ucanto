@@ -19,7 +19,7 @@ var (
 func init() {
 	ts, err := ipld.LoadSchemaBytes(errorsch)
 	if err != nil {
-		panic(fmt.Errorf("failed to load IPLD schema: %s", err))
+		panic(fmt.Errorf("failed to load IPLD schema: %w", err))
 	}
 	errorTypeSystem = ts
 }

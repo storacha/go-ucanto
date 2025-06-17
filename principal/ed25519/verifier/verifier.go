@@ -27,7 +27,7 @@ var size = publicTagSize + keySize
 func Parse(str string) (principal.Verifier, error) {
 	did, err := did.Parse(str)
 	if err != nil {
-		return nil, fmt.Errorf("parsing DID: %s", err)
+		return nil, fmt.Errorf("parsing DID: %w", err)
 	}
 	return Decode(did.Bytes())
 }
@@ -39,7 +39,7 @@ func Decode(b []byte) (principal.Verifier, error) {
 
 	prc, err := varint.ReadUvarint(bytes.NewReader(b))
 	if err != nil {
-		return nil, fmt.Errorf("reading public key codec: %s", err)
+		return nil, fmt.Errorf("reading public key codec: %w", err)
 	}
 	if prc != Code {
 		return nil, fmt.Errorf("invalid public key codec: %d", prc)
@@ -47,7 +47,7 @@ func Decode(b []byte) (principal.Verifier, error) {
 
 	puc, err := varint.ReadUvarint(bytes.NewReader(b))
 	if err != nil {
-		return nil, fmt.Errorf("reading public key codec: %s", err)
+		return nil, fmt.Errorf("reading public key codec: %w", err)
 	}
 	if puc != Code {
 		return nil, fmt.Errorf("invalid public key codec: %d", prc)

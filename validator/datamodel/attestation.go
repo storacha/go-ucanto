@@ -16,7 +16,7 @@ var attestationTypeSystem *schema.TypeSystem
 func init() {
 	ts, err := ipld.LoadSchemaBytes(attestationsch)
 	if err != nil {
-		panic(fmt.Errorf("failed to load IPLD schema: %s", err))
+		panic(fmt.Errorf("failed to load IPLD schema: %w", err))
 	}
 	attestationTypeSystem = ts
 }

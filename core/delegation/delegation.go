@@ -115,7 +115,7 @@ func (d *delegation) Attach(b block.Block) error {
 func NewDelegation(root ipld.Block, bs blockstore.BlockReader) (Delegation, error) {
 	ucan, err := decode(root)
 	if err != nil {
-		return nil, fmt.Errorf("decoding UCAN: %s", err)
+		return nil, fmt.Errorf("decoding UCAN: %w", err)
 	}
 	attachments, err := blockstore.NewBlockStore()
 	if err != nil {
@@ -127,7 +127,7 @@ func NewDelegation(root ipld.Block, bs blockstore.BlockReader) (Delegation, erro
 func NewDelegationView(root ipld.Link, bs blockstore.BlockReader) (Delegation, error) {
 	blk, ok, err := bs.Get(root)
 	if err != nil {
-		return nil, fmt.Errorf("getting delegation root block: %s", err)
+		return nil, fmt.Errorf("getting delegation root block: %w", err)
 	}
 	if !ok {
 		return nil, fmt.Errorf("missing delegation root block: %s", root)
@@ -201,20 +201,20 @@ func Archive(d Delegation) io.Reader {
 	)
 	if err != nil {
 		reader, _ := io.Pipe()
-		reader.CloseWithError(fmt.Errorf("hashing variant block bytes: %s", err))
+		reader.CloseWithError(fmt.Errorf("hashing variant block bytes: %w", err))
 		return reader
 	}
 	// Create a new reader that contains the new block as well as the others.
 	blks, err := blockstore.NewBlockStore(blockstore.WithBlocksIterator(d.Blocks()))
 	if err != nil {
 		reader, _ := io.Pipe()
-		reader.CloseWithError(fmt.Errorf("creating new block reader: %s", err))
+		reader.CloseWithError(fmt.Errorf("creating new block reader: %w", err))
 		return reader
 	}
 	err = blks.Put(variant)
 	if err != nil {
 		reader, _ := io.Pipe()
-		reader.CloseWithError(fmt.Errorf("adding variant block: %s", err))
+		reader.CloseWithError(fmt.Errorf("adding variant block: %w", err))
 		return reader
 	}
 	return car.Encode([]ipld.Link{variant.Link()}, blks.Iterator())
@@ -234,15 +234,15 @@ func Extract(b []byte) (Delegation, error) {
 
 	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(blks))
 	if err != nil {
-		return nil, fmt.Errorf("creating block reader: %s", err)
+		return nil, fmt.Errorf("creating block reader: %w", err)
 	}
 
 	rt, ok, err := br.Get(roots[0])
 	if err != nil {
-		return nil, fmt.Errorf("getting root block: %s", err)
+		return nil, fmt.Errorf("getting root block: %w", err)
 	}
 	if !ok {
-		return nil, fmt.Errorf("missing root block: %d", len(roots))
+		return nil, fmt.Errorf("missing root block: %s", roots[0])
 	}
 
 	model := adm.ArchiveModel{}
@@ -254,7 +254,7 @@ func Extract(b []byte) (Delegation, error) {
 		sha256.Hasher,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("decoding root block: %s", err)
+		return nil, fmt.Errorf("decoding root block: %w", err)
 	}
 
 	return NewDelegationView(model.Ucan0_9_1, br)
