@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/ipld"
@@ -29,8 +31,8 @@ type srvConfig struct {
 
 func WithServiceMethod[O ipld.Builder](can string, handleFunc ServiceMethod[O]) Option {
 	return func(cfg *srvConfig) error {
-		cfg.service[can] = func(input invocation.Invocation, context InvocationContext) (transaction.Transaction[ipld.Builder, ipld.Builder], error) {
-			tx, err := handleFunc(input, context)
+		cfg.service[can] = func(ctx context.Context, input invocation.Invocation, invCtx InvocationContext) (transaction.Transaction[ipld.Builder, ipld.Builder], error) {
+			tx, err := handleFunc(ctx, input, invCtx)
 			if err != nil {
 				return nil, err
 			}

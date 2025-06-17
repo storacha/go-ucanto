@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -80,7 +81,7 @@ var storeAdd = NewCapability(
 )
 
 var testLink = cidlink.Link{Cid: cid.MustParse("bafkqaaa")}
-var validateAuthOk = func(auth Authorization[any]) Revoked { return nil }
+var validateAuthOk = func(ctx context.Context, auth Authorization[any]) Revoked { return nil }
 var parseEdPrincipal = func(str string) (principal.Verifier, error) {
 	return verifier.Parse(str)
 }
@@ -96,7 +97,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -106,7 +107,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.NoError(t, x)
 			require.Equal(t, storeAdd.Can(), a.Capability().Can())
 			require.Equal(t, fixtures.Alice.DID().String(), a.Capability().With())
@@ -132,7 +133,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -142,7 +143,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.NoError(t, x)
 			require.Equal(t, storeAdd.Can(), a.Capability().Can())
 			require.Equal(t, fixtures.Alice.DID().String(), a.Capability().With())
@@ -177,7 +178,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -187,7 +188,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.NoError(t, x)
 			require.Equal(t, storeAdd.Can(), a.Capability().Can())
 			require.Equal(t, fixtures.Alice.DID().String(), a.Capability().With())
@@ -223,12 +224,12 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
 				validateAuthOk,
-				func(p ucan.Link) (delegation.Delegation, UnavailableProof) {
+				func(ctx context.Context, p ucan.Link) (delegation.Delegation, UnavailableProof) {
 					if p == dlg.Link() {
 						return dlg, nil
 					}
@@ -238,7 +239,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.NoError(t, x)
 			require.Equal(t, storeAdd.Can(), a.Capability().Can())
 			require.Equal(t, fixtures.Alice.DID().String(), a.Capability().With())
@@ -264,7 +265,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -274,7 +275,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -296,7 +297,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -306,7 +307,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -328,7 +329,7 @@ func TestAccess(t *testing.T) {
 
 			inv.Data().Model().S = fixtures.Bob.Sign(inv.Root().Bytes()).Bytes()
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -338,7 +339,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -361,7 +362,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -371,7 +372,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -395,7 +396,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -405,7 +406,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -438,7 +439,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -448,7 +449,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -482,7 +483,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -492,7 +493,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -545,7 +546,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -555,7 +556,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -588,7 +589,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -598,7 +599,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -632,7 +633,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -642,7 +643,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -675,7 +676,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -685,7 +686,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -718,7 +719,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -728,7 +729,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -761,7 +762,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -771,7 +772,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -813,7 +814,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -824,7 +825,7 @@ func TestAccess(t *testing.T) {
 			)
 
 			cstr := fmt.Sprintf(`{"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}}`, storeAdd.Can(), fixtures.Service.DID(), testLink)
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -860,7 +861,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -871,7 +872,7 @@ func TestAccess(t *testing.T) {
 			)
 
 			cstr := fmt.Sprintf(`{"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}}`, storeAdd.Can(), fixtures.Alice.DID(), testLink)
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -906,7 +907,7 @@ func TestAccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewValidationContext(
+			vctx := NewValidationContext(
 				fixtures.Service.Verifier(),
 				storeAdd,
 				IsSelfIssued,
@@ -917,7 +918,7 @@ func TestAccess(t *testing.T) {
 			)
 
 			cstr := fmt.Sprintf(`{"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}}`, storeAdd.Can(), space.DID(), testLink)
-			a, x := Access(inv, context)
+			a, x := Access(context.Background(), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -943,7 +944,7 @@ func TestClaim(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		context := NewValidationContext(
+		vctx := NewValidationContext(
 			fixtures.Service.Verifier(),
 			storeAdd,
 			IsSelfIssued,
@@ -953,7 +954,7 @@ func TestClaim(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Claim(storeAdd, []delegation.Proof{delegation.FromLink(dlg.Link())}, context)
+		a, x := Claim(context.Background(), storeAdd, []delegation.Proof{delegation.FromLink(dlg.Link())}, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 		require.Equal(t, x.Name(), "Unauthorized")
@@ -983,7 +984,7 @@ func TestClaim(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		context := NewValidationContext(
+		vctx := NewValidationContext(
 			new.Verifier(),
 			storeAdd,
 			IsSelfIssued,
@@ -993,7 +994,7 @@ func TestClaim(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Claim(storeAdd, []delegation.Proof{delegation.FromDelegation(dlg)}, context)
+		a, x := Claim(context.Background(), storeAdd, []delegation.Proof{delegation.FromDelegation(dlg)}, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 		require.Equal(t, x.Name(), "Unauthorized")

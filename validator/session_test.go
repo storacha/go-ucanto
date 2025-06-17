@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"strings"
@@ -127,7 +128,7 @@ func TestSession(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		context := NewValidationContext(
+		vctx := NewValidationContext(
 			service.Verifier(),
 			debugEcho,
 			IsSelfIssued,
@@ -137,7 +138,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(inv, context)
+		a, x := Access(context.Background(), inv, vctx)
 		require.NoError(t, x)
 		require.Equal(t, debugEcho.Can(), a.Capability().Can())
 		require.Equal(t, account.DID().String(), a.Capability().With())
@@ -191,24 +192,24 @@ func TestSession(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		context := NewValidationContext(
+		vctx := NewValidationContext(
 			service.Verifier(),
 			debugEcho,
 			IsSelfIssued,
 			validateAuthOk,
 			ProofUnavailable,
 			parseEdPrincipal,
-			func(d did.DID) (did.DID, UnresolvedDID) {
+			func(ctx context.Context, d did.DID) (did.DID, UnresolvedDID) {
 				if d == othersvc.DID() {
 					return othersvc.(signer.WrappedSigner).Unwrap().DID(), nil
 				}
 
-				return FailDIDKeyResolution(d)
+				return FailDIDKeyResolution(ctx, d)
 			},
 			auth,
 		)
 
-		a, x := Access(inv, context)
+		a, x := Access(context.Background(), inv, vctx)
 		require.NoError(t, x)
 		require.Equal(t, debugEcho.Can(), a.Capability().Can())
 		require.Equal(t, account.DID().String(), a.Capability().With())
@@ -286,7 +287,7 @@ func TestSession(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		context := NewValidationContext(
+		vctx := NewValidationContext(
 			service.Verifier(),
 			debugEcho,
 			IsSelfIssued,
@@ -296,7 +297,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(inv, context)
+		a, x := Access(context.Background(), inv, vctx)
 		require.NoError(t, x)
 		require.Equal(t, debugEcho.Can(), a.Capability().Can())
 		require.Equal(t, account.DID().String(), a.Capability().With())
@@ -316,7 +317,7 @@ func TestSession(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		context := NewValidationContext(
+		vctx := NewValidationContext(
 			service.Verifier(),
 			debugEcho,
 			IsSelfIssued,
@@ -326,7 +327,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(inv, context)
+		a, x := Access(context.Background(), inv, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 		require.Equal(t, x.Name(), "Unauthorized")
@@ -361,7 +362,7 @@ func TestSession(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		context := NewValidationContext(
+		vctx := NewValidationContext(
 			service.Verifier(),
 			debugEcho,
 			IsSelfIssued,
@@ -371,7 +372,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(inv, context)
+		a, x := Access(context.Background(), inv, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 		require.Equal(t, x.Name(), "Unauthorized")
@@ -429,7 +430,7 @@ func TestSession(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		context := NewValidationContext(
+		vctx := NewValidationContext(
 			service.Verifier(),
 			debugEcho,
 			IsSelfIssued,
@@ -439,7 +440,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(inv, context)
+		a, x := Access(context.Background(), inv, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 		require.Equal(t, x.Name(), "Unauthorized")
@@ -485,23 +486,23 @@ func TestSession(t *testing.T) {
 		require.NoError(t, err)
 
 		// authority is service, but attestation was issued by othersvc
-		context := NewValidationContext(
+		vctx := NewValidationContext(
 			service.Verifier(),
 			debugEcho,
 			IsSelfIssued,
 			validateAuthOk,
 			ProofUnavailable,
 			parseEdPrincipal,
-			func(d did.DID) (did.DID, UnresolvedDID) {
+			func(ctx context.Context, d did.DID) (did.DID, UnresolvedDID) {
 				if d == othersvc.DID() {
 					return othersvc.(signer.WrappedSigner).Unwrap().DID(), nil
 				}
 
-				return FailDIDKeyResolution(d)
+				return FailDIDKeyResolution(ctx, d)
 			},
 		)
 
-		a, x := Access(inv, context)
+		a, x := Access(context.Background(), inv, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 		require.Equal(t, x.Name(), "Unauthorized")
@@ -522,19 +523,19 @@ func TestSession(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		context := NewValidationContext(
+		vctx := NewValidationContext(
 			service.Verifier(),
 			debugEcho,
 			IsSelfIssued,
 			validateAuthOk,
 			ProofUnavailable,
 			parseEdPrincipal,
-			func(d did.DID) (did.DID, UnresolvedDID) {
+			func(ctx context.Context, d did.DID) (did.DID, UnresolvedDID) {
 				return fixtures.Alice.DID(), nil
 			},
 		)
 
-		a, x := Access(inv, context)
+		a, x := Access(context.Background(), inv, vctx)
 		require.NoError(t, x)
 		require.Equal(t, debugEcho.Can(), a.Capability().Can())
 		require.Equal(t, account.DID().String(), a.Capability().With())
@@ -577,7 +578,7 @@ func TestSession(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		context := NewValidationContext(
+		vctx := NewValidationContext(
 			service.Verifier(),
 			debugEcho,
 			IsSelfIssued,
@@ -587,7 +588,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(inv, context)
+		a, x := Access(context.Background(), inv, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 	})
@@ -629,7 +630,7 @@ func TestSession(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		context := NewValidationContext(
+		vctx := NewValidationContext(
 			service.Verifier(),
 			debugEcho,
 			IsSelfIssued,
@@ -639,7 +640,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(inv, context)
+		a, x := Access(context.Background(), inv, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 	})
@@ -667,7 +668,7 @@ func TestSession(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		context := NewValidationContext(
+		vctx := NewValidationContext(
 			service.Verifier(),
 			debugEcho,
 			IsSelfIssued,
@@ -677,7 +678,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(inv, context)
+		a, x := Access(context.Background(), inv, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 	})
@@ -730,7 +731,7 @@ func TestSession(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		context := NewValidationContext(
+		vctx := NewValidationContext(
 			service.Verifier(),
 			debugEcho,
 			IsSelfIssued,
@@ -740,7 +741,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(inv, context)
+		a, x := Access(context.Background(), inv, vctx)
 		require.NotEmpty(t, a)
 		require.NoError(t, x)
 	})

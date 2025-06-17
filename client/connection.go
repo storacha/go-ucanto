@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"hash"
@@ -101,7 +102,7 @@ type ExecutionResponse interface {
 	Get(inv ucan.Link) (ucan.Link, bool)
 }
 
-func Execute(invocations []invocation.Invocation, conn Connection) (ExecutionResponse, error) {
+func Execute(ctx context.Context, invocations []invocation.Invocation, conn Connection) (ExecutionResponse, error) {
 	input, err := message.Build(invocations, nil)
 	if err != nil {
 		return nil, fmt.Errorf("building message: %s", err)
@@ -112,7 +113,7 @@ func Execute(invocations []invocation.Invocation, conn Connection) (ExecutionRes
 		return nil, fmt.Errorf("encoding message: %s", err)
 	}
 
-	res, err := conn.Channel().Request(req)
+	res, err := conn.Channel().Request(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("sending message: %s", err)
 	}

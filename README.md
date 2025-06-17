@@ -67,7 +67,7 @@ inv, _ := invocation.Invoke(signer, audience, capability, delegation.WithProofs(
 invocations := []invocation.Invocation{inv}
 
 // send the invocation(s) to the service
-resp, _ := client.Execute(invocations, conn)
+resp, _ := client.Execute(context.Background(), invocations, conn)
 
 // define datamodels for ok and error outcome
 type OkModel struct {
@@ -144,7 +144,7 @@ func createServer(signer principal.Signer) (server.ServerView, error) {
 			testecho.Can(),
 			server.Provide(
 				testecho,
-				func(cap ucan.Capability[TestEcho], inv invocation.Invocation, ctx server.InvocationContext) (TestEcho, receipt.Effects, error) {
+				func(ctx context.Context, cap ucan.Capability[TestEcho], inv invocation.Invocation, ictx server.InvocationContext) (TestEcho, receipt.Effects, error) {
 					return TestEcho{Echo: cap.Nb().Echo}, nil, nil
 				},
 			),
@@ -157,7 +157,7 @@ func main() {
 	server, _ := createServer(signer)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		res, _ := server.Request(uhttp.NewHTTPRequest(r.Body, r.Header))
+		res, _ := server.Request(r.Context(), uhttp.NewHTTPRequest(r.Body, r.Header))
 
 		for key, vals := range res.Headers() {
 			for _, v := range vals {

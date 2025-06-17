@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -128,7 +129,7 @@ func TestExecute(t *testing.T) {
 			fixtures.Service,
 			WithServiceMethod(
 				uploadadd.Can(),
-				Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
+				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
 					return uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}, nil, nil
 				}),
 			),
@@ -140,7 +141,7 @@ func TestExecute(t *testing.T) {
 		inv, err := invocation.Invoke(fixtures.Service, fixtures.Service, cap)
 		require.NoError(t, err)
 
-		resp, err := client.Execute([]invocation.Invocation{inv}, conn)
+		resp, err := client.Execute(context.Background(), []invocation.Invocation{inv}, conn)
 		require.NoError(t, err)
 
 		// get the receipt link for the invocation from the response
@@ -174,7 +175,7 @@ func TestExecute(t *testing.T) {
 			fixtures.Service,
 			WithServiceMethod(
 				uploadadd.Can(),
-				Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
+				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
 					return uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}, nil, nil
 				}),
 			),
@@ -196,7 +197,7 @@ func TestExecute(t *testing.T) {
 		inv, err := invocation.Invoke(fixtures.Alice, fixtures.Service, cap, delegation.WithProof(prfs...))
 		require.NoError(t, err)
 
-		resp, err := client.Execute([]invocation.Invocation{inv}, conn)
+		resp, err := client.Execute(context.Background(), []invocation.Invocation{inv}, conn)
 		require.NoError(t, err)
 
 		// get the receipt link for the invocation from the response
@@ -230,7 +231,7 @@ func TestExecute(t *testing.T) {
 		)
 
 		invs := []invocation.Invocation{helpers.Must(invocation.Invoke(fixtures.Alice, fixtures.Service, capability))}
-		resp := helpers.Must(client.Execute(invs, conn))
+		resp := helpers.Must(client.Execute(context.Background(), invs, conn))
 		rcptlnk, ok := resp.Get(invs[0].Link())
 		require.True(t, ok, "missing receipt for invocation: %s", invs[0].Link())
 
@@ -258,7 +259,7 @@ func TestExecute(t *testing.T) {
 			fixtures.Service,
 			WithServiceMethod(
 				uploadadd.Can(),
-				Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
+				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
 					return uploadAddSuccess{}, nil, fmt.Errorf("test error")
 				}),
 			),
@@ -268,7 +269,7 @@ func TestExecute(t *testing.T) {
 		rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
 		cap := uploadadd.New(fixtures.Alice.DID().String(), uploadAddCaveats{Root: rt})
 		invs := []invocation.Invocation{helpers.Must(invocation.Invoke(fixtures.Alice, fixtures.Service, cap))}
-		resp := helpers.Must(client.Execute(invs, conn))
+		resp := helpers.Must(client.Execute(context.Background(), invs, conn))
 		rcptlnk, ok := resp.Get(invs[0].Link())
 		require.True(t, ok, "missing receipt for invocation: %s", invs[0].Link())
 
@@ -296,7 +297,7 @@ func TestExecute(t *testing.T) {
 			fixtures.Service,
 			WithServiceMethod(
 				uploadadd.Can(),
-				Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
+				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
 					return uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}, nil, nil
 				}),
 			),
@@ -309,7 +310,7 @@ func TestExecute(t *testing.T) {
 		// invocation audience different from the service
 		invs := []invocation.Invocation{helpers.Must(invocation.Invoke(fixtures.Alice, fixtures.Bob, cap))}
 
-		resp, err := client.Execute(invs, conn)
+		resp, err := client.Execute(context.Background(), invs, conn)
 		require.NoError(t, err)
 
 		rcptlnk, ok := resp.Get(invs[0].Link())
@@ -338,7 +339,7 @@ func TestExecute(t *testing.T) {
 			fixtures.Service,
 			WithServiceMethod(
 				uploadadd.Can(),
-				Provide(uploadadd, func(cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ctx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
+				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
 					return uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}, nil, nil
 				}),
 			),
@@ -352,7 +353,7 @@ func TestExecute(t *testing.T) {
 		// invocation audience different from the service, but an accepted alternative audience
 		invs := []invocation.Invocation{helpers.Must(invocation.Invoke(fixtures.Alice, fixtures.Bob, cap))}
 
-		resp, err := client.Execute(invs, conn)
+		resp, err := client.Execute(context.Background(), invs, conn)
 		require.NoError(t, err)
 
 		rcptlnk, ok := resp.Get(invs[0].Link())
@@ -380,7 +381,7 @@ func TestHandle(t *testing.T) {
 		hd.Set("Accept", response.ContentType)
 
 		req := thttp.NewHTTPRequest(bytes.NewReader([]byte{}), hd)
-		res := helpers.Must(Handle(server, req))
+		res := helpers.Must(Handle(context.Background(), server, req))
 		require.Equal(t, res.Status(), http.StatusUnsupportedMediaType)
 	})
 
@@ -392,7 +393,7 @@ func TestHandle(t *testing.T) {
 		hd.Set("Accept", "not/acceptable")
 
 		req := thttp.NewHTTPRequest(bytes.NewReader([]byte{}), hd)
-		res := helpers.Must(Handle(server, req))
+		res := helpers.Must(Handle(context.Background(), server, req))
 		require.Equal(t, res.Status(), http.StatusNotAcceptable)
 	})
 
@@ -405,7 +406,7 @@ func TestHandle(t *testing.T) {
 
 		// request with invalid payload
 		req := thttp.NewHTTPRequest(bytes.NewReader([]byte{}), hd)
-		res := helpers.Must(Handle(server, req))
+		res := helpers.Must(Handle(context.Background(), server, req))
 		require.Equal(t, res.Status(), http.StatusBadRequest)
 	})
 }
