@@ -27,7 +27,7 @@ func Encode(roots []ipld.Link, blocks iter.Seq2[ipld.Block, error]) io.Reader {
 		for _, r := range roots {
 			_, cid, err := cid.CidFromBytes([]byte(r.Binary()))
 			if err != nil {
-				writer.CloseWithError(fmt.Errorf("decoding CAR root: %s: %s", r, err))
+				writer.CloseWithError(fmt.Errorf("decoding CAR root: %s: %w", r, err))
 				return
 			}
 			cids = append(cids, cid)
@@ -38,18 +38,18 @@ func Encode(roots []ipld.Link, blocks iter.Seq2[ipld.Block, error]) io.Reader {
 		}
 		hb, err := cbor.DumpObject(h)
 		if err != nil {
-			writer.CloseWithError(fmt.Errorf("writing CAR header: %s", err))
+			writer.CloseWithError(fmt.Errorf("writing CAR header: %w", err))
 			return
 		}
 		util.LdWrite(writer, hb)
 		for block, err := range blocks {
 			if err != nil {
-				writer.CloseWithError(fmt.Errorf("writing CAR blocks: %s", err))
+				writer.CloseWithError(fmt.Errorf("writing CAR blocks: %w", err))
 				return
 			}
 			err = util.LdWrite(writer, []byte(block.Link().Binary()), block.Bytes())
 			if err != nil {
-				writer.CloseWithError(fmt.Errorf("writing CAR blocks: %s", err))
+				writer.CloseWithError(fmt.Errorf("writing CAR blocks: %w", err))
 				return
 			}
 		}

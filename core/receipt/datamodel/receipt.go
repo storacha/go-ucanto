@@ -24,7 +24,7 @@ var anyReceiptTs *schema.TypeSystem
 func init() {
 	ts, err := NewReceiptModelType(anyResultSchema)
 	if err != nil {
-		panic(fmt.Errorf("failed to load IPLD schema: %s", err))
+		panic(fmt.Errorf("failed to load IPLD schema: %w", err))
 	}
 	anyReceiptTs = ts.TypeSystem()
 }

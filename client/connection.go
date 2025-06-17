@@ -105,22 +105,22 @@ type ExecutionResponse interface {
 func Execute(ctx context.Context, invocations []invocation.Invocation, conn Connection) (ExecutionResponse, error) {
 	input, err := message.Build(invocations, nil)
 	if err != nil {
-		return nil, fmt.Errorf("building message: %s", err)
+		return nil, fmt.Errorf("building message: %w", err)
 	}
 
 	req, err := conn.Codec().Encode(input)
 	if err != nil {
-		return nil, fmt.Errorf("encoding message: %s", err)
+		return nil, fmt.Errorf("encoding message: %w", err)
 	}
 
 	res, err := conn.Channel().Request(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("sending message: %s", err)
+		return nil, fmt.Errorf("sending message: %w", err)
 	}
 
 	output, err := conn.Codec().Decode(res)
 	if err != nil {
-		return nil, fmt.Errorf("decoding message: %s", err)
+		return nil, fmt.Errorf("decoding message: %w", err)
 	}
 
 	return ExecutionResponse(output), nil

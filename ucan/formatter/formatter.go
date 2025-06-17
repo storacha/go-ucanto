@@ -18,7 +18,7 @@ func FormatSignPayload(payload pdm.PayloadModel, version string, algorithm strin
 	}
 	pld, err := FormatPayload(payload)
 	if err != nil {
-		return "", fmt.Errorf("formatting payload: %s", err)
+		return "", fmt.Errorf("formatting payload: %w", err)
 	}
 	return fmt.Sprintf("%s.%s", hdr, pld), nil
 }
@@ -31,7 +31,7 @@ func FormatHeader(version string, algorithm string) (string, error) {
 	}
 	bytes, err := ipld.Marshal(dagjson.Encode, &header, hdm.Type())
 	if err != nil {
-		return "", fmt.Errorf("dag-json encoding header: %s", err)
+		return "", fmt.Errorf("dag-json encoding header: %w", err)
 	}
 	return base64.RawURLEncoding.EncodeToString(bytes), nil
 }
@@ -39,7 +39,7 @@ func FormatHeader(version string, algorithm string) (string, error) {
 func FormatPayload(payload pdm.PayloadModel) (string, error) {
 	bytes, err := ipld.Marshal(dagjson.Encode, &payload, pdm.Type())
 	if err != nil {
-		return "", fmt.Errorf("dag-json encoding payload: %s", err)
+		return "", fmt.Errorf("dag-json encoding payload: %w", err)
 	}
 	return base64.RawURLEncoding.EncodeToString(bytes), nil
 }

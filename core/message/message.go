@@ -140,7 +140,7 @@ func NewMessage(roots []ipld.Link, blks blockstore.BlockReader) (AgentMessage, e
 
 	rblock, ok, err := blks.Get(roots[0])
 	if err != nil {
-		return nil, fmt.Errorf("getting root block: %s", err)
+		return nil, fmt.Errorf("getting root block: %w", err)
 	}
 	if !ok {
 		return nil, fmt.Errorf("missing root block: %s", roots[0])
@@ -155,7 +155,7 @@ func NewMessage(roots []ipld.Link, blks blockstore.BlockReader) (AgentMessage, e
 		sha256.Hasher,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("decoding message: %s", err)
+		return nil, fmt.Errorf("decoding message: %w", err)
 	}
 
 	return &message{root: rblock, data: msg.UcantoMessage7, blks: blks}, nil

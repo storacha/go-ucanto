@@ -187,7 +187,7 @@ func WriteInto(view ipld.View, bs BlockWriter) error {
 	for b := range view.Blocks() {
 		err := bs.Put(b)
 		if err != nil {
-			return fmt.Errorf("putting proof block: %s", err)
+			return fmt.Errorf("putting proof block: %w", err)
 		}
 	}
 	return nil
