@@ -1,9 +1,7 @@
 package helpers
 
 import (
-	"context"
 	crand "crypto/rand"
-	"testing"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime/datamodel"
@@ -35,13 +33,4 @@ func RandomCID() datamodel.Link {
 		MhLength: -1,
 	}.Sum(bytes)
 	return cidlink.Link{Cid: c}
-}
-
-// TestContext returns the `t.Context()` if available (Go 1.24+), or a
-// background context on older versions of Go.
-func TestContext(t *testing.T) context.Context {
-	if tCtx, ok := any(t).(interface{ Context() context.Context }); ok {
-		return tCtx.Context()
-	}
-	return context.Background()
 }
