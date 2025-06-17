@@ -141,7 +141,7 @@ func TestExecute(t *testing.T) {
 		inv, err := invocation.Invoke(fixtures.Service, fixtures.Service, cap)
 		require.NoError(t, err)
 
-		resp, err := client.Execute(helpers.TestContext(t), []invocation.Invocation{inv}, conn)
+		resp, err := client.Execute(t.Context(), []invocation.Invocation{inv}, conn)
 		require.NoError(t, err)
 
 		// get the receipt link for the invocation from the response
@@ -197,7 +197,7 @@ func TestExecute(t *testing.T) {
 		inv, err := invocation.Invoke(fixtures.Alice, fixtures.Service, cap, delegation.WithProof(prfs...))
 		require.NoError(t, err)
 
-		resp, err := client.Execute(helpers.TestContext(t), []invocation.Invocation{inv}, conn)
+		resp, err := client.Execute(t.Context(), []invocation.Invocation{inv}, conn)
 		require.NoError(t, err)
 
 		// get the receipt link for the invocation from the response
@@ -231,7 +231,7 @@ func TestExecute(t *testing.T) {
 		)
 
 		invs := []invocation.Invocation{helpers.Must(invocation.Invoke(fixtures.Alice, fixtures.Service, capability))}
-		resp := helpers.Must(client.Execute(helpers.TestContext(t), invs, conn))
+		resp := helpers.Must(client.Execute(t.Context(), invs, conn))
 		rcptlnk, ok := resp.Get(invs[0].Link())
 		require.True(t, ok, "missing receipt for invocation: %s", invs[0].Link())
 
@@ -269,7 +269,7 @@ func TestExecute(t *testing.T) {
 		rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
 		cap := uploadadd.New(fixtures.Alice.DID().String(), uploadAddCaveats{Root: rt})
 		invs := []invocation.Invocation{helpers.Must(invocation.Invoke(fixtures.Alice, fixtures.Service, cap))}
-		resp := helpers.Must(client.Execute(helpers.TestContext(t), invs, conn))
+		resp := helpers.Must(client.Execute(t.Context(), invs, conn))
 		rcptlnk, ok := resp.Get(invs[0].Link())
 		require.True(t, ok, "missing receipt for invocation: %s", invs[0].Link())
 
@@ -310,7 +310,7 @@ func TestExecute(t *testing.T) {
 		// invocation audience different from the service
 		invs := []invocation.Invocation{helpers.Must(invocation.Invoke(fixtures.Alice, fixtures.Bob, cap))}
 
-		resp, err := client.Execute(helpers.TestContext(t), invs, conn)
+		resp, err := client.Execute(t.Context(), invs, conn)
 		require.NoError(t, err)
 
 		rcptlnk, ok := resp.Get(invs[0].Link())
@@ -353,7 +353,7 @@ func TestExecute(t *testing.T) {
 		// invocation audience different from the service, but an accepted alternative audience
 		invs := []invocation.Invocation{helpers.Must(invocation.Invoke(fixtures.Alice, fixtures.Bob, cap))}
 
-		resp, err := client.Execute(helpers.TestContext(t), invs, conn)
+		resp, err := client.Execute(t.Context(), invs, conn)
 		require.NoError(t, err)
 
 		rcptlnk, ok := resp.Get(invs[0].Link())
@@ -381,7 +381,7 @@ func TestHandle(t *testing.T) {
 		hd.Set("Accept", response.ContentType)
 
 		req := thttp.NewHTTPRequest(bytes.NewReader([]byte{}), hd)
-		res := helpers.Must(Handle(helpers.TestContext(t), server, req))
+		res := helpers.Must(Handle(t.Context(), server, req))
 		require.Equal(t, res.Status(), http.StatusUnsupportedMediaType)
 	})
 
@@ -393,7 +393,7 @@ func TestHandle(t *testing.T) {
 		hd.Set("Accept", "not/acceptable")
 
 		req := thttp.NewHTTPRequest(bytes.NewReader([]byte{}), hd)
-		res := helpers.Must(Handle(helpers.TestContext(t), server, req))
+		res := helpers.Must(Handle(t.Context(), server, req))
 		require.Equal(t, res.Status(), http.StatusNotAcceptable)
 	})
 
@@ -406,7 +406,7 @@ func TestHandle(t *testing.T) {
 
 		// request with invalid payload
 		req := thttp.NewHTTPRequest(bytes.NewReader([]byte{}), hd)
-		res := helpers.Must(Handle(helpers.TestContext(t), server, req))
+		res := helpers.Must(Handle(t.Context(), server, req))
 		require.Equal(t, res.Status(), http.StatusBadRequest)
 	})
 }
