@@ -2,7 +2,6 @@ package car
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/transport"
@@ -50,33 +49,14 @@ type carInbound struct {
 }
 
 func (ic *carInbound) Accept(req transport.HTTPRequest) (transport.InboundAcceptCodec, transport.HTTPError) {
-	// TODO: select a decoder - we only support 1 ATM
-	contentType := req.Headers().Get("Content-Type")
-	if contentType != request.ContentType {
-		headers := http.Header{}
-		headers.Set("Accept", contentType)
+	msgHdr := req.Headers().Get("X-Agent-Message")
+	if msgHdr == "" {
 		return nil, thttp.NewHTTPError(
-			"The server cannot process the request because the payload format is not supported. Please check the content-type header and try again with a supported media type.",
+			"The server cannot process the request because the payload format is not supported. Please send the X-Agent-Message header.",
 			http.StatusUnsupportedMediaType,
-			headers,
+			http.Header{},
 		)
 	}
-
-	// TODO: select an encoder by desired preference (q=) - we only support 1 ATM
-	accept := req.Headers().Get("Accept")
-	if accept == "" {
-		accept = "*/*"
-	}
-	if accept != "*/*" && !strings.Contains(accept, contentType) {
-		headers := http.Header{}
-		headers.Set("Accept", contentType)
-		return nil, thttp.NewHTTPError(
-			"The requested resource cannot be served in the requested content type. Please specify a supported content type using the Accept header.",
-			http.StatusNotAcceptable,
-			headers,
-		)
-	}
-
 	return ic.codec, nil
 }
 
