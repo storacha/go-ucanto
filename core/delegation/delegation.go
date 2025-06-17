@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"sync"
 
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multibase"
@@ -18,7 +17,6 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld/block"
 	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
 	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
-	"github.com/storacha/go-ucanto/core/iterable"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 	udm "github.com/storacha/go-ucanto/ucan/datamodel/ucan"
@@ -46,23 +44,11 @@ type delegation struct {
 	blks     blockstore.BlockReader
 	atchblks blockstore.BlockStore
 	ucan     ucan.View
-	once     sync.Once
 }
 
 var _ Delegation = (*delegation)(nil)
 
 func (d *delegation) Data() ucan.View {
-	d.once.Do(func() {
-		data := udm.UCANModel{}
-		err := block.Decode(d.rt, &data, udm.Type(), cbor.Codec, sha256.Hasher)
-		if err != nil {
-			fmt.Printf("Error: decoding UCAN: %s\n", err)
-		}
-		d.ucan, err = ucan.NewUCAN(&data)
-		if err != nil {
-			fmt.Printf("Error: constructing UCAN view: %s\n", err)
-		}
-	})
 	return d.ucan
 }
 
@@ -75,7 +61,7 @@ func (d *delegation) Link() ucan.Link {
 }
 
 func (d *delegation) Blocks() iter.Seq2[ipld.Block, error] {
-	return iterable.Concat2(d.blks.Iterator(), d.atchblks.Iterator())
+	return export(d.ucan, d.rt, d.blks, d.atchblks)
 }
 
 func (d *delegation) Archive() io.Reader {
@@ -127,11 +113,15 @@ func (d *delegation) Attach(b block.Block) error {
 }
 
 func NewDelegation(root ipld.Block, bs blockstore.BlockReader) (Delegation, error) {
+	ucan, err := decode(root)
+	if err != nil {
+		return nil, fmt.Errorf("decoding UCAN: %s", err)
+	}
 	attachments, err := blockstore.NewBlockStore()
 	if err != nil {
 		return nil, err
 	}
-	return &delegation{rt: root, blks: bs, atchblks: attachments}, nil
+	return &delegation{rt: root, ucan: ucan, blks: bs, atchblks: attachments}, nil
 }
 
 func NewDelegationView(root ipld.Link, bs blockstore.BlockReader) (Delegation, error) {
@@ -143,6 +133,62 @@ func NewDelegationView(root ipld.Link, bs blockstore.BlockReader) (Delegation, e
 		return nil, fmt.Errorf("missing delegation root block: %s", root)
 	}
 	return NewDelegation(blk, bs)
+}
+
+// export the blocks that comprise the delegation, including all extra attached
+// blocks.
+func export(rt ucan.View, rtblk ipld.Block, blks blockstore.BlockReader, atchblks blockstore.BlockReader) iter.Seq2[ipld.Block, error] {
+	return func(yield func(ipld.Block, error) bool) {
+		for _, p := range rt.Proofs() {
+			proofblk, ok, err := blks.Get(p)
+			if err != nil {
+				yield(nil, err)
+				return
+			}
+			if !ok {
+				continue
+			}
+			prf, err := decode(proofblk)
+			if err != nil {
+				yield(nil, err)
+				return
+			}
+			for b, err := range export(prf, proofblk, blks, nil) {
+				if !yield(b, err) {
+					return
+				}
+				if err != nil {
+					return
+				}
+			}
+		}
+
+		if atchblks != nil {
+			for b, err := range atchblks.Iterator() {
+				if !yield(b, err) {
+					return
+				}
+				if err != nil {
+					return
+				}
+			}
+		}
+
+		yield(rtblk, nil)
+	}
+}
+
+func decode(root ipld.Block) (ucan.View, error) {
+	data := udm.UCANModel{}
+	err := block.Decode(root, &data, udm.Type(), cbor.Codec, sha256.Hasher)
+	if err != nil {
+		return nil, fmt.Errorf("decoding root block: %w", err)
+	}
+	ucan, err := ucan.NewUCAN(&data)
+	if err != nil {
+		return nil, fmt.Errorf("constructing UCAN view: %w", err)
+	}
+	return ucan, nil
 }
 
 func Archive(d Delegation) io.Reader {
