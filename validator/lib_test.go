@@ -107,7 +107,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.NoError(t, x)
 			require.Equal(t, storeAdd.Can(), a.Capability().Can())
 			require.Equal(t, fixtures.Alice.DID().String(), a.Capability().With())
@@ -143,7 +143,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.NoError(t, x)
 			require.Equal(t, storeAdd.Can(), a.Capability().Can())
 			require.Equal(t, fixtures.Alice.DID().String(), a.Capability().With())
@@ -188,7 +188,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.NoError(t, x)
 			require.Equal(t, storeAdd.Can(), a.Capability().Can())
 			require.Equal(t, fixtures.Alice.DID().String(), a.Capability().With())
@@ -239,7 +239,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.NoError(t, x)
 			require.Equal(t, storeAdd.Can(), a.Capability().Can())
 			require.Equal(t, fixtures.Alice.DID().String(), a.Capability().With())
@@ -275,7 +275,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -307,7 +307,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -339,7 +339,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -372,7 +372,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -406,7 +406,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -449,7 +449,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -493,7 +493,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -556,7 +556,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -599,7 +599,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -643,7 +643,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -686,7 +686,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -729,7 +729,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -772,7 +772,7 @@ func TestAccess(t *testing.T) {
 				FailDIDKeyResolution,
 			)
 
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -825,7 +825,7 @@ func TestAccess(t *testing.T) {
 			)
 
 			cstr := fmt.Sprintf(`{"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}}`, storeAdd.Can(), fixtures.Service.DID(), testLink)
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -872,7 +872,7 @@ func TestAccess(t *testing.T) {
 			)
 
 			cstr := fmt.Sprintf(`{"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}}`, storeAdd.Can(), fixtures.Alice.DID(), testLink)
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -918,7 +918,7 @@ func TestAccess(t *testing.T) {
 			)
 
 			cstr := fmt.Sprintf(`{"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}}`, storeAdd.Can(), space.DID(), testLink)
-			a, x := Access(context.Background(), inv, vctx)
+			a, x := Access(helpers.TestContext(t), inv, vctx)
 			require.Nil(t, a)
 			require.Error(t, x)
 			require.Equal(t, x.Name(), "Unauthorized")
@@ -954,7 +954,7 @@ func TestClaim(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Claim(context.Background(), storeAdd, []delegation.Proof{delegation.FromLink(dlg.Link())}, vctx)
+		a, x := Claim(helpers.TestContext(t), storeAdd, []delegation.Proof{delegation.FromLink(dlg.Link())}, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 		require.Equal(t, x.Name(), "Unauthorized")
@@ -994,7 +994,7 @@ func TestClaim(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Claim(context.Background(), storeAdd, []delegation.Proof{delegation.FromDelegation(dlg)}, vctx)
+		a, x := Claim(helpers.TestContext(t), storeAdd, []delegation.Proof{delegation.FromDelegation(dlg)}, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 		require.Equal(t, x.Name(), "Unauthorized")

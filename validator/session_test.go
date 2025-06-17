@@ -138,7 +138,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(context.Background(), inv, vctx)
+		a, x := Access(helpers.TestContext(t), inv, vctx)
 		require.NoError(t, x)
 		require.Equal(t, debugEcho.Can(), a.Capability().Can())
 		require.Equal(t, account.DID().String(), a.Capability().With())
@@ -209,7 +209,7 @@ func TestSession(t *testing.T) {
 			auth,
 		)
 
-		a, x := Access(context.Background(), inv, vctx)
+		a, x := Access(helpers.TestContext(t), inv, vctx)
 		require.NoError(t, x)
 		require.Equal(t, debugEcho.Can(), a.Capability().Can())
 		require.Equal(t, account.DID().String(), a.Capability().With())
@@ -297,7 +297,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(context.Background(), inv, vctx)
+		a, x := Access(helpers.TestContext(t), inv, vctx)
 		require.NoError(t, x)
 		require.Equal(t, debugEcho.Can(), a.Capability().Can())
 		require.Equal(t, account.DID().String(), a.Capability().With())
@@ -327,7 +327,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(context.Background(), inv, vctx)
+		a, x := Access(helpers.TestContext(t), inv, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 		require.Equal(t, x.Name(), "Unauthorized")
@@ -372,7 +372,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(context.Background(), inv, vctx)
+		a, x := Access(helpers.TestContext(t), inv, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 		require.Equal(t, x.Name(), "Unauthorized")
@@ -440,7 +440,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(context.Background(), inv, vctx)
+		a, x := Access(helpers.TestContext(t), inv, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 		require.Equal(t, x.Name(), "Unauthorized")
@@ -502,7 +502,7 @@ func TestSession(t *testing.T) {
 			},
 		)
 
-		a, x := Access(context.Background(), inv, vctx)
+		a, x := Access(helpers.TestContext(t), inv, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 		require.Equal(t, x.Name(), "Unauthorized")
@@ -535,7 +535,7 @@ func TestSession(t *testing.T) {
 			},
 		)
 
-		a, x := Access(context.Background(), inv, vctx)
+		a, x := Access(helpers.TestContext(t), inv, vctx)
 		require.NoError(t, x)
 		require.Equal(t, debugEcho.Can(), a.Capability().Can())
 		require.Equal(t, account.DID().String(), a.Capability().With())
@@ -588,7 +588,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(context.Background(), inv, vctx)
+		a, x := Access(helpers.TestContext(t), inv, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 	})
@@ -640,7 +640,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(context.Background(), inv, vctx)
+		a, x := Access(helpers.TestContext(t), inv, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 	})
@@ -678,7 +678,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(context.Background(), inv, vctx)
+		a, x := Access(helpers.TestContext(t), inv, vctx)
 		require.Nil(t, a)
 		require.Error(t, x)
 	})
@@ -741,7 +741,7 @@ func TestSession(t *testing.T) {
 			FailDIDKeyResolution,
 		)
 
-		a, x := Access(context.Background(), inv, vctx)
+		a, x := Access(helpers.TestContext(t), inv, vctx)
 		require.NotEmpty(t, a)
 		require.NoError(t, x)
 	})

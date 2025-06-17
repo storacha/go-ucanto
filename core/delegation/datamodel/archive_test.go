@@ -18,13 +18,13 @@ func TestEncodeDecode(t *testing.T) {
 	}
 	mblk, err := block.Encode(&m0, adm.Type(), cbor.Codec, sha256.Hasher)
 	if err != nil {
-		t.Fatalf("encoding archive model: %w", err)
+		t.Fatalf("encoding archive model: %s", err)
 	}
 
 	m1 := adm.ArchiveModel{}
 	err = block.Decode(mblk, &m1, adm.Type(), cbor.Codec, sha256.Hasher)
 	if err != nil {
-		t.Fatalf("decoding agent message: %w", err)
+		t.Fatalf("decoding agent message: %s", err)
 	}
 
 	d1 := m1.Ucan0_9_1
