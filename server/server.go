@@ -92,7 +92,7 @@ func NewServer(id principal.Signer, options ...Option) (ServerView, error) {
 
 	codec := cfg.codec
 	if codec == nil {
-		codec = car.NewCARInboundCodec()
+		codec = car.NewInboundCodec()
 	}
 
 	canIssue := cfg.canIssue
