@@ -17,6 +17,7 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld/block"
 	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
 	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
+	"github.com/storacha/go-ucanto/core/iterable"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 	udm "github.com/storacha/go-ucanto/ucan/datamodel/ucan"
@@ -33,6 +34,12 @@ type Delegation interface {
 	Link() ucan.Link
 	// Archive writes the delegation to a Content Addressed aRchive (CAR).
 	Archive() io.Reader
+	// Export ONLY the blocks that comprise the delegation and it's proofs as well
+	// as blocks attached using Attach.
+	//
+	// Note: this differs from calling Blocks - which simply iterates over all
+	// blocks in the block reader that backs this [ipld.View].
+	Export() iter.Seq2[block.Block, error]
 	// Attach a block to the delegation DAG so it will be included in the block
 	// iterator. You should only attach blocks that are referenced from
 	// `Capabilities` or `Facts`.
@@ -61,6 +68,10 @@ func (d *delegation) Link() ucan.Link {
 }
 
 func (d *delegation) Blocks() iter.Seq2[ipld.Block, error] {
+	return iterable.Concat2(d.blks.Iterator(), d.atchblks.Iterator())
+}
+
+func (d *delegation) Export() iter.Seq2[ipld.Block, error] {
 	return export(d.ucan, d.rt, d.blks, d.atchblks)
 }
 
@@ -204,20 +215,14 @@ func Archive(d Delegation) io.Reader {
 		reader.CloseWithError(fmt.Errorf("hashing variant block bytes: %w", err))
 		return reader
 	}
-	// Create a new reader that contains the new block as well as the others.
-	blks, err := blockstore.NewBlockStore(blockstore.WithBlocksIterator(d.Blocks()))
-	if err != nil {
-		reader, _ := io.Pipe()
-		reader.CloseWithError(fmt.Errorf("creating new block reader: %w", err))
-		return reader
-	}
-	err = blks.Put(variant)
-	if err != nil {
-		reader, _ := io.Pipe()
-		reader.CloseWithError(fmt.Errorf("adding variant block: %w", err))
-		return reader
-	}
-	return car.Encode([]ipld.Link{variant.Link()}, blks.Iterator())
+	return car.Encode([]ipld.Link{variant.Link()}, func(yield func(ipld.Block, error) bool) {
+		for b, err := range d.Export() {
+			if !yield(b, err) || err != nil {
+				return
+			}
+		}
+		yield(variant, nil)
+	})
 }
 
 func Extract(b []byte) (Delegation, error) {
