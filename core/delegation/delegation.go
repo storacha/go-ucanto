@@ -34,7 +34,7 @@ type Delegation interface {
 	Link() ucan.Link
 	// Archive writes the delegation to a Content Addressed aRchive (CAR).
 	Archive() io.Reader
-	// Export ONLY the blocks that comprise the delegation and it's proofs as well
+	// Export ONLY the blocks for the delegation and it's proofs, as well
 	// as blocks attached using Attach.
 	//
 	// Note: this differs from calling Blocks - which simply iterates over all
