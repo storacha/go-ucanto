@@ -1,6 +1,7 @@
 package delegation
 
 import (
+	_ "embed"
 	"fmt"
 	"slices"
 	"testing"
@@ -118,4 +119,19 @@ func TestFormatParse(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, dlg.Link(), parsed.Link())
+}
+
+//go:embed delegationnonb.car
+var delegationnonb []byte
+
+func TestParseNoNb(t *testing.T) {
+	// An archived delegation with a capability with no `nb`
+	dlg, err := Extract(delegationnonb)
+	require.NoError(t, err)
+	require.Equal(t, "did:key:z6MkpveRpPySqSVXyhAmWbyQLdY9w5noKr1Ff2MX8P9htje9", dlg.Issuer().DID().String())
+	require.Equal(t, "did:example:alice", dlg.Audience().DID().String())
+	require.Len(t, dlg.Capabilities(), 1)
+	require.Equal(t, "do/something", dlg.Capabilities()[0].Can())
+	require.Equal(t, "did:key:123456789", dlg.Capabilities()[0].With())
+	require.Equal(t, nil, dlg.Capabilities()[0].Nb())
 }
