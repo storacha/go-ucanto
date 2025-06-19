@@ -22,6 +22,7 @@ func TestExport(t *testing.T) {
 			ucan.NewCapability("test/proof", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
 		},
 	)
+	require.NoError(t, err)
 	dlg, err := Delegate(
 		fixtures.Bob,
 		fixtures.Mallory,
@@ -59,9 +60,13 @@ func TestExport(t *testing.T) {
 	err = bs.Put(otherblk)
 	require.NoError(t, err)
 
+	// reinstantiate delegation with our new blockstore
+	dlg, err = NewDelegationView(dlg.Link(), bs)
+	require.NoError(t, err)
+
 	var exblks []ipld.Block
 	// export the delegation from the blockstore
-	for b, err := range export(dlg.Data(), dlg.Root(), bs, nil) {
+	for b, err := range dlg.Export() {
 		require.NoError(t, err)
 		exblks = append(exblks, b)
 	}
@@ -72,6 +77,14 @@ func TestExport(t *testing.T) {
 	for i, b := range blks {
 		require.Equal(t, b.Link().String(), exblks[i].Link().String())
 	}
+
+	// expect dlg.Blocks() to include otherblk though...
+	var blklnks []string
+	for b, err := range dlg.Blocks() {
+		require.NoError(t, err)
+		blklnks = append(blklnks, b.Link().String())
+	}
+	require.Contains(t, blklnks, otherblk.Link().String())
 }
 
 func TestAttach(t *testing.T) {
@@ -88,15 +101,12 @@ func TestAttach(t *testing.T) {
 	err = dlg.Attach(blk)
 	require.NoError(t, err)
 
-	found := false
+	var blklnks []string
 	for b, err := range dlg.Blocks() {
 		require.NoError(t, err)
-		if b.Link().String() == blk.Link().String() {
-			found = true
-			break
-		}
+		blklnks = append(blklnks, b.Link().String())
 	}
-	require.True(t, found)
+	require.Contains(t, blklnks, blk.Link().String())
 }
 
 func TestFormatParse(t *testing.T) {
