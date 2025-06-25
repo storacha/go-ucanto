@@ -2,16 +2,21 @@ package testing
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
 	prime "github.com/ipld/go-ipld-prime"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-ucanto/client"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/message"
+	"github.com/storacha/go-ucanto/core/receipt"
 	"github.com/storacha/go-ucanto/core/receipt/fx"
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/core/schema"
@@ -101,6 +106,7 @@ func TestHeaderCARTransport(t *testing.T) {
 			server.Provide(
 				serve,
 				func(cap ucan.Capability[serveCaveats], inv invocation.Invocation, ctx server.InvocationContext) (serveOk, fx.Effects, error) {
+					printDelegation(t, inv)
 					return serveOk{Digest: cap.Nb().Digest, Range: cap.Nb().Range}, nil, nil
 				},
 			),
@@ -146,6 +152,9 @@ func TestHeaderCARTransport(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok)
 
+	fmt.Println("---")
+	printReceipt(t, rcpt)
+
 	o, x := result.Unwrap(rcpt.Out())
 	require.Nil(t, x)
 	serveOk, err := ipld.Rebind[serveOk](o, serveTS.TypeByName("ServeOk"))
@@ -156,4 +165,58 @@ func TestHeaderCARTransport(t *testing.T) {
 	outBytes, err := io.ReadAll(res.Body())
 	require.NoError(t, err)
 	require.Equal(t, data[5:905], outBytes)
+
+	fmt.Println("---")
+	fmt.Println("Response Body")
+	fmt.Printf("\tRange: %d-%d\n", serveOk.Range[0], serveOk.Range[0]+serveOk.Range[1])
+	fmt.Printf("\tBytes: 0x%x\n", outBytes)
+}
+
+func printDelegation(t *testing.T, d delegation.Delegation) {
+	t.Helper()
+	fmt.Printf("Delegation (%s)\n", d.Link())
+	fmt.Printf("\tIssuer: %s\n", d.Issuer().DID())
+	fmt.Printf("\tAudience: %s\n", d.Audience().DID())
+
+	fmt.Println("\tCapabilities:")
+	for _, c := range d.Capabilities() {
+		fmt.Printf("\t\tCan: %s\n", c.Can())
+		fmt.Printf("\t\tWith: %s\n", c.With())
+		fmt.Printf("\t\tNb: %v\n", c.Nb())
+	}
+
+	if d.Expiration() != nil {
+		fmt.Printf("\tExpiration: %s\n", time.Unix(int64(*d.Expiration()), 0).String())
+	}
+
+	bs, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(d.Blocks()))
+	require.NoError(t, err)
+
+	if len(d.Proofs()) > 0 {
+		fmt.Println("\tProofs:")
+		for _, p := range d.Proofs() {
+			fmt.Printf("\t\t%s\n", p)
+		}
+		for _, p := range d.Proofs() {
+			fmt.Println("---")
+			pd, err := delegation.NewDelegationView(p, bs)
+			if err == nil {
+				printDelegation(t, pd)
+			}
+		}
+	}
+}
+
+func printReceipt(t *testing.T, r receipt.AnyReceipt) {
+	t.Helper()
+	fmt.Printf("Receipt (%s)\n", r.Root().Link())
+	fmt.Printf("\tIssuer: %s\n", r.Issuer().DID())
+	fmt.Printf("\tRan: %s\n", r.Ran().Link())
+	fmt.Println("\tOut:")
+	o, x := result.Unwrap(r.Out())
+	if x != nil {
+		fmt.Printf("\t\tError: %+v\n", x)
+	} else {
+		fmt.Printf("\t\tOK: %+v\n", o)
+	}
 }
