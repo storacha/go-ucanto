@@ -116,17 +116,17 @@ func Delegate[C ucan.CaveatBuilder](issuer ucan.Signer, audience ucan.Principal,
 
 	data, err := ucan.Issue(issuer, audience, capabilities, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("issuing UCAN: %s", err)
+		return nil, fmt.Errorf("issuing UCAN: %w", err)
 	}
 
 	rt, err := block.Encode(data.Model(), udm.Type(), cbor.Codec, sha256.Hasher)
 	if err != nil {
-		return nil, fmt.Errorf("encoding UCAN: %s", err)
+		return nil, fmt.Errorf("encoding UCAN: %w", err)
 	}
 
 	err = bs.Put(rt)
 	if err != nil {
-		return nil, fmt.Errorf("adding delegation root to store: %s", err)
+		return nil, fmt.Errorf("adding delegation root to store: %w", err)
 	}
 
 	return NewDelegation(rt, bs)

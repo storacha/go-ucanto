@@ -23,7 +23,7 @@ func mustLoadSchema() *schema.TypeSystem {
 		ts, err = ipld.LoadSchemaBytes(headersch)
 	})
 	if err != nil {
-		panic(fmt.Errorf("failed to load IPLD schema: %s", err))
+		panic(fmt.Errorf("failed to load IPLD schema: %w", err))
 	}
 	return ts
 }

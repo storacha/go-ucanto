@@ -115,7 +115,7 @@ func Issue[C CaveatBuilder](issuer Signer, audience Principal, capabilities []Ca
 	for _, cap := range capabilities {
 		nb, err := cap.Nb().ToIPLD()
 		if err != nil {
-			return nil, fmt.Errorf("building caveats: %s", err)
+			return nil, fmt.Errorf("building caveats: %w", err)
 		}
 		m := udm.CapabilityModel{
 			With: cap.With(),
@@ -134,7 +134,7 @@ func Issue[C CaveatBuilder](issuer Signer, audience Principal, capabilities []Ca
 	for _, f := range cfg.fct {
 		vals, err := f.ToIPLD()
 		if err != nil {
-			return nil, fmt.Errorf("building fact: %s", err)
+			return nil, fmt.Errorf("building fact: %w", err)
 		}
 		var keys []string
 		for k := range vals {
@@ -162,7 +162,7 @@ func Issue[C CaveatBuilder](issuer Signer, audience Principal, capabilities []Ca
 	}
 	bytes, err := encodeSignaturePayload(payload, version, issuer.SignatureAlgorithm())
 	if err != nil {
-		return nil, fmt.Errorf("encoding signature payload: %s", err)
+		return nil, fmt.Errorf("encoding signature payload: %w", err)
 	}
 
 	model := udm.UCANModel{

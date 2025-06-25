@@ -22,7 +22,7 @@ const SignatureAlgorithm = "RS256"
 func Parse(str string) (principal.Verifier, error) {
 	did, err := did.Parse(str)
 	if err != nil {
-		return nil, fmt.Errorf("parsing DID: %s", err)
+		return nil, fmt.Errorf("parsing DID: %w", err)
 	}
 	return Decode(did.Bytes())
 }
@@ -35,7 +35,7 @@ func Decode(b []byte) (principal.Verifier, error) {
 
 	pub, err := x509.ParsePKCS1PublicKey(utb)
 	if err != nil {
-		return nil, fmt.Errorf("parsing public key: %s", err)
+		return nil, fmt.Errorf("parsing public key: %w", err)
 	}
 
 	return RSAVerifier{bytes: b, pubKey: pub}, nil
@@ -47,7 +47,7 @@ func FromRaw(b []byte) (principal.Verifier, error) {
 	tb := multiformat.TagWith(Code, b)
 	pub, err := x509.ParsePKCS1PublicKey(b)
 	if err != nil {
-		return nil, fmt.Errorf("parsing public key: %s", err)
+		return nil, fmt.Errorf("parsing public key: %w", err)
 	}
 	return RSAVerifier{tb, pub}, nil
 }

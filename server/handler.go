@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/receipt/fx"
@@ -12,29 +14,29 @@ import (
 	"github.com/storacha/go-ucanto/validator"
 )
 
-type HandlerFunc[C any, O ipld.Builder] func(capability ucan.Capability[C], invocation invocation.Invocation, context InvocationContext) (out O, fx fx.Effects, err error)
+type HandlerFunc[C any, O ipld.Builder] func(ctx context.Context, capability ucan.Capability[C], invocation invocation.Invocation, context InvocationContext) (out O, fx fx.Effects, err error)
 
 // Provide is used to define given capability provider. It decorates the passed
 // handler and takes care of UCAN validation. It only calls the handler
 // when validation succeeds.
 func Provide[C any, O ipld.Builder](capability validator.CapabilityParser[C], handler HandlerFunc[C, O]) ServiceMethod[O] {
-	return func(invocation invocation.Invocation, context InvocationContext) (transaction.Transaction[O, ipld.Builder], error) {
+	return func(ctx context.Context, invocation invocation.Invocation, ictx InvocationContext) (transaction.Transaction[O, ipld.Builder], error) {
 		vctx := validator.NewValidationContext(
-			context.ID().Verifier(),
+			ictx.ID().Verifier(),
 			capability,
-			context.CanIssue,
-			context.ValidateAuthorization,
-			context.ResolveProof,
-			context.ParsePrincipal,
-			context.ResolveDIDKey,
-			context.AuthorityProofs()...,
+			ictx.CanIssue,
+			ictx.ValidateAuthorization,
+			ictx.ResolveProof,
+			ictx.ParsePrincipal,
+			ictx.ResolveDIDKey,
+			ictx.AuthorityProofs()...,
 		)
 
 		// confirm the audience of the invocation is this service or any of the configured alternative audiences
-		acceptedAudiences := schema.Literal(context.ID().DID().String())
-		if len(context.AlternativeAudiences()) > 0 {
-			altAudiences := make([]schema.Reader[string, string], 0, len(context.AlternativeAudiences()))
-			for _, a := range context.AlternativeAudiences() {
+		acceptedAudiences := schema.Literal(ictx.ID().DID().String())
+		if len(ictx.AlternativeAudiences()) > 0 {
+			altAudiences := make([]schema.Reader[string, string], 0, len(ictx.AlternativeAudiences()))
+			for _, a := range ictx.AlternativeAudiences() {
 				altAudiences = append(altAudiences, schema.Literal(a.DID().String()))
 			}
 
@@ -42,17 +44,17 @@ func Provide[C any, O ipld.Builder](capability validator.CapabilityParser[C], ha
 		}
 
 		if _, err := acceptedAudiences.Read(invocation.Audience().DID().String()); err != nil {
-			expectedAudiences := append([]ucan.Principal{context.ID()}, context.AlternativeAudiences()...)
+			expectedAudiences := append([]ucan.Principal{ictx.ID()}, ictx.AlternativeAudiences()...)
 			audErr := NewInvalidAudienceError(invocation.Audience(), expectedAudiences...)
 			return transaction.NewTransaction(result.Error[O, ipld.Builder](audErr)), nil
 		}
 
-		auth, aerr := validator.Access(invocation, vctx)
+		auth, aerr := validator.Access(ctx, invocation, vctx)
 		if aerr != nil {
 			return transaction.NewTransaction(result.Error[O, ipld.Builder](failure.FromError(aerr))), nil
 		}
 
-		o, fx, herr := handler(auth.Capability(), invocation, context)
+		o, fx, herr := handler(ctx, auth.Capability(), invocation, ictx)
 		if herr != nil {
 			return nil, herr
 		}

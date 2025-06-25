@@ -27,7 +27,7 @@ const keySize = 2048
 func Generate() (principal.Signer, error) {
 	priv, err := rsa.GenerateKey(rand.Reader, keySize)
 	if err != nil {
-		return nil, fmt.Errorf("generating RSA key: %s", err)
+		return nil, fmt.Errorf("generating RSA key: %w", err)
 	}
 
 	// Next we need to encode public key, because `RSAVerifier` uses it to
@@ -36,7 +36,7 @@ func Generate() (principal.Signer, error) {
 
 	verif, err := verifier.Decode(pubbytes)
 	if err != nil {
-		return nil, fmt.Errorf("decoding public bytes: %s", err)
+		return nil, fmt.Errorf("decoding public bytes: %w", err)
 	}
 
 	// Export key in Private Key Cryptography Standards (PKCS) format and extract
@@ -51,7 +51,7 @@ func Generate() (principal.Signer, error) {
 func Parse(str string) (principal.Signer, error) {
 	_, bytes, err := multibase.Decode(str)
 	if err != nil {
-		return nil, fmt.Errorf("decoding multibase string: %s", err)
+		return nil, fmt.Errorf("decoding multibase string: %w", err)
 	}
 	return Decode(bytes)
 }
@@ -68,14 +68,14 @@ func Decode(b []byte) (principal.Signer, error) {
 
 	priv, err := x509.ParsePKCS1PrivateKey(utb)
 	if err != nil {
-		return nil, fmt.Errorf("parsing private key: %s", err)
+		return nil, fmt.Errorf("parsing private key: %w", err)
 	}
 
 	pubbytes := multiformat.TagWith(verifier.Code, x509.MarshalPKCS1PublicKey(&priv.PublicKey))
 
 	verif, err := verifier.Decode(pubbytes)
 	if err != nil {
-		return nil, fmt.Errorf("decoding public bytes: %s", err)
+		return nil, fmt.Errorf("decoding public bytes: %w", err)
 	}
 
 	return RSASigner{bytes: b, privKey: priv, verifier: verif}, nil
@@ -87,11 +87,11 @@ func FromRaw(b []byte) (principal.Signer, error) {
 	tb := multiformat.TagWith(Code, b)
 	priv, err := x509.ParsePKCS1PrivateKey(b)
 	if err != nil {
-		return nil, fmt.Errorf("parsing private key: %s", err)
+		return nil, fmt.Errorf("parsing private key: %w", err)
 	}
 	verif, err := verifier.FromRaw(x509.MarshalPKCS1PublicKey(&priv.PublicKey))
 	if err != nil {
-		return nil, fmt.Errorf("decoding public bytes: %s", err)
+		return nil, fmt.Errorf("decoding public bytes: %w", err)
 	}
 	return RSASigner{bytes: tb, privKey: priv, verifier: verif}, nil
 }

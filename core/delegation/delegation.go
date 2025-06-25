@@ -17,6 +17,7 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld/block"
 	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
 	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
+	"github.com/storacha/go-ucanto/core/iterable"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 	udm "github.com/storacha/go-ucanto/ucan/datamodel/ucan"
@@ -33,6 +34,12 @@ type Delegation interface {
 	Link() ucan.Link
 	// Archive writes the delegation to a Content Addressed aRchive (CAR).
 	Archive() io.Reader
+	// Export ONLY the blocks for the delegation and it's proofs, as well
+	// as blocks attached using Attach.
+	//
+	// Note: this differs from calling Blocks - which simply iterates over all
+	// blocks in the block reader that backs this [ipld.View].
+	Export() iter.Seq2[block.Block, error]
 	// Attach a block to the delegation DAG so it will be included in the block
 	// iterator. You should only attach blocks that are referenced from
 	// `Capabilities` or `Facts`.
@@ -61,6 +68,10 @@ func (d *delegation) Link() ucan.Link {
 }
 
 func (d *delegation) Blocks() iter.Seq2[ipld.Block, error] {
+	return iterable.Concat2(d.blks.Iterator(), d.atchblks.Iterator())
+}
+
+func (d *delegation) Export() iter.Seq2[ipld.Block, error] {
 	return export(d.ucan, d.rt, d.blks, d.atchblks)
 }
 
@@ -115,7 +126,7 @@ func (d *delegation) Attach(b block.Block) error {
 func NewDelegation(root ipld.Block, bs blockstore.BlockReader) (Delegation, error) {
 	ucan, err := decode(root)
 	if err != nil {
-		return nil, fmt.Errorf("decoding UCAN: %s", err)
+		return nil, fmt.Errorf("decoding UCAN: %w", err)
 	}
 	attachments, err := blockstore.NewBlockStore()
 	if err != nil {
@@ -127,7 +138,7 @@ func NewDelegation(root ipld.Block, bs blockstore.BlockReader) (Delegation, erro
 func NewDelegationView(root ipld.Link, bs blockstore.BlockReader) (Delegation, error) {
 	blk, ok, err := bs.Get(root)
 	if err != nil {
-		return nil, fmt.Errorf("getting delegation root block: %s", err)
+		return nil, fmt.Errorf("getting delegation root block: %w", err)
 	}
 	if !ok {
 		return nil, fmt.Errorf("missing delegation root block: %s", root)
@@ -201,23 +212,17 @@ func Archive(d Delegation) io.Reader {
 	)
 	if err != nil {
 		reader, _ := io.Pipe()
-		reader.CloseWithError(fmt.Errorf("hashing variant block bytes: %s", err))
+		reader.CloseWithError(fmt.Errorf("hashing variant block bytes: %w", err))
 		return reader
 	}
-	// Create a new reader that contains the new block as well as the others.
-	blks, err := blockstore.NewBlockStore(blockstore.WithBlocksIterator(d.Blocks()))
-	if err != nil {
-		reader, _ := io.Pipe()
-		reader.CloseWithError(fmt.Errorf("creating new block reader: %s", err))
-		return reader
-	}
-	err = blks.Put(variant)
-	if err != nil {
-		reader, _ := io.Pipe()
-		reader.CloseWithError(fmt.Errorf("adding variant block: %s", err))
-		return reader
-	}
-	return car.Encode([]ipld.Link{variant.Link()}, blks.Iterator())
+	return car.Encode([]ipld.Link{variant.Link()}, func(yield func(ipld.Block, error) bool) {
+		for b, err := range d.Export() {
+			if !yield(b, err) || err != nil {
+				return
+			}
+		}
+		yield(variant, nil)
+	})
 }
 
 func Extract(b []byte) (Delegation, error) {
@@ -234,15 +239,15 @@ func Extract(b []byte) (Delegation, error) {
 
 	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(blks))
 	if err != nil {
-		return nil, fmt.Errorf("creating block reader: %s", err)
+		return nil, fmt.Errorf("creating block reader: %w", err)
 	}
 
 	rt, ok, err := br.Get(roots[0])
 	if err != nil {
-		return nil, fmt.Errorf("getting root block: %s", err)
+		return nil, fmt.Errorf("getting root block: %w", err)
 	}
 	if !ok {
-		return nil, fmt.Errorf("missing root block: %d", len(roots))
+		return nil, fmt.Errorf("missing root block: %s", roots[0])
 	}
 
 	model := adm.ArchiveModel{}
@@ -254,7 +259,7 @@ func Extract(b []byte) (Delegation, error) {
 		sha256.Hasher,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("decoding root block: %s", err)
+		return nil, fmt.Errorf("decoding root block: %w", err)
 	}
 
 	return NewDelegationView(model.Ucan0_9_1, br)
