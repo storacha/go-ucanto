@@ -2,6 +2,7 @@ package testing
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -105,7 +106,7 @@ func TestHeaderCARTransport(t *testing.T) {
 			serve.Can(),
 			server.Provide(
 				serve,
-				func(cap ucan.Capability[serveCaveats], inv invocation.Invocation, ctx server.InvocationContext) (serveOk, fx.Effects, error) {
+				func(ctx context.Context, cap ucan.Capability[serveCaveats], inv invocation.Invocation, ictx server.InvocationContext) (serveOk, fx.Effects, error) {
 					printDelegation(t, inv)
 					return serveOk{Digest: cap.Nb().Digest, Range: cap.Nb().Range}, nil, nil
 				},
@@ -141,7 +142,7 @@ func TestHeaderCARTransport(t *testing.T) {
 	req, err := conn.Codec().Encode(input)
 	require.NoError(t, err)
 
-	res, err := conn.Channel().Request(req)
+	res, err := conn.Channel().Request(t.Context(), req)
 	require.NoError(t, err)
 
 	output, err := conn.Codec().Decode(res)
