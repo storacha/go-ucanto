@@ -1,54 +1,78 @@
-package car
+package headercar
 
 import (
 	"net/http"
 
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/transport"
-	"github.com/storacha/go-ucanto/transport/car/request"
-	"github.com/storacha/go-ucanto/transport/car/response"
+	chmessage "github.com/storacha/go-ucanto/transport/headercar/message"
+	"github.com/storacha/go-ucanto/transport/headercar/request"
+	"github.com/storacha/go-ucanto/transport/headercar/response"
 	thttp "github.com/storacha/go-ucanto/transport/http"
 )
 
-type carOutbound struct{}
-
-func (oc *carOutbound) Encode(msg message.AgentMessage) (transport.HTTPRequest, error) {
-	return request.Encode(msg)
+type config struct {
+	data chmessage.AgentMessageDataStreamer
 }
 
-func (oc *carOutbound) Decode(res transport.HTTPResponse) (message.AgentMessage, error) {
+type Option func(c *config)
+
+func WithDataStreamer(dataStreamer chmessage.AgentMessageDataStreamer) Option {
+	return func(c *config) {
+		c.data = dataStreamer
+	}
+}
+
+type OutboundCodec struct {
+	data chmessage.AgentMessageDataStreamer
+}
+
+func (oc *OutboundCodec) Encode(msg message.AgentMessage) (transport.HTTPRequest, error) {
+	return request.Encode(msg, oc.data)
+}
+
+func (oc *OutboundCodec) Decode(res transport.HTTPResponse) (message.AgentMessage, error) {
 	return response.Decode(res)
 }
 
-var _ transport.OutboundCodec = (*carOutbound)(nil)
+var _ transport.OutboundCodec = (*OutboundCodec)(nil)
 
-func NewOutboundCodec() transport.OutboundCodec {
-	return &carOutbound{}
+func NewOutboundCodec(opts ...Option) transport.OutboundCodec {
+	cfg := config{}
+	for _, option := range opts {
+		option(&cfg)
+	}
+	if cfg.data == nil {
+		cfg.data = chmessage.EmptyDataStreamer{}
+	}
+	return &OutboundCodec{data: cfg.data}
 }
 
-type carInboundAcceptCodec struct{}
+type InboundAcceptCodec struct {
+	data chmessage.AgentMessageDataStreamer
+}
 
-func (cic *carInboundAcceptCodec) Encoder() transport.ResponseEncoder {
+func (cic *InboundAcceptCodec) Encoder() transport.ResponseEncoder {
 	return cic
 }
 
-func (cic *carInboundAcceptCodec) Decoder() transport.RequestDecoder {
+func (cic *InboundAcceptCodec) Decoder() transport.RequestDecoder {
 	return cic
 }
 
-func (cic *carInboundAcceptCodec) Encode(msg message.AgentMessage) (transport.HTTPResponse, error) {
-	return response.Encode(msg)
+func (cic *InboundAcceptCodec) Encode(msg message.AgentMessage) (transport.HTTPResponse, error) {
+	return response.Encode(msg, cic.data)
 }
 
-func (cic *carInboundAcceptCodec) Decode(req transport.HTTPRequest) (message.AgentMessage, error) {
+func (cic *InboundAcceptCodec) Decode(req transport.HTTPRequest) (message.AgentMessage, error) {
 	return request.Decode(req)
 }
 
-type carInbound struct {
+type InboundCodec struct {
 	codec transport.InboundAcceptCodec
 }
 
-func (ic *carInbound) Accept(req transport.HTTPRequest) (transport.InboundAcceptCodec, transport.HTTPError) {
+func (ic *InboundCodec) Accept(req transport.HTTPRequest) (transport.InboundAcceptCodec, transport.HTTPError) {
 	msgHdr := req.Headers().Get("X-Agent-Message")
 	if msgHdr == "" {
 		return nil, thttp.NewHTTPError(
@@ -60,8 +84,15 @@ func (ic *carInbound) Accept(req transport.HTTPRequest) (transport.InboundAccept
 	return ic.codec, nil
 }
 
-var _ transport.InboundCodec = (*carInbound)(nil)
+var _ transport.InboundCodec = (*InboundCodec)(nil)
 
-func NewInboundCodec() transport.InboundCodec {
-	return &carInbound{codec: &carInboundAcceptCodec{}}
+func NewInboundCodec(opts ...Option) transport.InboundCodec {
+	cfg := config{}
+	for _, option := range opts {
+		option(&cfg)
+	}
+	if cfg.data == nil {
+		cfg.data = chmessage.EmptyDataStreamer{}
+	}
+	return &InboundCodec{codec: &InboundAcceptCodec{data: cfg.data}}
 }

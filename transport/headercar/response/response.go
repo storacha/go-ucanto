@@ -14,17 +14,17 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/transport"
+	chmessage "github.com/storacha/go-ucanto/transport/headercar/message"
 	uhttp "github.com/storacha/go-ucanto/transport/http"
 )
 
-func Encode(msg message.AgentMessage) (transport.HTTPResponse, error) {
-	headers := http.Header{}
-	body := car.Encode([]ipld.Link{msg.Root().Link()}, msg.Blocks())
+func Encode(msg message.AgentMessage, data chmessage.AgentMessageDataStreamer) (transport.HTTPResponse, error) {
+	carBody := car.Encode([]ipld.Link{msg.Root().Link()}, msg.Blocks())
 
 	r, w := io.Pipe()
 	go func() {
 		gz := gzip.NewWriter(w)
-		_, err := io.Copy(gz, body)
+		_, err := io.Copy(gz, carBody)
 		gz.Close()
 		w.CloseWithError(err)
 	}()
@@ -35,9 +35,18 @@ func Encode(msg message.AgentMessage) (transport.HTTPResponse, error) {
 		return nil, fmt.Errorf("reading encoded CAR: %w", err)
 	}
 
-	msgHdr, err := multibase.Encode(multibase.Base64, b.Bytes())
-	headers.Set("X-Agent-Message", msgHdr)
-	return uhttp.NewHTTPResponse(http.StatusOK, nil, headers), nil
+	xAgentMsg, err := multibase.Encode(multibase.Base64, b.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("multibase encoding: %w", err)
+	}
+
+	body, headers, err := data.Stream(msg)
+	if err != nil {
+		return nil, fmt.Errorf("streaming data: %w", err)
+	}
+	headers.Set("X-Agent-Message", xAgentMsg)
+
+	return uhttp.NewHTTPResponse(http.StatusOK, body, headers), nil
 }
 
 func Decode(response transport.HTTPResponse) (message.AgentMessage, error) {

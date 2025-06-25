@@ -19,9 +19,13 @@ type AgentMessage interface {
 	// Invocations is a list of links to the root block of invocations than can
 	// be found in the message.
 	Invocations() []ipld.Link
+	// Get a given invocation from the message by root CID.
+	Invocation(root ipld.Link) (invocation.Invocation, bool, error)
 	// Receipts is a list of links to the root block of receipts that can be
 	// found in the message.
 	Receipts() []ipld.Link
+	// Get a given receipt from the message by root CID.
+	Receipt(root ipld.Link) (receipt.AnyReceipt, bool, error)
 	// Get returns a receipt link from the message, given an invocation link.
 	Get(link ipld.Link) (ipld.Link, bool)
 }
@@ -30,6 +34,10 @@ type message struct {
 	root ipld.Block
 	data *mdm.DataModel
 	blks blockstore.BlockReader
+	// invs is cache of invocations decoded from the message
+	invs map[string]invocation.Invocation
+	// rcpts is a cache of receipts decoded from the message
+	rcpts map[string]receipt.AnyReceipt
 }
 
 var _ AgentMessage = (*message)(nil)
@@ -46,6 +54,22 @@ func (m *message) Invocations() []ipld.Link {
 	return m.data.Execute
 }
 
+func (m *message) Invocation(root ipld.Link) (invocation.Invocation, bool, error) {
+	if inv, ok := m.invs[root.String()]; ok {
+		return inv, true, nil
+	}
+	rtBlk, ok, err := m.blks.Get(root)
+	if !ok || err != nil {
+		return nil, ok, err
+	}
+	inv, err := invocation.NewInvocation(rtBlk, m.blks)
+	if err != nil {
+		return nil, false, err
+	}
+	m.invs[root.String()] = inv
+	return inv, true, nil
+}
+
 func (m *message) Receipts() []ipld.Link {
 	var rcpts []ipld.Link
 	for _, k := range m.data.Report.Keys {
@@ -55,6 +79,22 @@ func (m *message) Receipts() []ipld.Link {
 		}
 	}
 	return rcpts
+}
+
+func (m *message) Receipt(root ipld.Link) (receipt.AnyReceipt, bool, error) {
+	if rcpt, ok := m.rcpts[root.String()]; ok {
+		return rcpt, true, nil
+	}
+	_, ok, err := m.blks.Get(root)
+	if !ok || err != nil {
+		return nil, ok, err
+	}
+	rcpt, err := receipt.NewAnyReceipt[ipld.Node, ipld.Node](root, m.blks)
+	if err != nil {
+		return nil, false, err
+	}
+	m.rcpts[root.String()] = rcpt
+	return rcpt, true, nil
 }
 
 func (m *message) Get(link ipld.Link) (ipld.Link, bool) {
@@ -80,8 +120,10 @@ func Build(invocations []invocation.Invocation, receipts []receipt.AnyReceipt) (
 	}
 
 	ex := []ipld.Link{}
+	invCache := map[string]invocation.Invocation{}
 	for _, inv := range invocations {
 		ex = append(ex, inv.Link())
+		invCache[inv.Link().String()] = inv
 
 		err := blockstore.WriteInto(inv, bs)
 		if err != nil {
@@ -90,6 +132,7 @@ func Build(invocations []invocation.Invocation, receipts []receipt.AnyReceipt) (
 	}
 
 	var report *mdm.ReportModel
+	rcptCache := map[string]receipt.AnyReceipt{}
 	if len(receipts) > 0 {
 		report = &mdm.ReportModel{
 			Keys:   make([]string, 0, len(receipts)),
@@ -100,6 +143,7 @@ func Build(invocations []invocation.Invocation, receipts []receipt.AnyReceipt) (
 			if err != nil {
 				return nil, err
 			}
+			rcptCache[receipt.Root().Link().String()] = receipt
 
 			key := receipt.Ran().Link().String()
 			report.Keys = append(report.Keys, key)
@@ -130,7 +174,13 @@ func Build(invocations []invocation.Invocation, receipts []receipt.AnyReceipt) (
 		return nil, err
 	}
 
-	return &message{root: rt, data: msg.UcantoMessage7, blks: bs}, nil
+	return &message{
+		root:  rt,
+		data:  msg.UcantoMessage7,
+		blks:  bs,
+		invs:  invCache,
+		rcpts: rcptCache,
+	}, nil
 }
 
 func NewMessage(roots []ipld.Link, blks blockstore.BlockReader) (AgentMessage, error) {
@@ -158,5 +208,11 @@ func NewMessage(roots []ipld.Link, blks blockstore.BlockReader) (AgentMessage, e
 		return nil, fmt.Errorf("decoding message: %w", err)
 	}
 
-	return &message{root: rblock, data: msg.UcantoMessage7, blks: blks}, nil
+	return &message{
+		root:  rblock,
+		data:  msg.UcantoMessage7,
+		blks:  blks,
+		invs:  map[string]invocation.Invocation{},
+		rcpts: map[string]receipt.AnyReceipt{},
+	}, nil
 }
