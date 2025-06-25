@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -42,7 +44,7 @@ type InvocationContext interface {
 }
 
 // ServiceMethod is an invocation handler.
-type ServiceMethod[O ipld.Builder] func(input invocation.Invocation, context InvocationContext) (transaction.Transaction[O, ipld.Builder], error)
+type ServiceMethod[O ipld.Builder] func(context.Context, invocation.Invocation, InvocationContext) (transaction.Transaction[O, ipld.Builder], error)
 
 // Service is a mapping of service names to handlers, used to define a
 // service implementation.
@@ -68,7 +70,7 @@ type ServerView interface {
 	Server
 	transport.Channel
 	// Run executes a single invocation and returns a receipt.
-	Run(invocation ServiceInvocation) (receipt.AnyReceipt, error)
+	Run(ctx context.Context, invocation ServiceInvocation) (receipt.AnyReceipt, error)
 }
 
 // ErrorHandlerFunc allows non-result errors generated during handler execution
@@ -102,7 +104,7 @@ func NewServer(id principal.Signer, options ...Option) (ServerView, error) {
 
 	validateAuthorization := cfg.validateAuthorization
 	if validateAuthorization == nil {
-		validateAuthorization = func(auth validator.Authorization[any]) validator.Revoked {
+		validateAuthorization = func(context.Context, validator.Authorization[any]) validator.Revoked {
 			return nil
 		}
 	}
@@ -122,7 +124,7 @@ func NewServer(id principal.Signer, options ...Option) (ServerView, error) {
 		resolveDIDKey = validator.FailDIDKeyResolution
 	}
 
-	ctx := context{id, canIssue, validateAuthorization, resolveProof, parsePrincipal, resolveDIDKey, cfg.authorityProofs, cfg.altAudiences}
+	ctx := serverContext{id, canIssue, validateAuthorization, resolveProof, parsePrincipal, resolveDIDKey, cfg.authorityProofs, cfg.altAudiences}
 	svr := &server{id, cfg.service, ctx, codec, catch}
 	return svr, nil
 }
@@ -132,7 +134,7 @@ func ParsePrincipal(str string) (principal.Verifier, error) {
 	return verifier.Parse(str)
 }
 
-type context struct {
+type serverContext struct {
 	id                    principal.Signer
 	canIssue              validator.CanIssueFunc[any]
 	validateAuthorization validator.RevocationCheckerFunc[any]
@@ -143,36 +145,36 @@ type context struct {
 	altAudiences          []ucan.Principal
 }
 
-func (ctx context) ID() principal.Signer {
+func (ctx serverContext) ID() principal.Signer {
 	return ctx.id
 }
 
-func (ctx context) CanIssue(capability ucan.Capability[any], issuer did.DID) bool {
-	return ctx.canIssue(capability, issuer)
+func (sctx serverContext) CanIssue(capability ucan.Capability[any], issuer did.DID) bool {
+	return sctx.canIssue(capability, issuer)
 }
 
-func (ctx context) ValidateAuthorization(auth validator.Authorization[any]) validator.Revoked {
-	return ctx.validateAuthorization(auth)
+func (sctx serverContext) ValidateAuthorization(ctx context.Context, auth validator.Authorization[any]) validator.Revoked {
+	return sctx.validateAuthorization(ctx, auth)
 }
 
-func (ctx context) ResolveProof(proof ucan.Link) (delegation.Delegation, validator.UnavailableProof) {
-	return ctx.resolveProof(proof)
+func (sctx serverContext) ResolveProof(ctx context.Context, proof ucan.Link) (delegation.Delegation, validator.UnavailableProof) {
+	return sctx.resolveProof(ctx, proof)
 }
 
-func (ctx context) ParsePrincipal(str string) (principal.Verifier, error) {
-	return ctx.parsePrincipal(str)
+func (sctx serverContext) ParsePrincipal(str string) (principal.Verifier, error) {
+	return sctx.parsePrincipal(str)
 }
 
-func (ctx context) ResolveDIDKey(did did.DID) (did.DID, validator.UnresolvedDID) {
-	return ctx.resolveDIDKey(did)
+func (sctx serverContext) ResolveDIDKey(ctx context.Context, did did.DID) (did.DID, validator.UnresolvedDID) {
+	return sctx.resolveDIDKey(ctx, did)
 }
 
-func (ctx context) AuthorityProofs() []delegation.Delegation {
-	return ctx.authorityProofs
+func (sctx serverContext) AuthorityProofs() []delegation.Delegation {
+	return sctx.authorityProofs
 }
 
-func (ctx context) AlternativeAudiences() []ucan.Principal {
-	return ctx.altAudiences
+func (sctx serverContext) AlternativeAudiences() []ucan.Principal {
+	return sctx.altAudiences
 }
 
 type server struct {
@@ -199,12 +201,12 @@ func (srv *server) Codec() transport.InboundCodec {
 	return srv.codec
 }
 
-func (srv *server) Request(request transport.HTTPRequest) (transport.HTTPResponse, error) {
-	return Handle(srv, request)
+func (srv *server) Request(ctx context.Context, request transport.HTTPRequest) (transport.HTTPResponse, error) {
+	return Handle(ctx, srv, request)
 }
 
-func (srv *server) Run(invocation ServiceInvocation) (receipt.AnyReceipt, error) {
-	return Run(srv, invocation)
+func (srv *server) Run(ctx context.Context, invocation ServiceInvocation) (receipt.AnyReceipt, error) {
+	return Run(ctx, srv, invocation)
 }
 
 func (srv *server) Catch(err HandlerExecutionError[any]) {
@@ -214,7 +216,7 @@ func (srv *server) Catch(err HandlerExecutionError[any]) {
 var _ transport.Channel = (*server)(nil)
 var _ ServerView = (*server)(nil)
 
-func Handle(server Server, request transport.HTTPRequest) (transport.HTTPResponse, error) {
+func Handle(ctx context.Context, server Server, request transport.HTTPRequest) (transport.HTTPResponse, error) {
 	selection, aerr := server.Codec().Accept(request)
 	if aerr != nil {
 		return thttp.NewHTTPResponse(aerr.Status(), strings.NewReader(aerr.Error()), aerr.Headers()), nil
@@ -225,7 +227,7 @@ func Handle(server Server, request transport.HTTPRequest) (transport.HTTPRespons
 		return thttp.NewHTTPResponse(http.StatusBadRequest, strings.NewReader("The server failed to decode the request payload. Please format the payload according to the specified media type."), nil), nil
 	}
 
-	result, err := Execute(server, msg)
+	result, err := Execute(ctx, server, msg)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +235,7 @@ func Handle(server Server, request transport.HTTPRequest) (transport.HTTPRespons
 	return selection.Encoder().Encode(result)
 }
 
-func Execute(server Server, msg message.AgentMessage) (message.AgentMessage, error) {
+func Execute(ctx context.Context, server Server, msg message.AgentMessage) (message.AgentMessage, error) {
 	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(msg.Blocks()))
 	if err != nil {
 		return nil, err
@@ -256,7 +258,7 @@ func Execute(server Server, msg message.AgentMessage) (message.AgentMessage, err
 		wg.Add(1)
 		go func(inv invocation.Invocation) {
 			defer wg.Done()
-			rcpt, err := Run(server, inv)
+			rcpt, err := Run(ctx, server, inv)
 			if err != nil {
 				rerr = err
 				return
@@ -276,7 +278,7 @@ func Execute(server Server, msg message.AgentMessage) (message.AgentMessage, err
 	return message.Build(nil, rcpts)
 }
 
-func Run(server Server, invocation ServiceInvocation) (receipt.AnyReceipt, error) {
+func Run(ctx context.Context, server Server, invocation ServiceInvocation) (receipt.AnyReceipt, error) {
 	caps := invocation.Capabilities()
 	// Invocation needs to have one single capability
 	if len(caps) != 1 {
@@ -291,8 +293,11 @@ func Run(server Server, invocation ServiceInvocation) (receipt.AnyReceipt, error
 		return receipt.Issue(server.ID(), result.NewFailure(err), ran.FromInvocation(invocation))
 	}
 
-	tx, err := handle(invocation, server.Context())
+	tx, err := handle(ctx, invocation, server.Context())
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return nil, err
+		}
 		herr := NewHandlerExecutionError(err, cap)
 		server.Catch(herr)
 		return receipt.Issue(server.ID(), result.NewFailure(herr), ran.FromInvocation(invocation))
