@@ -172,6 +172,11 @@ func NewReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, typ sch
 	return &rcpt, nil
 }
 
+func NewAnyReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, opts ...bindnode.Option) (AnyReceipt, error) {
+	anyReceiptType := rdm.TypeSystem().TypeByName("Receipt")
+	return NewReceipt[ipld.Node, ipld.Node](root, blocks, anyReceiptType, opts...)
+}
+
 type ReceiptReader[O, X any] interface {
 	Read(rcpt ipld.Link, blks iter.Seq2[block.Block, error]) (Receipt[O, X], error)
 }
