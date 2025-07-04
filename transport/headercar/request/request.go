@@ -41,7 +41,11 @@ func Encode(msg message.AgentMessage, options ...EncodeOption) (transport.HTTPRe
 		if err != nil {
 			return nil, fmt.Errorf("streaming data: %w", err)
 		}
-		headers = h
+		if h != nil {
+			headers = h
+		} else {
+			headers = http.Header{}
+		}
 		body = b
 	} else {
 		headers = http.Header{}
