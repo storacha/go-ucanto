@@ -2,6 +2,7 @@ package response
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/storacha/go-ucanto/core/message"
@@ -33,9 +34,21 @@ func Encode(msg message.AgentMessage, options ...EncodeOption) (transport.HTTPRe
 		return nil, fmt.Errorf("encoding %s header: %w", hcmsg.AgentMessageHeader, err)
 	}
 
-	body, headers, err := opts.bodyProvider.Stream(msg)
-	if err != nil {
-		return nil, fmt.Errorf("streaming data: %w", err)
+	var headers http.Header
+	var body io.Reader
+	if opts.bodyProvider != nil {
+		b, h, err := opts.bodyProvider.Stream(msg)
+		if err != nil {
+			return nil, fmt.Errorf("streaming data: %w", err)
+		}
+		if h != nil {
+			headers = h
+		} else {
+			headers = http.Header{}
+		}
+		body = b
+	} else {
+		headers = http.Header{}
 	}
 	headers.Set(hcmsg.AgentMessageHeader, xAgentMsg)
 
