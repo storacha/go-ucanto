@@ -5,29 +5,29 @@ import (
 
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/transport"
-	chmessage "github.com/storacha/go-ucanto/transport/headercar/message"
+	hcmsg "github.com/storacha/go-ucanto/transport/headercar/message"
 	uhttp "github.com/storacha/go-ucanto/transport/http"
 )
 
-func Encode(msg message.AgentMessage, data chmessage.AgentMessageDataStreamer) (transport.HTTPRequest, error) {
-	xAgentMsg, err := chmessage.EncodeHeader(msg)
+func Encode(msg message.AgentMessage, data hcmsg.AgentMessageDataStreamer) (transport.HTTPRequest, error) {
+	xAgentMsg, err := hcmsg.EncodeHeader(msg)
 	if err != nil {
-		return nil, fmt.Errorf("encoding %s header: %w", chmessage.AgentMessageHeader, err)
+		return nil, fmt.Errorf("encoding %s header: %w", hcmsg.AgentMessageHeader, err)
 	}
 
 	body, headers, err := data.Stream(msg)
 	if err != nil {
 		return nil, fmt.Errorf("streaming data: %w", err)
 	}
-	headers.Set(chmessage.AgentMessageHeader, xAgentMsg)
+	headers.Set(hcmsg.AgentMessageHeader, xAgentMsg)
 
 	return uhttp.NewHTTPRequest(body, headers), nil
 }
 
 func Decode(req transport.HTTPRequest) (message.AgentMessage, error) {
-	msgHdr := req.Headers().Get(chmessage.AgentMessageHeader)
+	msgHdr := req.Headers().Get(hcmsg.AgentMessageHeader)
 	if msgHdr == "" {
-		return nil, fmt.Errorf("missing %s header in request", chmessage.AgentMessageHeader)
+		return nil, fmt.Errorf("missing %s header in request", hcmsg.AgentMessageHeader)
 	}
-	return chmessage.DecodeHeader(msgHdr)
+	return hcmsg.DecodeHeader(msgHdr)
 }
