@@ -68,12 +68,12 @@ var serve = validator.NewCapability(
 	validator.DefaultDerives,
 )
 
-type mockStreamer struct {
+type mockBodyProvider struct {
 	t    *testing.T
 	data map[string][]byte
 }
 
-func (ms *mockStreamer) Stream(msg message.AgentMessage) (io.Reader, http.Header, error) {
+func (ms *mockBodyProvider) Stream(msg message.AgentMessage) (io.Reader, http.Header, error) {
 	t := ms.t
 	require.Len(t, msg.Receipts(), 1)
 	rcpt, ok, err := msg.Receipt(msg.Receipts()[0])
@@ -94,7 +94,7 @@ func (ms *mockStreamer) Stream(msg message.AgentMessage) (io.Reader, http.Header
 func TestHeaderCARTransport(t *testing.T) {
 	blobDigest := helpers.RandomDigest()
 	data := helpers.RandomBytes(1024)
-	dataStreamer := mockStreamer{
+	provider := mockBodyProvider{
 		t:    t,
 		data: map[string][]byte{blobDigest.B58String(): data},
 	}
@@ -112,7 +112,7 @@ func TestHeaderCARTransport(t *testing.T) {
 				},
 			),
 		),
-		server.WithInboundCodec(headercar.NewInboundCodec(headercar.WithDataStreamer(&dataStreamer))),
+		server.WithInboundCodec(headercar.NewInboundCodec(headercar.WithBodyProvider(&provider))),
 	)
 	require.NoError(t, err)
 
