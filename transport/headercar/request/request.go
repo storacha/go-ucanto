@@ -1,6 +1,7 @@
 package request
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -51,6 +52,10 @@ func Encode(msg message.AgentMessage, options ...EncodeOption) (transport.HTTPRe
 		headers = http.Header{}
 	}
 	headers.Set(hcmsg.AgentMessageHeader, xAgentMsg)
+
+	if body == nil {
+		body = bytes.NewReader([]byte{})
+	}
 
 	return uhttp.NewHTTPRequest(body, headers), nil
 }
