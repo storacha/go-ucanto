@@ -10,13 +10,30 @@ import (
 	uhttp "github.com/storacha/go-ucanto/transport/http"
 )
 
-func Encode(msg message.AgentMessage, data hcmsg.AgentMessageDataStreamer) (transport.HTTPResponse, error) {
+type encodeOptions struct {
+	bodyProvider hcmsg.BodyProvider
+}
+
+type EncodeOption func(c *encodeOptions)
+
+func WithBodyProvider(provider hcmsg.BodyProvider) EncodeOption {
+	return func(c *encodeOptions) {
+		c.bodyProvider = provider
+	}
+}
+
+func Encode(msg message.AgentMessage, options ...EncodeOption) (transport.HTTPResponse, error) {
+	opts := encodeOptions{}
+	for _, opt := range options {
+		opt(&opts)
+	}
+
 	xAgentMsg, err := hcmsg.EncodeHeader(msg)
 	if err != nil {
 		return nil, fmt.Errorf("encoding %s header: %w", hcmsg.AgentMessageHeader, err)
 	}
 
-	body, headers, err := data.Stream(msg)
+	body, headers, err := opts.bodyProvider.Stream(msg)
 	if err != nil {
 		return nil, fmt.Errorf("streaming data: %w", err)
 	}

@@ -2,6 +2,8 @@ package request
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/transport"
@@ -9,15 +11,40 @@ import (
 	uhttp "github.com/storacha/go-ucanto/transport/http"
 )
 
-func Encode(msg message.AgentMessage, data hcmsg.AgentMessageDataStreamer) (transport.HTTPRequest, error) {
+type encodeOptions struct {
+	bodyProvider hcmsg.BodyProvider
+}
+
+type EncodeOption func(c *encodeOptions)
+
+func WithBodyProvider(provider hcmsg.BodyProvider) EncodeOption {
+	return func(c *encodeOptions) {
+		c.bodyProvider = provider
+	}
+}
+
+func Encode(msg message.AgentMessage, options ...EncodeOption) (transport.HTTPRequest, error) {
+	opts := encodeOptions{}
+	for _, opt := range options {
+		opt(&opts)
+	}
+
 	xAgentMsg, err := hcmsg.EncodeHeader(msg)
 	if err != nil {
 		return nil, fmt.Errorf("encoding %s header: %w", hcmsg.AgentMessageHeader, err)
 	}
 
-	body, headers, err := data.Stream(msg)
-	if err != nil {
-		return nil, fmt.Errorf("streaming data: %w", err)
+	var headers http.Header
+	var body io.Reader
+	if opts.bodyProvider != nil {
+		b, h, err := opts.bodyProvider.Stream(msg)
+		if err != nil {
+			return nil, fmt.Errorf("streaming data: %w", err)
+		}
+		headers = h
+		body = b
+	} else {
+		headers = http.Header{}
 	}
 	headers.Set(hcmsg.AgentMessageHeader, xAgentMsg)
 

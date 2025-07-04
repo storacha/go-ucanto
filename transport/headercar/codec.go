@@ -12,23 +12,23 @@ import (
 )
 
 type config struct {
-	data hcmsg.AgentMessageDataStreamer
+	bodyProvider hcmsg.BodyProvider
 }
 
 type Option func(c *config)
 
-func WithDataStreamer(dataStreamer hcmsg.AgentMessageDataStreamer) Option {
+func WithBodyProvider(provider hcmsg.BodyProvider) Option {
 	return func(c *config) {
-		c.data = dataStreamer
+		c.bodyProvider = provider
 	}
 }
 
 type OutboundCodec struct {
-	data hcmsg.AgentMessageDataStreamer
+	bodyProvider hcmsg.BodyProvider
 }
 
 func (oc *OutboundCodec) Encode(msg message.AgentMessage) (transport.HTTPRequest, error) {
-	return request.Encode(msg, oc.data)
+	return request.Encode(msg, request.WithBodyProvider(oc.bodyProvider))
 }
 
 func (oc *OutboundCodec) Decode(res transport.HTTPResponse) (message.AgentMessage, error) {
@@ -42,14 +42,11 @@ func NewOutboundCodec(opts ...Option) transport.OutboundCodec {
 	for _, option := range opts {
 		option(&cfg)
 	}
-	if cfg.data == nil {
-		cfg.data = hcmsg.EmptyDataStreamer{}
-	}
-	return &OutboundCodec{data: cfg.data}
+	return &OutboundCodec{bodyProvider: cfg.bodyProvider}
 }
 
 type InboundAcceptCodec struct {
-	data hcmsg.AgentMessageDataStreamer
+	bodyProvider hcmsg.BodyProvider
 }
 
 func (cic *InboundAcceptCodec) Encoder() transport.ResponseEncoder {
@@ -61,7 +58,7 @@ func (cic *InboundAcceptCodec) Decoder() transport.RequestDecoder {
 }
 
 func (cic *InboundAcceptCodec) Encode(msg message.AgentMessage) (transport.HTTPResponse, error) {
-	return response.Encode(msg, cic.data)
+	return response.Encode(msg, response.WithBodyProvider(cic.bodyProvider))
 }
 
 func (cic *InboundAcceptCodec) Decode(req transport.HTTPRequest) (message.AgentMessage, error) {
@@ -91,8 +88,5 @@ func NewInboundCodec(opts ...Option) transport.InboundCodec {
 	for _, option := range opts {
 		option(&cfg)
 	}
-	if cfg.data == nil {
-		cfg.data = hcmsg.EmptyDataStreamer{}
-	}
-	return &InboundCodec{codec: &InboundAcceptCodec{data: cfg.data}}
+	return &InboundCodec{codec: &InboundAcceptCodec{bodyProvider: cfg.bodyProvider}}
 }
