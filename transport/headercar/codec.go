@@ -5,26 +5,26 @@ import (
 
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/transport"
-	chmessage "github.com/storacha/go-ucanto/transport/headercar/message"
+	hcmsg "github.com/storacha/go-ucanto/transport/headercar/message"
 	"github.com/storacha/go-ucanto/transport/headercar/request"
 	"github.com/storacha/go-ucanto/transport/headercar/response"
 	thttp "github.com/storacha/go-ucanto/transport/http"
 )
 
 type config struct {
-	data chmessage.AgentMessageDataStreamer
+	data hcmsg.AgentMessageDataStreamer
 }
 
 type Option func(c *config)
 
-func WithDataStreamer(dataStreamer chmessage.AgentMessageDataStreamer) Option {
+func WithDataStreamer(dataStreamer hcmsg.AgentMessageDataStreamer) Option {
 	return func(c *config) {
 		c.data = dataStreamer
 	}
 }
 
 type OutboundCodec struct {
-	data chmessage.AgentMessageDataStreamer
+	data hcmsg.AgentMessageDataStreamer
 }
 
 func (oc *OutboundCodec) Encode(msg message.AgentMessage) (transport.HTTPRequest, error) {
@@ -43,13 +43,13 @@ func NewOutboundCodec(opts ...Option) transport.OutboundCodec {
 		option(&cfg)
 	}
 	if cfg.data == nil {
-		cfg.data = chmessage.EmptyDataStreamer{}
+		cfg.data = hcmsg.EmptyDataStreamer{}
 	}
 	return &OutboundCodec{data: cfg.data}
 }
 
 type InboundAcceptCodec struct {
-	data chmessage.AgentMessageDataStreamer
+	data hcmsg.AgentMessageDataStreamer
 }
 
 func (cic *InboundAcceptCodec) Encoder() transport.ResponseEncoder {
@@ -92,7 +92,7 @@ func NewInboundCodec(opts ...Option) transport.InboundCodec {
 		option(&cfg)
 	}
 	if cfg.data == nil {
-		cfg.data = chmessage.EmptyDataStreamer{}
+		cfg.data = hcmsg.EmptyDataStreamer{}
 	}
 	return &InboundCodec{codec: &InboundAcceptCodec{data: cfg.data}}
 }
