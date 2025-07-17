@@ -62,7 +62,7 @@ func NewConnection(id ucan.Principal, channel transport.Channel, options ...Opti
 
 	codec := cfg.codec
 	if codec == nil {
-		codec = car.NewCAROutboundCodec()
+		codec = car.NewOutboundCodec()
 	}
 
 	c := conn{id, codec, channel, hasher}

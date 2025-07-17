@@ -34,3 +34,7 @@ func RandomCID() datamodel.Link {
 	}.Sum(bytes)
 	return cidlink.Link{Cid: c}
 }
+
+func RandomDigest() multihash.Multihash {
+	return RandomCID().(cidlink.Link).Hash()
+}
