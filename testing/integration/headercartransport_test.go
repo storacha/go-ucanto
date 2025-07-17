@@ -112,7 +112,7 @@ func TestHeaderCARTransport(t *testing.T) {
 				},
 			),
 		),
-		server.WithInboundCodec(headercar.NewInboundCodec(headercar.WithBodyProvider(&provider))),
+		server.WithInboundCodec(headercar.NewInboundCodec(headercar.WithResponseProvider(&provider))),
 	)
 	require.NoError(t, err)
 
