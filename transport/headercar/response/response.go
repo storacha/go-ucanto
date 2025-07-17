@@ -15,12 +15,12 @@ import (
 )
 
 type encodeOptions struct {
-	bodyProvider hcmsg.BodyProvider
+	bodyProvider hcmsg.ResponseBodyProvider
 }
 
 type EncodeOption func(c *encodeOptions)
 
-func WithBodyProvider(provider hcmsg.BodyProvider) EncodeOption {
+func WithBodyProvider(provider hcmsg.ResponseBodyProvider) EncodeOption {
 	return func(c *encodeOptions) {
 		c.bodyProvider = provider
 	}
@@ -67,9 +67,12 @@ func Encode(msg message.AgentMessage, options ...EncodeOption) (transport.HTTPRe
 	var headers http.Header
 	var body io.Reader
 	if opts.bodyProvider != nil {
-		b, h, err := opts.bodyProvider.Stream(msg)
+		b, s, h, err := opts.bodyProvider.Stream(msg)
 		if err != nil {
 			return nil, fmt.Errorf("streaming data: %w", err)
+		}
+		if status == http.StatusOK && s > 0 {
+			status = s
 		}
 		if h != nil {
 			headers = h

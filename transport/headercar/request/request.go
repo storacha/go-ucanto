@@ -13,12 +13,12 @@ import (
 )
 
 type encodeOptions struct {
-	bodyProvider hcmsg.BodyProvider
+	bodyProvider hcmsg.RequestBodyProvider
 }
 
 type EncodeOption func(c *encodeOptions)
 
-func WithBodyProvider(provider hcmsg.BodyProvider) EncodeOption {
+func WithBodyProvider(provider hcmsg.RequestBodyProvider) EncodeOption {
 	return func(c *encodeOptions) {
 		c.bodyProvider = provider
 	}

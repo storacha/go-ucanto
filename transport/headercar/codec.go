@@ -3,6 +3,7 @@ package headercar
 import (
 	"net/http"
 
+	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/transport"
 	hcmsg "github.com/storacha/go-ucanto/transport/headercar/message"
@@ -11,20 +12,20 @@ import (
 	thttp "github.com/storacha/go-ucanto/transport/http"
 )
 
-type config struct {
-	bodyProvider hcmsg.BodyProvider
+type outboundConfig struct {
+	bodyProvider hcmsg.RequestBodyProvider
 }
 
-type Option func(c *config)
+type OutboundOption func(c *outboundConfig)
 
-func WithBodyProvider(provider hcmsg.BodyProvider) Option {
-	return func(c *config) {
+func WithRequestBodyProvider(provider hcmsg.RequestBodyProvider) OutboundOption {
+	return func(c *outboundConfig) {
 		c.bodyProvider = provider
 	}
 }
 
 type OutboundCodec struct {
-	bodyProvider hcmsg.BodyProvider
+	bodyProvider hcmsg.RequestBodyProvider
 }
 
 func (oc *OutboundCodec) Encode(msg message.AgentMessage) (transport.HTTPRequest, error) {
@@ -37,8 +38,8 @@ func (oc *OutboundCodec) Decode(res transport.HTTPResponse) (message.AgentMessag
 
 var _ transport.OutboundCodec = (*OutboundCodec)(nil)
 
-func NewOutboundCodec(opts ...Option) transport.OutboundCodec {
-	cfg := config{}
+func NewOutboundCodec(opts ...OutboundOption) transport.OutboundCodec {
+	cfg := outboundConfig{}
 	for _, option := range opts {
 		option(&cfg)
 	}
@@ -46,7 +47,8 @@ func NewOutboundCodec(opts ...Option) transport.OutboundCodec {
 }
 
 type InboundAcceptCodec struct {
-	bodyProvider hcmsg.BodyProvider
+	delegationCache delegation.Store
+	bodyProvider    hcmsg.ResponseBodyProvider
 }
 
 func (cic *InboundAcceptCodec) Encoder() transport.ResponseEncoder {
@@ -83,10 +85,22 @@ func (ic *InboundCodec) Accept(req transport.HTTPRequest) (transport.InboundAcce
 
 var _ transport.InboundCodec = (*InboundCodec)(nil)
 
-func NewInboundCodec(opts ...Option) transport.InboundCodec {
-	cfg := config{}
+type inboundConfig struct {
+	bodyProvider hcmsg.ResponseBodyProvider
+}
+
+type InboundOption func(c *inboundConfig)
+
+func WithResponseBodyProvider(provider hcmsg.ResponseBodyProvider) InboundOption {
+	return func(c *inboundConfig) {
+		c.bodyProvider = provider
+	}
+}
+
+func NewInboundCodec(delegationCache delegation.Store, opts ...InboundOption) transport.InboundCodec {
+	cfg := inboundConfig{}
 	for _, option := range opts {
 		option(&cfg)
 	}
-	return &InboundCodec{codec: &InboundAcceptCodec{bodyProvider: cfg.bodyProvider}}
+	return &InboundCodec{codec: &InboundAcceptCodec{delegationCache: delegationCache, bodyProvider: cfg.bodyProvider}}
 }
