@@ -1,6 +1,7 @@
 package did
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -53,6 +54,30 @@ func (d DID) String() string {
 // GoString formats the decentralized identity document (DID) as a string.
 func (d DID) GoString() string {
 	return d.String()
+}
+
+func (d DID) MarshalJSON() ([]byte, error) {
+	if d == Undef {
+		return json.Marshal(nil)
+	}
+	return json.Marshal(d.String())
+}
+
+func (d *DID) UnmarshalJSON(b []byte) error {
+	var str string
+	err := json.Unmarshal(b, &str)
+	if err != nil {
+		return fmt.Errorf("parsing string: %w", err)
+	}
+	if str == "" {
+		return nil
+	}
+	parsed, err := Parse(str)
+	if err != nil {
+		return fmt.Errorf("parsing DID: %w", err)
+	}
+	*d = parsed
+	return nil
 }
 
 func Decode(bytes []byte) (DID, error) {
