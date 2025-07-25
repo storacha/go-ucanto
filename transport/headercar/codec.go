@@ -3,7 +3,6 @@ package headercar
 import (
 	"net/http"
 
-	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/transport"
 	hcmsg "github.com/storacha/go-ucanto/transport/headercar/message"
@@ -47,8 +46,7 @@ func NewOutboundCodec(opts ...OutboundOption) transport.OutboundCodec {
 }
 
 type InboundAcceptCodec struct {
-	delegationCache delegation.Store
-	bodyProvider    hcmsg.ResponseBodyProvider
+	bodyProvider hcmsg.ResponseBodyProvider
 }
 
 func (cic *InboundAcceptCodec) Encoder() transport.ResponseEncoder {
@@ -97,10 +95,10 @@ func WithResponseBodyProvider(provider hcmsg.ResponseBodyProvider) InboundOption
 	}
 }
 
-func NewInboundCodec(delegationCache delegation.Store, opts ...InboundOption) transport.InboundCodec {
+func NewInboundCodec(opts ...InboundOption) transport.InboundCodec {
 	cfg := inboundConfig{}
 	for _, option := range opts {
 		option(&cfg)
 	}
-	return &InboundCodec{codec: &InboundAcceptCodec{delegationCache: delegationCache, bodyProvider: cfg.bodyProvider}}
+	return &InboundCodec{codec: &InboundAcceptCodec{bodyProvider: cfg.bodyProvider}}
 }

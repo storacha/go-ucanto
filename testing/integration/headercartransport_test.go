@@ -73,7 +73,7 @@ type mockBodyProvider struct {
 	data map[string][]byte
 }
 
-func (ms *mockBodyProvider) Stream(msg message.AgentMessage) (io.Reader, http.Header, error) {
+func (ms *mockBodyProvider) Stream(msg message.AgentMessage) (io.Reader, int, http.Header, error) {
 	t := ms.t
 	require.Len(t, msg.Receipts(), 1)
 	rcpt, ok, err := msg.Receipt(msg.Receipts()[0])
@@ -88,7 +88,21 @@ func (ms *mockBodyProvider) Stream(msg message.AgentMessage) (io.Reader, http.He
 
 	data := ms.data[multihash.Multihash(serveOk.Digest).B58String()]
 	offset, length := serveOk.Range[0], serveOk.Range[1]
-	return bytes.NewReader(data[offset : offset+length]), http.Header{}, nil
+	return bytes.NewReader(data[offset : offset+length]), 206, http.Header{}, nil
+}
+
+type mockDelegationCache struct {
+	data map[string]delegation.Delegation
+}
+
+func (m *mockDelegationCache) Get(ctx context.Context, root ipld.Link) (delegation.Delegation, bool, error) {
+	d, ok := m.data[root.String()]
+	return d, ok, nil
+}
+
+func (m *mockDelegationCache) Put(ctx context.Context, d delegation.Delegation) error {
+	m.data[d.Link().String()] = d
+	return nil
 }
 
 func TestHeaderCARTransport(t *testing.T) {
@@ -98,6 +112,7 @@ func TestHeaderCARTransport(t *testing.T) {
 		t:    t,
 		data: map[string][]byte{blobDigest.B58String(): data},
 	}
+	dlgCache := mockDelegationCache{data: map[string]delegation.Delegation{}}
 
 	server, err := server.NewServer(
 		fixtures.Service,
@@ -112,7 +127,7 @@ func TestHeaderCARTransport(t *testing.T) {
 				},
 			),
 		),
-		server.WithInboundCodec(headercar.NewInboundCodec(headercar.WithResponseProvider(&provider))),
+		server.WithInboundCodec(headercar.NewInboundCodec(&dlgCache, headercar.WithResponseBodyProvider(&provider))),
 	)
 	require.NoError(t, err)
 

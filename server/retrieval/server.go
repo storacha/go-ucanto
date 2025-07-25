@@ -17,16 +17,22 @@ import (
 )
 
 type RetrievalResponse struct {
-	Status  int
+	// Status is the HTTP status that should be returned. e.g. 206 when returning
+	// a range request.
+	Status int
+	// Headers are additional HTTP headers to return in the response. At minimum
+	// they should include the Content-Length header, but should also include
+	// Content-Range for byte range responses.
 	Headers http.Header
-	Body    io.Reader
+	// Body is the data to return in the response body.
+	Body io.Reader
 }
 
 // ServiceMethod is an invocation handler. It is different to
-// [server.ServiceMethod] in that it allows an [RetrievalResponse] to be returned,
-// which for a retrieval server will determine the HTTP headers and body content
-// of the HTTP response. The usual handler response (out and effects) are added
-// to the X-Agent-Message HTTP header.
+// [server.ServiceMethod] in that it allows an [RetrievalResponse] to be
+// returned, which for a retrieval server will determine the HTTP headers and
+// body content of the HTTP response. The usual handler response (out and
+// effects) are added to the X-Agent-Message HTTP header.
 type ServiceMethod[O ipld.Builder] func(context.Context, invocation.Invocation, server.InvocationContext) (transaction.Transaction[O, ipld.Builder], *RetrievalResponse, error)
 
 // Service is a mapping of service names to handlers, used to define a
@@ -64,14 +70,14 @@ func NewServer(id principal.Signer, options ...Option) (server.ServerView, error
 		dlgCache = dc
 	}
 
-	bodyProvider := &bodyProvider{retrievals: map[string]*RetrievalResponse{}}
+	bodyProvider := &bodyProvider{responses: map[string]*RetrievalResponse{}}
 	codec := headercar.NewInboundCodec(dlgCache, headercar.WithResponseBodyProvider(bodyProvider))
 
 	srvOpts := []server.Option{server.WithInboundCodec(codec)}
 	for ability, method := range cfg.service {
 		srvOpts = append(srvOpts, server.WithServiceMethod(ability, func(ctx context.Context, inv invocation.Invocation, ictx server.InvocationContext) (transaction.Transaction[ipld.Builder, ipld.Builder], error) {
 			txn, res, err := method(ctx, inv, ictx)
-			bodyProvider.setRetrieval(inv.Link(), res)
+			bodyProvider.setResponse(inv.Link(), res)
 			return txn, err
 		}))
 	}
@@ -98,13 +104,13 @@ func NewServer(id principal.Signer, options ...Option) (server.ServerView, error
 }
 
 type bodyProvider struct {
-	retrievals map[string]*RetrievalResponse
-	mutex      sync.Mutex
+	responses map[string]*RetrievalResponse
+	mutex     sync.Mutex
 }
 
-func (bp *bodyProvider) setRetrieval(ran ipld.Link, retrieval *RetrievalResponse) {
+func (bp *bodyProvider) setResponse(ran ipld.Link, retrieval *RetrievalResponse) {
 	bp.mutex.Lock()
-	bp.retrievals[ran.String()] = retrieval
+	bp.responses[ran.String()] = retrieval
 	bp.mutex.Unlock()
 }
 
@@ -117,10 +123,10 @@ func (bp *bodyProvider) Stream(msg message.AgentMessage) (io.Reader, int, http.H
 	key := inv.Link().String()
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
-	res, ok := bp.retrievals[key]
+	res, ok := bp.responses[key]
 	if !ok {
 		return nil, 0, nil, nil
 	}
-	delete(bp.retrievals, key)
+	delete(bp.responses, key)
 	return res.Body, res.Status, res.Headers, nil
 }
