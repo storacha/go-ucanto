@@ -1,4 +1,4 @@
-package retrieval
+package retrieval2
 
 import (
 	"context"
@@ -16,7 +16,6 @@ import (
 	"github.com/storacha/go-ucanto/server/transaction"
 	"github.com/storacha/go-ucanto/transport"
 	"github.com/storacha/go-ucanto/transport/headercar"
-	"github.com/storacha/go-ucanto/ucan"
 )
 
 type RetrievalRequest struct {
@@ -53,11 +52,28 @@ type Transaction[O any, X any] interface {
 // returned, which for a retrieval server will determine the HTTP headers and
 // body content of the HTTP response. The usual handler response (out and
 // effects) are added to the X-Agent-Message HTTP header.
-type ServiceMethod[O ipld.Builder] func(context.Context, invocation.Invocation, InvocationContext) (Transaction[O, ipld.Builder], error)
+type ServiceMethod[O, X ipld.Builder] func(context.Context, invocation.Invocation, InvocationContext) (Transaction[O, X], error)
 
-// Service is a mapping of service names to handlers, used to define a
-// retrieval server service implementation.
-type Service = map[ucan.Ability]ServiceMethod[ipld.Builder]
+type ServiceInvocation = invocation.IssuedInvocation
+
+type Server[O, X ipld.Builder] interface {
+	// ID is the DID which will be used to verify that received invocation
+	// audience matches it.
+	ID() principal.Signer
+	Codec() transport.InboundCodec
+	Context() InvocationContext
+	// Handler is the capability handler for retrievals.
+	Handler() ServiceMethod[O, X]
+	Catch(err server.HandlerExecutionError[any])
+}
+
+// Server is a materialized service that is configured to use a specific
+// transport channel. It has a invocation context which contains the DID of the
+// service itself, among other things.
+type ServerView[O, X ipld.Builder] interface {
+	Server[O, X]
+	transport.Channel
+}
 
 // NewServer creates a retrieval server, which is a UCAN server that comes
 // pre-loaded with a [headercar] codec.
@@ -73,7 +89,7 @@ type Service = map[ucan.Ability]ServiceMethod[ipld.Builder]
 // that can be looked up in the delegations cache.
 //
 // The delegations cache should be a size bounded LRU to prevent DoS attacks.
-func NewServer(id principal.Signer, options ...Option) (server.ServerView, error) {
+func NewServer[O, X ipld.Builder](id principal.Signer, handler ServiceMethod[O, X], options ...Option) (ServerView[O, X], error) {
 	cfg := srvConfig{service: Service{}}
 	for _, opt := range options {
 		if err := opt(&cfg); err != nil {

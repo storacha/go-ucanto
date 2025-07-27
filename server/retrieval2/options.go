@@ -1,14 +1,8 @@
-package retrieval
+package retrieval2
 
 import (
-	"context"
-
 	"github.com/storacha/go-ucanto/core/delegation"
-	"github.com/storacha/go-ucanto/core/invocation"
-	"github.com/storacha/go-ucanto/core/ipld"
-	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/server"
-	"github.com/storacha/go-ucanto/server/transaction"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/go-ucanto/validator"
 )
@@ -20,7 +14,6 @@ import (
 type Option func(cfg *srvConfig) error
 
 type srvConfig struct {
-	service               Service
 	validateAuthorization validator.RevocationCheckerFunc[any]
 	canIssue              validator.CanIssueFunc[any]
 	resolveProof          validator.ProofResolverFunc
@@ -30,20 +23,6 @@ type srvConfig struct {
 	altAudiences          []ucan.Principal
 	catch                 server.ErrorHandlerFunc
 	delegationCache       delegation.Store
-}
-
-func WithServiceMethod[O ipld.Builder](can string, handleFunc ServiceMethod[O]) Option {
-	return func(cfg *srvConfig) error {
-		cfg.service[can] = func(ctx context.Context, input invocation.Invocation, ictx server.InvocationContext, request *RetrievalRequest) (transaction.Transaction[ipld.Builder, ipld.Builder], *RetrievalResponse, error) {
-			tx, res, err := handleFunc(ctx, input, ictx, request)
-			if err != nil {
-				return nil, nil, err
-			}
-			out := result.MapOk(tx.Out(), func(o O) ipld.Builder { return o })
-			return transaction.NewTransaction(out, transaction.WithEffects(tx.Fx())), res, nil
-		}
-		return nil
-	}
 }
 
 // WithRevocationChecker configures the function used to check UCANs for
