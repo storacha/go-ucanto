@@ -17,16 +17,16 @@ import (
 // which for a retrieval server will determine the HTTP headers and body content
 // of the HTTP response. The usual handler response (out and effects) are added
 // to the X-Agent-Message HTTP header.
-type HandlerFunc[C any, O ipld.Builder] func(ctx context.Context, capability ucan.Capability[C], invocation invocation.Invocation, ictx server.InvocationContext, request *RetrievalRequest) (O, fx.Effects, *RetrievalResponse, error)
+type HandlerFunc[C any, O ipld.Builder] func(ctx context.Context, capability ucan.Capability[C], invocation invocation.Invocation, context server.InvocationContext) (O, fx.Effects, *RetrievalResponse, error)
 
 // Provide is used to define given capability provider. It decorates the passed
 // handler and takes care of UCAN validation. It only calls the handler
 // when validation succeeds.
 func Provide[C any, O ipld.Builder](capability validator.CapabilityParser[C], handler HandlerFunc[C, O]) ServiceMethod[O] {
-	return func(ctx context.Context, inv invocation.Invocation, ictx server.InvocationContext, request *RetrievalRequest) (transaction.Transaction[O, ipld.Builder], *RetrievalResponse, error) {
+	return func(ctx context.Context, inv invocation.Invocation, ictx server.InvocationContext) (transaction.Transaction[O, ipld.Builder], *RetrievalResponse, error) {
 		var response *RetrievalResponse
 		method := server.Provide(capability, func(ctx context.Context, capability ucan.Capability[C], inv invocation.Invocation, ictx server.InvocationContext) (O, fx.Effects, error) {
-			out, fx, res, err := handler(ctx, capability, inv, ictx, request)
+			out, fx, res, err := handler(ctx, capability, inv, ictx)
 			response = res
 			return out, fx, err
 		})

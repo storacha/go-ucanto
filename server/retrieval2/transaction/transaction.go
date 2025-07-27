@@ -10,12 +10,12 @@ import (
 
 // Transaction defines a result & effect pair, used by provider that wishes to
 // return results that have effects.
-type Transaction[O any, X any] interface {
-	Out() result.Result[O, X]
-	Fx() fx.Effects
-	Status() int
-	Headers() http.Header
-	Body() io.Reader
+type Transaction[O any, X any] struct {
+	Out     result.Result[O, X]
+	Fx      fx.Effects
+	Status  int
+	Headers http.Header
+	Body    io.Reader
 }
 
 type transaction[O, X any] struct {
