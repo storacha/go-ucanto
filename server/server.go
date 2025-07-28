@@ -17,6 +17,7 @@ import (
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/core/receipt"
 	"github.com/storacha/go-ucanto/core/result"
+	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
 	"github.com/storacha/go-ucanto/principal/ed25519/verifier"
@@ -44,11 +45,11 @@ type InvocationContext interface {
 }
 
 // ServiceMethod is an invocation handler.
-type ServiceMethod[O ipld.Builder] func(context.Context, invocation.Invocation, InvocationContext) (transaction.Transaction[O, ipld.Builder], error)
+type ServiceMethod[O ipld.Builder, X failure.IPLDBuilderFailure] func(context.Context, invocation.Invocation, InvocationContext) (transaction.Transaction[O, X], error)
 
 // Service is a mapping of service names to handlers, used to define a
 // service implementation.
-type Service = map[ucan.Ability]ServiceMethod[ipld.Builder]
+type Service = map[ucan.Ability]ServiceMethod[ipld.Builder, failure.IPLDBuilderFailure]
 
 type ServiceInvocation = invocation.IssuedInvocation
 

@@ -74,6 +74,31 @@ func (ok uploadAddSuccess) ToIPLD() (ipld.Node, error) {
 	return nb.Build(), nil
 }
 
+type uploadAddFailure struct {
+	name    string
+	message string
+}
+
+func (x uploadAddFailure) Name() string {
+	return x.name
+}
+
+func (x uploadAddFailure) Error() string {
+	return x.message
+}
+
+func (x uploadAddFailure) ToIPLD() (ipld.Node, error) {
+	np := basicnode.Prototype.Any
+	nb := np.NewBuilder()
+	ma, _ := nb.BeginMap(2)
+	ma.AssembleKey().AssignString("name")
+	ma.AssembleValue().AssignString(x.name)
+	ma.AssembleKey().AssignString("message")
+	ma.AssembleValue().AssignString(x.message)
+	ma.Finish()
+	return nb.Build(), nil
+}
+
 var rcptsch = []byte(`
 	type Result union {
 		| UploadAddSuccess "ok"
@@ -129,8 +154,8 @@ func TestExecute(t *testing.T) {
 			fixtures.Service,
 			WithServiceMethod(
 				uploadadd.Can(),
-				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
-					return uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}, nil, nil
+				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (result.Result[uploadAddSuccess, uploadAddFailure], fx.Effects, error) {
+					return result.Ok[uploadAddSuccess, uploadAddFailure](uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}), nil, nil
 				}),
 			),
 		))
@@ -175,8 +200,8 @@ func TestExecute(t *testing.T) {
 			fixtures.Service,
 			WithServiceMethod(
 				uploadadd.Can(),
-				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
-					return uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}, nil, nil
+				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (result.Result[uploadAddSuccess, uploadAddFailure], fx.Effects, error) {
+					return result.Ok[uploadAddSuccess, uploadAddFailure](uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}), nil, nil
 				}),
 			),
 		))
@@ -259,8 +284,8 @@ func TestExecute(t *testing.T) {
 			fixtures.Service,
 			WithServiceMethod(
 				uploadadd.Can(),
-				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
-					return uploadAddSuccess{}, nil, fmt.Errorf("test error")
+				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (result.Result[uploadAddSuccess, uploadAddFailure], fx.Effects, error) {
+					return nil, nil, fmt.Errorf("test error")
 				}),
 			),
 		))
@@ -285,6 +310,44 @@ func TestExecute(t *testing.T) {
 		})
 	})
 
+	t.Run("failure", func(t *testing.T) {
+		uploadadd := validator.NewCapability(
+			"upload/add",
+			schema.DIDString(),
+			schema.Struct[uploadAddCaveats](uploadAddCaveatsType(), nil),
+			nil,
+		)
+
+		server := helpers.Must(NewServer(
+			fixtures.Service,
+			WithServiceMethod(
+				uploadadd.Can(),
+				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (result.Result[uploadAddSuccess, uploadAddFailure], fx.Effects, error) {
+					return result.Error[uploadAddSuccess](uploadAddFailure{name: "UploadAddError", message: "boom"}), nil, nil
+				}),
+			),
+		))
+
+		conn := helpers.Must(client.NewConnection(fixtures.Service, server))
+		rt := cidlink.Link{Cid: cid.MustParse("bafkreiem4twkqzsq2aj4shbycd4yvoj2cx72vezicletlhi7dijjciqpui")}
+		cap := uploadadd.New(fixtures.Alice.DID().String(), uploadAddCaveats{Root: rt})
+		invs := []invocation.Invocation{helpers.Must(invocation.Invoke(fixtures.Alice, fixtures.Service, cap))}
+		resp := helpers.Must(client.Execute(t.Context(), invs, conn))
+		rcptlnk, ok := resp.Get(invs[0].Link())
+		require.True(t, ok, "missing receipt for invocation: %s", invs[0].Link())
+
+		reader := helpers.Must(receipt.NewReceiptReader[uploadAddSuccess, ipld.Node](rcptsch))
+		rcpt := helpers.Must(reader.Read(rcptlnk, resp.Blocks()))
+
+		result.MatchResultR0(rcpt.Out(), func(uploadAddSuccess) {
+			t.Fatalf("expected error: %s", invs[0].Link())
+		}, func(x ipld.Node) {
+			f := asFailure(t, x)
+			fmt.Printf("%s %+v\n", *f.Name, f)
+			require.Equal(t, *f.Name, "UploadAddError")
+		})
+	})
+
 	t.Run("invalid audience", func(t *testing.T) {
 		uploadadd := validator.NewCapability(
 			"upload/add",
@@ -297,8 +360,8 @@ func TestExecute(t *testing.T) {
 			fixtures.Service,
 			WithServiceMethod(
 				uploadadd.Can(),
-				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
-					return uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}, nil, nil
+				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (result.Result[uploadAddSuccess, uploadAddFailure], fx.Effects, error) {
+					return result.Ok[uploadAddSuccess, uploadAddFailure](uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}), nil, nil
 				}),
 			),
 		))
@@ -339,8 +402,8 @@ func TestExecute(t *testing.T) {
 			fixtures.Service,
 			WithServiceMethod(
 				uploadadd.Can(),
-				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (uploadAddSuccess, fx.Effects, error) {
-					return uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}, nil, nil
+				Provide(uploadadd, func(ctx context.Context, cap ucan.Capability[uploadAddCaveats], inv invocation.Invocation, ictx InvocationContext) (result.Result[uploadAddSuccess, uploadAddFailure], fx.Effects, error) {
+					return result.Ok[uploadAddSuccess, uploadAddFailure](uploadAddSuccess{Root: cap.Nb().Root, Status: "done"}), nil, nil
 				}),
 			),
 			WithAlternativeAudiences(fixtures.Bob),

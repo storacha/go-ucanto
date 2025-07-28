@@ -14,13 +14,13 @@ import (
 	"github.com/storacha/go-ucanto/validator"
 )
 
-type HandlerFunc[C any, O ipld.Builder] func(ctx context.Context, capability ucan.Capability[C], invocation invocation.Invocation, context InvocationContext) (out O, fx fx.Effects, err error)
+type HandlerFunc[C any, O ipld.Builder, X failure.IPLDBuilderFailure] func(ctx context.Context, capability ucan.Capability[C], invocation invocation.Invocation, context InvocationContext) (result result.Result[O, X], fx fx.Effects, err error)
 
 // Provide is used to define given capability provider. It decorates the passed
 // handler and takes care of UCAN validation. It only calls the handler
 // when validation succeeds.
-func Provide[C any, O ipld.Builder](capability validator.CapabilityParser[C], handler HandlerFunc[C, O]) ServiceMethod[O] {
-	return func(ctx context.Context, invocation invocation.Invocation, ictx InvocationContext) (transaction.Transaction[O, ipld.Builder], error) {
+func Provide[C any, O ipld.Builder, X failure.IPLDBuilderFailure](capability validator.CapabilityParser[C], handler HandlerFunc[C, O, X]) ServiceMethod[O, failure.IPLDBuilderFailure] {
+	return func(ctx context.Context, invocation invocation.Invocation, ictx InvocationContext) (transaction.Transaction[O, failure.IPLDBuilderFailure], error) {
 		vctx := validator.NewValidationContext(
 			ictx.ID().Verifier(),
 			capability,
@@ -46,19 +46,26 @@ func Provide[C any, O ipld.Builder](capability validator.CapabilityParser[C], ha
 		if _, err := acceptedAudiences.Read(invocation.Audience().DID().String()); err != nil {
 			expectedAudiences := append([]ucan.Principal{ictx.ID()}, ictx.AlternativeAudiences()...)
 			audErr := NewInvalidAudienceError(invocation.Audience(), expectedAudiences...)
-			return transaction.NewTransaction(result.Error[O, ipld.Builder](audErr)), nil
+			return transaction.NewTransaction(result.Error[O, failure.IPLDBuilderFailure](audErr)), nil
 		}
 
 		auth, aerr := validator.Access(ctx, invocation, vctx)
 		if aerr != nil {
-			return transaction.NewTransaction(result.Error[O, ipld.Builder](failure.FromError(aerr))), nil
+			return transaction.NewTransaction(result.Error[O](failure.FromError(aerr))), nil
 		}
 
-		o, fx, herr := handler(ctx, auth.Capability(), invocation, ictx)
+		res, fx, herr := handler(ctx, auth.Capability(), invocation, ictx)
 		if herr != nil {
 			return nil, herr
 		}
 
-		return transaction.NewTransaction(result.Ok[O, ipld.Builder](o), transaction.WithEffects(fx)), nil
+		return transaction.NewTransaction(
+			result.MapResultR0(
+				res,
+				func(o O) O { return o },
+				func(x X) failure.IPLDBuilderFailure { return x },
+			),
+			transaction.WithEffects(fx),
+		), nil
 	}
 }
