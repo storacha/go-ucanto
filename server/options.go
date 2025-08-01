@@ -61,8 +61,8 @@ func WithRevocationChecker(fn validator.RevocationCheckerFunc[any]) Option {
 	}
 }
 
-// WithErrorHandler configures a function to be called when errors occur during
-// execution of a handler.
+// WithErrorHandler configures a function to be called when errors that are not
+// a [failure.IPLDBuilderFailure] occur during execution of a handler.
 func WithErrorHandler(fn ErrorHandlerFunc) Option {
 	return func(cfg *srvConfig) error {
 		cfg.catch = fn

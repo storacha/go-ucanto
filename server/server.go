@@ -17,6 +17,7 @@ import (
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/core/receipt"
 	"github.com/storacha/go-ucanto/core/result"
+	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
 	"github.com/storacha/go-ucanto/principal/ed25519/verifier"
@@ -60,6 +61,8 @@ type Server interface {
 	Context() InvocationContext
 	// Service is the actual service providing capability handlers.
 	Service() Service
+	// Catch allows an unexpected error that is not a [failure.IPLDBuilderFailure]
+	// to be logged.
 	Catch(err HandlerExecutionError[any])
 }
 
@@ -298,9 +301,12 @@ func Run(ctx context.Context, server Server, invocation ServiceInvocation) (rece
 		if errors.Is(err, context.Canceled) {
 			return nil, err
 		}
-		herr := NewHandlerExecutionError(err, cap)
-		server.Catch(herr)
-		return receipt.Issue(server.ID(), result.NewFailure(herr), ran.FromInvocation(invocation))
+		if _, ok := err.(failure.IPLDBuilderFailure); !ok {
+			herr := NewHandlerExecutionError(err, cap)
+			server.Catch(herr)
+			err = herr
+		}
+		return receipt.Issue(server.ID(), result.NewFailure(err), ran.FromInvocation(invocation))
 	}
 
 	fx := tx.Fx()
