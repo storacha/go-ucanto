@@ -37,7 +37,7 @@ func (oc *OutboundCodec) Decode(res transport.HTTPResponse) (message.AgentMessag
 
 var _ transport.OutboundCodec = (*OutboundCodec)(nil)
 
-func NewOutboundCodec(opts ...OutboundOption) transport.OutboundCodec {
+func NewOutboundCodec(opts ...OutboundOption) *OutboundCodec {
 	cfg := outboundConfig{}
 	for _, option := range opts {
 		option(&cfg)
