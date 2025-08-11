@@ -7,6 +7,7 @@ import (
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/result"
+	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/server/transaction"
 	"github.com/storacha/go-ucanto/transport"
 	"github.com/storacha/go-ucanto/ucan"
@@ -29,14 +30,18 @@ type srvConfig struct {
 	catch                 ErrorHandlerFunc
 }
 
-func WithServiceMethod[O ipld.Builder](can string, handleFunc ServiceMethod[O]) Option {
+func WithServiceMethod[O ipld.Builder, X failure.IPLDBuilderFailure](can string, handleFunc ServiceMethod[O, X]) Option {
 	return func(cfg *srvConfig) error {
-		cfg.service[can] = func(ctx context.Context, input invocation.Invocation, invCtx InvocationContext) (transaction.Transaction[ipld.Builder, ipld.Builder], error) {
+		cfg.service[can] = func(ctx context.Context, input invocation.Invocation, invCtx InvocationContext) (transaction.Transaction[ipld.Builder, failure.IPLDBuilderFailure], error) {
 			tx, err := handleFunc(ctx, input, invCtx)
 			if err != nil {
 				return nil, err
 			}
-			out := result.MapOk(tx.Out(), func(o O) ipld.Builder { return o })
+			out := result.MapResultR0(
+				tx.Out(),
+				func(o O) ipld.Builder { return o },
+				func(x X) failure.IPLDBuilderFailure { return x },
+			)
 			return transaction.NewTransaction(out, transaction.WithEffects(tx.Fx())), nil
 		}
 		return nil
