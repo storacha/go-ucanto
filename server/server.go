@@ -45,7 +45,11 @@ type InvocationContext interface {
 }
 
 // ServiceMethod is an invocation handler.
-type ServiceMethod[O ipld.Builder, X failure.IPLDBuilderFailure] func(context.Context, invocation.Invocation, InvocationContext) (transaction.Transaction[O, X], error)
+type ServiceMethod[O ipld.Builder, X failure.IPLDBuilderFailure] func(
+	context.Context,
+	invocation.Invocation,
+	InvocationContext,
+) (transaction.Transaction[O, X], error)
 
 // Service is a mapping of service names to handlers, used to define a
 // service implementation.

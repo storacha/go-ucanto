@@ -177,13 +177,13 @@ func TestExecute(t *testing.T) {
 		rcpt := helpers.Must(reader.Read(rcptlnk, resp.Blocks()))
 
 		result.MatchResultR0(rcpt.Out(), func(ok uploadAddSuccess) {
-			fmt.Printf("%+v\n", ok)
+			t.Logf("%+v\n", ok)
 			require.Equal(t, ok.Root, rt)
 			require.Equal(t, ok.Status, "done")
 		}, func(x ipld.Node) {
 			f := asFailure(t, x)
-			fmt.Println(f.Message)
-			fmt.Println(*f.Stack)
+			t.Log(f.Message)
+			t.Log(*f.Stack)
 			require.Nil(t, f)
 		})
 	})
@@ -233,13 +233,13 @@ func TestExecute(t *testing.T) {
 		rcpt := helpers.Must(reader.Read(rcptlnk, resp.Blocks()))
 
 		result.MatchResultR0(rcpt.Out(), func(ok uploadAddSuccess) {
-			fmt.Printf("%+v\n", ok)
+			t.Logf("%+v\n", ok)
 			require.Equal(t, ok.Root, rt)
 			require.Equal(t, ok.Status, "done")
 		}, func(x ipld.Node) {
 			f := asFailure(t, x)
-			fmt.Println(f.Message)
-			fmt.Println(*f.Stack)
+			t.Log(f.Message)
+			t.Log(*f.Stack)
 			require.Nil(t, f)
 		})
 	})
@@ -267,7 +267,7 @@ func TestExecute(t *testing.T) {
 			t.Fatalf("expected error: %s", invs[0].Link())
 		}, func(x ipld.Node) {
 			f := asFailure(t, x)
-			fmt.Printf("%s %+v\n", *f.Name, f)
+			t.Logf("%s %+v\n", *f.Name, f)
 			require.Equal(t, *f.Name, "HandlerNotFoundError")
 		})
 	})
@@ -305,7 +305,7 @@ func TestExecute(t *testing.T) {
 			t.Fatalf("expected error: %s", invs[0].Link())
 		}, func(x ipld.Node) {
 			f := asFailure(t, x)
-			fmt.Printf("%s %+v\n", *f.Name, f)
+			t.Logf("%s %+v\n", *f.Name, f)
 			require.Equal(t, *f.Name, "HandlerExecutionError")
 		})
 	})
@@ -343,7 +343,7 @@ func TestExecute(t *testing.T) {
 			t.Fatalf("expected error: %s", invs[0].Link())
 		}, func(x ipld.Node) {
 			f := asFailure(t, x)
-			fmt.Printf("%s %+v\n", *f.Name, f)
+			t.Logf("%s %+v\n", *f.Name, f)
 			require.Equal(t, *f.Name, "UploadAddError")
 		})
 	})

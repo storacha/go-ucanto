@@ -14,12 +14,20 @@ import (
 	"github.com/storacha/go-ucanto/validator"
 )
 
-type HandlerFunc[C any, O ipld.Builder, X failure.IPLDBuilderFailure] func(ctx context.Context, capability ucan.Capability[C], invocation invocation.Invocation, context InvocationContext) (result result.Result[O, X], fx fx.Effects, err error)
+type HandlerFunc[C any, O ipld.Builder, X failure.IPLDBuilderFailure] func(
+	ctx context.Context,
+	capability ucan.Capability[C],
+	invocation invocation.Invocation,
+	context InvocationContext,
+) (result result.Result[O, X], fx fx.Effects, err error)
 
 // Provide is used to define given capability provider. It decorates the passed
 // handler and takes care of UCAN validation. It only calls the handler
 // when validation succeeds.
-func Provide[C any, O ipld.Builder, X failure.IPLDBuilderFailure](capability validator.CapabilityParser[C], handler HandlerFunc[C, O, X]) ServiceMethod[O, failure.IPLDBuilderFailure] {
+func Provide[C any, O ipld.Builder, X failure.IPLDBuilderFailure](
+	capability validator.CapabilityParser[C],
+	handler HandlerFunc[C, O, X],
+) ServiceMethod[O, failure.IPLDBuilderFailure] {
 	return func(ctx context.Context, invocation invocation.Invocation, ictx InvocationContext) (transaction.Transaction[O, failure.IPLDBuilderFailure], error) {
 		vctx := validator.NewValidationContext(
 			ictx.ID().Verifier(),
