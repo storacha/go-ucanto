@@ -44,14 +44,14 @@ func WithSuccessStatusCode(codes ...int) Option {
 	}
 }
 
-type channel struct {
+type Channel struct {
 	url      *url.URL
 	client   *http.Client
 	method   string
 	statuses []int
 }
 
-func (c *channel) Request(ctx context.Context, req transport.HTTPRequest) (transport.HTTPResponse, error) {
+func (c *Channel) Request(ctx context.Context, req transport.HTTPRequest) (transport.HTTPResponse, error) {
 	hr, err := http.NewRequestWithContext(ctx, c.method, c.url.String(), req.Body())
 	if err != nil {
 		return nil, fmt.Errorf("creating HTTP request: %w", err)
@@ -66,10 +66,12 @@ func (c *channel) Request(ctx context.Context, req transport.HTTPRequest) (trans
 		return nil, NewHTTPError(fmt.Sprintf("HTTP Request failed. %s %s → %d", hr.Method, c.url.String(), res.StatusCode), res.StatusCode, res.Header)
 	}
 
-	return NewHTTPResponse(res.StatusCode, res.Body, res.Header), nil
+	return NewResponse(res.StatusCode, res.Body, res.Header), nil
 }
 
-func NewHTTPChannel(url *url.URL, options ...Option) transport.Channel {
+var _ transport.Channel = (*Channel)(nil)
+
+func NewChannel(url *url.URL, options ...Option) *Channel {
 	cfg := chanConfig{}
 	for _, opt := range options {
 		opt(&cfg)
@@ -83,7 +85,7 @@ func NewHTTPChannel(url *url.URL, options ...Option) transport.Channel {
 	if len(cfg.statuses) == 0 {
 		cfg.statuses = append(cfg.statuses, http.StatusOK)
 	}
-	return &channel{
+	return &Channel{
 		url:      url,
 		client:   cfg.client,
 		method:   cfg.method,

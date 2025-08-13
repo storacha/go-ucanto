@@ -18,7 +18,7 @@ func Encode(msg message.AgentMessage) (transport.HTTPResponse, error) {
 	headers := http.Header{}
 	headers.Add("Content-Type", car.ContentType)
 	reader := car.Encode([]ipld.Link{msg.Root().Link()}, msg.Blocks())
-	return uhttp.NewHTTPResponse(http.StatusOK, reader, headers), nil
+	return uhttp.NewResponse(http.StatusOK, reader, headers), nil
 }
 
 func Decode(response transport.HTTPResponse) (message.AgentMessage, error) {

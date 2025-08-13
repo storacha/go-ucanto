@@ -20,7 +20,7 @@ func Encode(message message.AgentMessage) (transport.HTTPRequest, error) {
 	// signal that we want to receive a CAR file in the response
 	headers.Add("Accept", car.ContentType)
 	reader := car.Encode([]ipld.Link{message.Root().Link()}, message.Blocks())
-	return uhttp.NewHTTPRequest(reader, headers), nil
+	return uhttp.NewRequest(reader, headers), nil
 }
 
 func Decode(req transport.HTTPRequest) (message.AgentMessage, error) {

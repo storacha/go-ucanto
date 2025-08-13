@@ -1,10 +1,8 @@
 package response
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/storacha/go-ucanto/core/message"
@@ -14,24 +12,7 @@ import (
 	uhttp "github.com/storacha/go-ucanto/transport/http"
 )
 
-type encodeOptions struct {
-	bodyProvider hcmsg.ResponseBodyProvider
-}
-
-type EncodeOption func(c *encodeOptions)
-
-func WithBodyProvider(provider hcmsg.ResponseBodyProvider) EncodeOption {
-	return func(c *encodeOptions) {
-		c.bodyProvider = provider
-	}
-}
-
-func Encode(msg message.AgentMessage, options ...EncodeOption) (transport.HTTPResponse, error) {
-	opts := encodeOptions{}
-	for _, opt := range options {
-		opt(&opts)
-	}
-
+func Encode(msg message.AgentMessage) (transport.HTTPResponse, error) {
 	xAgentMsg, err := hcmsg.EncodeHeader(msg)
 	if err != nil {
 		return nil, fmt.Errorf("encoding %s header: %w", hcmsg.AgentMessageHeader, err)
@@ -64,32 +45,10 @@ func Encode(msg message.AgentMessage, options ...EncodeOption) (transport.HTTPRe
 		}
 	}
 
-	var headers http.Header
-	var body io.Reader
-	if opts.bodyProvider != nil {
-		b, s, h, err := opts.bodyProvider.Stream(msg)
-		if err != nil {
-			return nil, fmt.Errorf("streaming data: %w", err)
-		}
-		if status == http.StatusOK && s > 0 {
-			status = s
-		}
-		if h != nil {
-			headers = h
-		} else {
-			headers = http.Header{}
-		}
-		body = b
-	} else {
-		headers = http.Header{}
-	}
+	headers := http.Header{}
 	headers.Set(hcmsg.AgentMessageHeader, xAgentMsg)
 
-	if body == nil {
-		body = bytes.NewReader([]byte{})
-	}
-
-	return uhttp.NewHTTPResponse(status, body, headers), nil
+	return uhttp.NewResponse(status, nil, headers), nil
 }
 
 func Decode(response transport.HTTPResponse) (message.AgentMessage, error) {

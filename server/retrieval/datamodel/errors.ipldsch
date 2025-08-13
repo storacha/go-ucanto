@@ -1,0 +1,5 @@
+type MissingProofs struct {
+	name String
+	message String
+	proofs [Link]
+}

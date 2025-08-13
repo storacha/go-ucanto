@@ -443,7 +443,7 @@ func TestHandle(t *testing.T) {
 		hd.Set("Content-Type", "unsupported/media")
 		hd.Set("Accept", response.ContentType)
 
-		req := thttp.NewHTTPRequest(bytes.NewReader([]byte{}), hd)
+		req := thttp.NewRequest(bytes.NewReader([]byte{}), hd)
 		res := helpers.Must(Handle(t.Context(), server, req))
 		require.Equal(t, res.Status(), http.StatusUnsupportedMediaType)
 	})
@@ -455,7 +455,7 @@ func TestHandle(t *testing.T) {
 		hd.Set("Content-Type", request.ContentType)
 		hd.Set("Accept", "not/acceptable")
 
-		req := thttp.NewHTTPRequest(bytes.NewReader([]byte{}), hd)
+		req := thttp.NewRequest(bytes.NewReader([]byte{}), hd)
 		res := helpers.Must(Handle(t.Context(), server, req))
 		require.Equal(t, res.Status(), http.StatusNotAcceptable)
 	})
@@ -468,7 +468,7 @@ func TestHandle(t *testing.T) {
 		hd.Set("Accept", request.ContentType)
 
 		// request with invalid payload
-		req := thttp.NewHTTPRequest(bytes.NewReader([]byte{}), hd)
+		req := thttp.NewRequest(bytes.NewReader([]byte{}), hd)
 		res := helpers.Must(Handle(t.Context(), server, req))
 		require.Equal(t, res.Status(), http.StatusBadRequest)
 	})

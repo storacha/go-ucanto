@@ -12,6 +12,11 @@ type HTTPRequest interface {
 	Body() io.Reader
 }
 
+type InboundHTTPRequest interface {
+	HTTPRequest
+	URL() string
+}
+
 type HTTPResponse interface {
 	Status() int
 	Headers() http.Header

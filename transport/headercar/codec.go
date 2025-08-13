@@ -5,30 +5,15 @@ import (
 
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/transport"
-	hcmsg "github.com/storacha/go-ucanto/transport/headercar/message"
 	"github.com/storacha/go-ucanto/transport/headercar/request"
 	"github.com/storacha/go-ucanto/transport/headercar/response"
 	thttp "github.com/storacha/go-ucanto/transport/http"
 )
 
-type outboundConfig struct {
-	bodyProvider hcmsg.RequestBodyProvider
-}
-
-type OutboundOption func(c *outboundConfig)
-
-func WithRequestBodyProvider(provider hcmsg.RequestBodyProvider) OutboundOption {
-	return func(c *outboundConfig) {
-		c.bodyProvider = provider
-	}
-}
-
-type OutboundCodec struct {
-	bodyProvider hcmsg.RequestBodyProvider
-}
+type OutboundCodec struct{}
 
 func (oc *OutboundCodec) Encode(msg message.AgentMessage) (transport.HTTPRequest, error) {
-	return request.Encode(msg, request.WithBodyProvider(oc.bodyProvider))
+	return request.Encode(msg)
 }
 
 func (oc *OutboundCodec) Decode(res transport.HTTPResponse) (message.AgentMessage, error) {
@@ -37,17 +22,11 @@ func (oc *OutboundCodec) Decode(res transport.HTTPResponse) (message.AgentMessag
 
 var _ transport.OutboundCodec = (*OutboundCodec)(nil)
 
-func NewOutboundCodec(opts ...OutboundOption) *OutboundCodec {
-	cfg := outboundConfig{}
-	for _, option := range opts {
-		option(&cfg)
-	}
-	return &OutboundCodec{bodyProvider: cfg.bodyProvider}
+func NewOutboundCodec() *OutboundCodec {
+	return &OutboundCodec{}
 }
 
-type InboundAcceptCodec struct {
-	bodyProvider hcmsg.ResponseBodyProvider
-}
+type InboundAcceptCodec struct{}
 
 func (cic *InboundAcceptCodec) Encoder() transport.ResponseEncoder {
 	return cic
@@ -58,7 +37,7 @@ func (cic *InboundAcceptCodec) Decoder() transport.RequestDecoder {
 }
 
 func (cic *InboundAcceptCodec) Encode(msg message.AgentMessage) (transport.HTTPResponse, error) {
-	return response.Encode(msg, response.WithBodyProvider(cic.bodyProvider))
+	return response.Encode(msg)
 }
 
 func (cic *InboundAcceptCodec) Decode(req transport.HTTPRequest) (message.AgentMessage, error) {
@@ -83,22 +62,6 @@ func (ic *InboundCodec) Accept(req transport.HTTPRequest) (transport.InboundAcce
 
 var _ transport.InboundCodec = (*InboundCodec)(nil)
 
-type inboundConfig struct {
-	bodyProvider hcmsg.ResponseBodyProvider
-}
-
-type InboundOption func(c *inboundConfig)
-
-func WithResponseBodyProvider(provider hcmsg.ResponseBodyProvider) InboundOption {
-	return func(c *inboundConfig) {
-		c.bodyProvider = provider
-	}
-}
-
-func NewInboundCodec(opts ...InboundOption) transport.InboundCodec {
-	cfg := inboundConfig{}
-	for _, option := range opts {
-		option(&cfg)
-	}
-	return &InboundCodec{codec: &InboundAcceptCodec{bodyProvider: cfg.bodyProvider}}
+func NewInboundCodec() transport.InboundCodec {
+	return &InboundCodec{codec: &InboundAcceptCodec{}}
 }

@@ -2,31 +2,38 @@ package retrieval
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"sync"
+	"strings"
 
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/invocation/ran"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/core/receipt"
+	"github.com/storacha/go-ucanto/core/result"
+	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/principal"
 	"github.com/storacha/go-ucanto/server"
 	"github.com/storacha/go-ucanto/server/transaction"
 	"github.com/storacha/go-ucanto/transport"
 	"github.com/storacha/go-ucanto/transport/headercar"
+	thttp "github.com/storacha/go-ucanto/transport/http"
 	"github.com/storacha/go-ucanto/ucan"
 )
 
-type RetrievalRequest struct {
+type Request struct {
 	// Relative URL requested.
-	URL url.URL
+	URL string
 	// Headers are the HTTP headers sent in the HTTP request to the server.
 	Headers http.Header
 }
 
-type RetrievalResponse struct {
+type Response struct {
 	// Status is the HTTP status that should be returned. e.g. 206 when returning
 	// a range request.
 	Status int
@@ -38,32 +45,42 @@ type RetrievalResponse struct {
 	Body io.Reader
 }
 
-type InvocationContext interface {
-	server.InvocationContext
-	Request() *RetrievalRequest
-}
-
-type Transaction[O any, X any] interface {
-	transaction.Transaction[O, X]
-	Response() *RetrievalResponse
+func NewResponse(status int, headers http.Header, body io.Reader) Response {
+	return Response{Status: status, Headers: headers, Body: body}
 }
 
 // ServiceMethod is an invocation handler. It is different to
-// [server.ServiceMethod] in that it allows an [RetrievalResponse] to be
-// returned, which for a retrieval server will determine the HTTP headers and
-// body content of the HTTP response. The usual handler response (out and
-// effects) are added to the X-Agent-Message HTTP header.
-type ServiceMethod[O ipld.Builder] func(context.Context, invocation.Invocation, InvocationContext) (Transaction[O, ipld.Builder], error)
+// [server.ServiceMethod] in that it allows an [Response] to be
+// returned as part of the [transation.Transation], which for a retrieval server
+// will determine the HTTP headers and body content of the HTTP response. The
+// usual handler response (out and effects) are added to the X-Agent-Message
+// HTTP header.
+type ServiceMethod[O ipld.Builder, X failure.IPLDBuilderFailure] func(
+	context.Context,
+	invocation.Invocation,
+	server.InvocationContext,
+	Request,
+) (transaction.Transaction[O, X], Response, error)
 
 // Service is a mapping of service names to handlers, used to define a
-// retrieval server service implementation.
-type Service = map[ucan.Ability]ServiceMethod[ipld.Builder]
+// service implementation.
+type Service = map[ucan.Ability]ServiceMethod[ipld.Builder, failure.IPLDBuilderFailure]
+
+// CachingServer is a retrieval that also caches invocations/delegations to
+// allow invocations with delegations chains bigger than HTTP header size limits
+// to be executed as multiple requests.
+type CachingServer interface {
+	server.Server[Service]
+	Cache() delegation.Store
+}
 
 // NewServer creates a retrieval server, which is a UCAN server that comes
 // pre-loaded with a [headercar] codec.
 //
-// Handlers have an additional return parameter - the data to return in the body
-// of the response.
+// Handlers have an additional return value - the data to return in the body
+// of the response as well as HTTP headers and status code. They also have an
+// additional parameter, which are the details of the request - the URL that was
+// requested and the HTTP headers.
 //
 // They require a delegation cache, which allows delegations that are too big
 // for the header to be sent in multiple rounds. By default an in-memory cache
@@ -73,7 +90,7 @@ type Service = map[ucan.Ability]ServiceMethod[ipld.Builder]
 // that can be looked up in the delegations cache.
 //
 // The delegations cache should be a size bounded LRU to prevent DoS attacks.
-func NewServer(id principal.Signer, options ...Option) (server.ServerView, error) {
+func NewServer(id principal.Signer, options ...Option) (*Server, error) {
 	cfg := srvConfig{service: Service{}}
 	for _, opt := range options {
 		if err := opt(&cfg); err != nil {
@@ -90,17 +107,8 @@ func NewServer(id principal.Signer, options ...Option) (server.ServerView, error
 		dlgCache = dc
 	}
 
-	bodyProvider := &bodyProvider{responses: map[string]*RetrievalResponse{}}
-	codec := headercar.NewInboundCodec(headercar.WithResponseBodyProvider(bodyProvider))
-
+	codec := headercar.NewInboundCodec()
 	srvOpts := []server.Option{server.WithInboundCodec(codec)}
-	for ability, method := range cfg.service {
-		srvOpts = append(srvOpts, server.WithServiceMethod(ability, func(ctx context.Context, inv invocation.Invocation, ictx server.InvocationContext) (transaction.Transaction[ipld.Builder, ipld.Builder], error) {
-			txn, err := method(ctx, inv, ictx)
-			bodyProvider.setResponse(inv.Link(), txn.Response())
-			return txn, err
-		}))
-	}
 	if cfg.canIssue != nil {
 		srvOpts = append(srvOpts, server.WithCanIssue(cfg.canIssue))
 	}
@@ -120,68 +128,293 @@ func NewServer(id principal.Signer, options ...Option) (server.ServerView, error
 		srvOpts = append(srvOpts, server.WithPrincipalResolver(cfg.resolveDIDKey))
 	}
 
-	return server.NewServer(id, srvOpts...)
-}
-
-type retrievalServer struct {
-	server server.ServerView
-}
-
-func (rs *retrievalServer) ID() principal.Signer {
-	return rs.server.ID()
-}
-
-func (rs *retrievalServer) Service() server.Service {
-	return rs.server.Service()
-}
-
-func (rs *retrievalServer) Context() server.InvocationContext {
-	return rs.server.Context()
-}
-
-func (rs *retrievalServer) Codec() transport.InboundCodec {
-	return rs.server.Codec()
-}
-
-func (rs *retrievalServer) Request(ctx context.Context, request transport.HTTPRequest) (transport.HTTPResponse, error) {
-	return rs.server.Request(ctx, request)
-}
-
-func (rs *retrievalServer) Run(ctx context.Context, invocation server.ServiceInvocation) (receipt.AnyReceipt, error) {
-	return rs.server.Run(ctx, rs, invocation)
-}
-
-func (rs *retrievalServer) Catch(err HandlerExecutionError[any]) {
-	srv.catch(err)
-}
-
-var _ transport.Channel = (*server)(nil)
-var _ ServerView = (*server)(nil)
-
-type bodyProvider struct {
-	responses map[string]*RetrievalResponse
-	mutex     sync.Mutex
-}
-
-func (bp *bodyProvider) setResponse(ran ipld.Link, retrieval *RetrievalResponse) {
-	bp.mutex.Lock()
-	bp.responses[ran.String()] = retrieval
-	bp.mutex.Unlock()
-}
-
-func (bp *bodyProvider) Stream(msg message.AgentMessage) (io.Reader, int, http.Header, error) {
-	rcpt, _, err := msg.Receipt(msg.Receipts()[0])
+	srv, err := server.NewServer(id, srvOpts...)
 	if err != nil {
-		return nil, 0, nil, err
+		return nil, fmt.Errorf("creating server: %w", err)
 	}
-	inv := rcpt.Ran()
-	key := inv.Link().String()
-	bp.mutex.Lock()
-	defer bp.mutex.Unlock()
-	res, ok := bp.responses[key]
+
+	return &Server{
+		server:          srv,
+		service:         cfg.service,
+		delegationCache: dlgCache,
+	}, nil
+}
+
+type Server struct {
+	server          server.Server[server.Service]
+	service         Service
+	delegationCache delegation.Store
+}
+
+func (srv *Server) ID() principal.Signer {
+	return srv.server.ID()
+}
+
+func (srv *Server) Service() Service {
+	return srv.service
+}
+
+func (srv *Server) Context() server.InvocationContext {
+	return srv.server.Context()
+}
+
+func (srv *Server) Codec() transport.InboundCodec {
+	return srv.server.Codec()
+}
+
+// Request handles an inbound HTTP request to the retrieval server. The request
+// URL will only be non-empty if this method is called with a request that is a
+// [transport.InboundHTTPRequest].
+func (srv *Server) Request(ctx context.Context, request transport.HTTPRequest) (transport.HTTPResponse, error) {
+	return Handle(ctx, srv, request)
+}
+
+func (srv *Server) Run(ctx context.Context, invocation server.ServiceInvocation) (receipt.AnyReceipt, error) {
+	rcpt, _, err := Run(ctx, srv, invocation, Request{})
+	return rcpt, err
+}
+
+func (srv *Server) Cache() delegation.Store {
+	return srv.delegationCache
+}
+
+func (srv *Server) Catch(err server.HandlerExecutionError[any]) {
+	srv.server.Catch(err)
+}
+
+var _ CachingServer = (*Server)(nil)
+
+func Handle(ctx context.Context, srv CachingServer, request transport.HTTPRequest) (transport.HTTPResponse, error) {
+	selection, aerr := srv.Codec().Accept(request)
+	if aerr != nil {
+		return thttp.NewResponse(aerr.Status(), strings.NewReader(aerr.Error()), aerr.Headers()), nil
+	}
+
+	msg, err := selection.Decoder().Decode(request)
+	if err != nil {
+		return thttp.NewResponse(http.StatusBadRequest, strings.NewReader("The server failed to decode the request payload. Please format the payload according to the specified media type."), nil), nil
+	}
+
+	// retrieval server supports only 1 invocation in the agent message, since
+	// only a single handler can use the body.
+	invs := msg.Invocations()
+	if len(invs) != 1 {
+		var rcpts []receipt.AnyReceipt
+		res := result.NewFailure(NewAgentMessageInvocationError())
+		for _, l := range invs {
+			rcpt, err := receipt.Issue(srv.ID(), res, ran.FromLink(l))
+			if err != nil {
+				return nil, fmt.Errorf("issuing invocation error receipt: %w", err)
+			}
+			rcpts = append(rcpts, rcpt)
+		}
+		out, err := message.Build(nil, rcpts)
+		if err != nil {
+			return nil, fmt.Errorf("building invocation error message: %w", err)
+		}
+		resp, err := selection.Encoder().Encode(out)
+		if err != nil {
+			return nil, fmt.Errorf("encoding invocation error message: %w", err)
+		}
+		return resp, nil
+	}
+
+	retreq := Request{Headers: request.Headers()}
+	if inreq, ok := request.(transport.InboundHTTPRequest); ok {
+		retreq.URL = inreq.URL()
+	}
+
+	out, execResp, err := Execute(ctx, srv, msg, retreq)
+	if err != nil {
+		return nil, fmt.Errorf("executing invocations: %w", err)
+	}
+
+	encResp, err := selection.Encoder().Encode(out)
+	if err != nil {
+		return nil, fmt.Errorf("encoding response message: %w", err)
+	}
+
+	// Use status from execution response if non-zero and encode response status
+	// is zero or 200.
+	status := encResp.Status()
+	if execResp.Status != 0 && (status == 0 || status == http.StatusOK) {
+		status = execResp.Status
+	}
+
+	// Merge headers
+	headers := encResp.Headers()
+	if execResp.Headers != nil {
+		if headers == nil {
+			headers = http.Header{}
+		}
+		for name, values := range execResp.Headers {
+			for _, v := range values {
+				headers.Add(name, v)
+			}
+		}
+	}
+
+	return thttp.NewResponse(status, execResp.Body, headers), nil
+}
+
+func Execute(ctx context.Context, srv CachingServer, msg message.AgentMessage, req Request) (message.AgentMessage, Response, error) {
+	// retrieval server supports only 1 invocation in the agent message, since
+	// only a single handler can use the body.
+	invs := msg.Invocations()
+	if len(invs) != 1 {
+		var rcpts []receipt.AnyReceipt
+		res := result.NewFailure(NewAgentMessageInvocationError())
+		for _, l := range invs {
+			rcpt, err := receipt.Issue(srv.ID(), res, ran.FromLink(l))
+			if err != nil {
+				return nil, Response{}, err
+			}
+			rcpts = append(rcpts, rcpt)
+		}
+		out, err := message.Build(nil, rcpts)
+		if err != nil {
+			return nil, Response{}, err
+		}
+		return out, Response{Status: http.StatusBadRequest}, nil
+	}
+
+	inv, err := ExtractInvocation(ctx, invs[0], msg, srv.Cache())
+	if err != nil {
+		mpe := MissingProofs{}
+		if errors.As(err, &mpe) {
+			rcpt, err := receipt.Issue(srv.ID(), result.NewFailure(mpe), ran.FromLink(invs[0]))
+			if err != nil {
+				return nil, Response{}, fmt.Errorf("issuing missing proofs receipt: %w", err)
+			}
+			out, err := message.Build(nil, []receipt.AnyReceipt{rcpt})
+			if err != nil {
+				return nil, Response{}, fmt.Errorf("building missing proofs error message: %w", err)
+			}
+			return out, Response{Status: http.StatusNotExtended}, nil
+		}
+		return nil, Response{}, err
+	}
+
+	rcpt, resp, err := Run(ctx, srv, inv, req)
+	if err != nil {
+		return nil, Response{}, fmt.Errorf("running invocation: %w", err)
+	}
+	out, err := message.Build(nil, []receipt.AnyReceipt{rcpt})
+	if err != nil {
+		return nil, Response{}, fmt.Errorf("building agent message: %w", err)
+	}
+	return out, resp, nil
+}
+
+func ExtractInvocation(ctx context.Context, root ipld.Link, msg message.AgentMessage, cache delegation.Store) (invocation.Invocation, error) {
+	bs, err := blockstore.NewBlockStore(blockstore.WithBlocksIterator(msg.Blocks()))
+	if err != nil {
+		return nil, fmt.Errorf("creating blockstore from agent message: %w", err)
+	}
+
+	var dlgs []delegation.Delegation
+	chkpfs := []ipld.Link{root}
+	var missingpfs []ipld.Link
+	for len(chkpfs) > 0 {
+		prf := chkpfs[0]
+		chkpfs = chkpfs[1:]
+
+		blk, ok, err := bs.Get(prf)
+		if err != nil {
+			return nil, fmt.Errorf("getting block %s: %w", prf.String(), err)
+		}
+
+		var dlg delegation.Delegation
+		if ok {
+			dlg, err = delegation.NewDelegation(blk, bs)
+			if err != nil {
+				return nil, fmt.Errorf("creating delegation %s: %w", prf.String(), err)
+			}
+		} else {
+			dlg, ok, err = cache.Get(ctx, prf)
+			if err != nil {
+				return nil, fmt.Errorf("getting delegation %s from cache: %w", prf.String(), err)
+			}
+			if !ok {
+				missingpfs = append(missingpfs, prf)
+				continue
+			}
+		}
+
+		dlgs = append(dlgs, dlg)
+		chkpfs = append(chkpfs, dlg.Proofs()...)
+	}
+
+	if len(missingpfs) > 0 {
+		for _, dlg := range dlgs {
+			err := cache.Put(ctx, dlg) // cache for subsequent request
+			if err != nil {
+				return nil, fmt.Errorf("caching delegation %s: %w", dlg.Link().String(), err)
+			}
+		}
+		return nil, NewMissingProofsError(missingpfs)
+	}
+
+	// Add the blocks from the delegations to the blockstore and create a new
+	// invocation which has everything.
+	for _, dlg := range dlgs {
+		for b, err := range dlg.Export() {
+			if err != nil {
+				return nil, fmt.Errorf("exporting blocks from delegation %s: %w", dlg.Link().String(), err)
+			}
+			err = bs.Put(b)
+			if err != nil {
+				return nil, fmt.Errorf("putting block %s: %w", b.Link().String(), err)
+			}
+		}
+	}
+	return invocation.NewInvocationView(root, bs)
+}
+
+// Run is similar to [server.Run] except the receipts that are issued do not
+// include the invocation block(s) in order to save bytes when transmitting the
+// receipt in HTTP headers.
+func Run(ctx context.Context, srv server.Server[Service], invocation server.ServiceInvocation, req Request) (receipt.AnyReceipt, Response, error) {
+	caps := invocation.Capabilities()
+	// Invocation needs to have one single capability
+	if len(caps) != 1 {
+		capErr := server.NewInvocationCapabilityError(invocation.Capabilities())
+		rcpt, err := receipt.Issue(srv.ID(), result.NewFailure(capErr), ran.FromLink(invocation.Link()))
+		return rcpt, Response{}, err
+	}
+
+	cap := caps[0]
+	handle, ok := srv.Service()[cap.Can()]
 	if !ok {
-		return nil, 0, nil, nil
+		notFoundErr := server.NewHandlerNotFoundError(cap)
+		rcpt, err := receipt.Issue(srv.ID(), result.NewFailure(notFoundErr), ran.FromLink(invocation.Link()))
+		return rcpt, Response{}, err
 	}
-	delete(bp.responses, key)
-	return res.Body, res.Status, res.Headers, nil
+
+	tx, resp, err := handle(ctx, invocation, srv.Context(), req)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return nil, Response{}, err
+		}
+		execErr := server.NewHandlerExecutionError(err, cap)
+		srv.Catch(execErr)
+		rcpt, err := receipt.Issue(srv.ID(), result.NewFailure(execErr), ran.FromLink(invocation.Link()))
+		if err != nil {
+			return nil, Response{}, err
+		}
+		return rcpt, resp, nil
+	}
+
+	fx := tx.Fx()
+	var opts []receipt.Option
+	if fx != nil {
+		opts = append(opts, receipt.WithJoin(fx.Join()), receipt.WithFork(fx.Fork()...))
+	}
+
+	rcpt, err := receipt.Issue(srv.ID(), tx.Out(), ran.FromLink(invocation.Link()), opts...)
+	if err != nil {
+		return nil, Response{}, err
+	}
+
+	return rcpt, resp, nil
 }

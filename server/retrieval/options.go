@@ -7,6 +7,7 @@ import (
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/result"
+	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/server"
 	"github.com/storacha/go-ucanto/server/transaction"
 	"github.com/storacha/go-ucanto/ucan"
@@ -14,9 +15,7 @@ import (
 )
 
 // Option is an option configuring a ucanto retrieval server. It does not
-// include a transport codec option as it must be [headercar]. Service methods
-// also have a different signature to allow them to return response body data,
-// HTTP status codes and HTTP headers.
+// include a transport codec option as it must be [headercar].
 type Option func(cfg *srvConfig) error
 
 type srvConfig struct {
@@ -32,15 +31,19 @@ type srvConfig struct {
 	delegationCache       delegation.Store
 }
 
-func WithServiceMethod[O ipld.Builder](can string, handleFunc ServiceMethod[O]) Option {
+func WithServiceMethod[O ipld.Builder, X failure.IPLDBuilderFailure](can string, handler ServiceMethod[O, X]) Option {
 	return func(cfg *srvConfig) error {
-		cfg.service[can] = func(ctx context.Context, input invocation.Invocation, ictx server.InvocationContext, request *RetrievalRequest) (transaction.Transaction[ipld.Builder, ipld.Builder], *RetrievalResponse, error) {
-			tx, res, err := handleFunc(ctx, input, ictx, request)
+		cfg.service[can] = func(ctx context.Context, input invocation.Invocation, invCtx server.InvocationContext, req Request) (transaction.Transaction[ipld.Builder, failure.IPLDBuilderFailure], Response, error) {
+			tx, resp, err := handler(ctx, input, invCtx, req)
 			if err != nil {
-				return nil, nil, err
+				return nil, resp, err
 			}
-			out := result.MapOk(tx.Out(), func(o O) ipld.Builder { return o })
-			return transaction.NewTransaction(out, transaction.WithEffects(tx.Fx())), res, nil
+			out := result.MapResultR0(
+				tx.Out(),
+				func(o O) ipld.Builder { return o },
+				func(x X) failure.IPLDBuilderFailure { return x },
+			)
+			return transaction.NewTransaction(out, transaction.WithEffects(tx.Fx())), resp, nil
 		}
 		return nil
 	}
