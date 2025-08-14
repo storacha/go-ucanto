@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"hash"
+	"io"
 	"net/http"
 	"net/url"
 
@@ -16,10 +17,10 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/ipld/block"
 	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
+	"github.com/storacha/go-ucanto/core/ipld/codec/json"
 	ucansha256 "github.com/storacha/go-ucanto/core/ipld/hash/sha256"
 	"github.com/storacha/go-ucanto/core/message"
 	mdm "github.com/storacha/go-ucanto/core/message/datamodel"
-	"github.com/storacha/go-ucanto/core/result"
 	rdm "github.com/storacha/go-ucanto/server/retrieval/datamodel"
 	"github.com/storacha/go-ucanto/transport"
 	"github.com/storacha/go-ucanto/transport/headercar"
@@ -155,20 +156,23 @@ func Execute(ctx context.Context, inv invocation.Invocation, conn client.Connect
 				return nil, nil, fmt.Errorf("unexpected status code: %d", res.Status())
 			}
 
-			// find the next part
-			output, err := conn.Codec().Decode(response)
+			body, err := io.ReadAll(response.Body())
 			if err != nil {
-				return nil, nil, fmt.Errorf("decoding message: %w", err)
+				return nil, nil, fmt.Errorf("reading not extended body: %w", err)
 			}
 
-			missprfs, err := extractMissingProofs(inv.Link(), output)
+			var model rdm.MissingProofsModel
+			err = json.Decode(body, &model, rdm.MissingProofsType())
 			if err != nil {
-				return nil, nil, fmt.Errorf("extracting missing proofs: %w", err)
+				return nil, nil, fmt.Errorf("decoding body: %w", err)
+			}
+			if len(model.Proofs) == 0 {
+				return nil, nil, fmt.Errorf("missing missing proofs: %w", err)
 			}
 
-			p, ok := parts[missprfs[0].String()]
+			p, ok := parts[model.Proofs[0].String()]
 			if !ok {
-				return nil, nil, fmt.Errorf("missing proof not found or was already sent: %s", missprfs[0].String())
+				return nil, nil, fmt.Errorf("missing proof not found or was already sent: %s", model.Proofs[0].String())
 			}
 			part = p
 			delete(parts, p.Link().String())
@@ -216,27 +220,4 @@ func newPartialInvocationMessage(invocation ipld.Link, part delegation.Delegatio
 		return nil, err
 	}
 	return message.NewMessage(rt.Link(), bs)
-}
-
-func extractMissingProofs(invocation ipld.Link, msg message.AgentMessage) ([]ipld.Link, error) {
-	root, ok := msg.Get(invocation)
-	if !ok {
-		return nil, fmt.Errorf("missing receipt for invocation: %s", invocation.String())
-	}
-	rcpt, ok, err := msg.Receipt(root)
-	if err != nil {
-		return nil, fmt.Errorf("getting receipt %s: %w", root.String(), err)
-	}
-	if !ok {
-		return nil, fmt.Errorf("missing receipt for invocation: %s", invocation.String())
-	}
-	_, x := result.Unwrap(rcpt.Out())
-	if x == nil {
-		return nil, errors.New("missing error in receipt")
-	}
-	model, err := ipld.Rebind[rdm.MissingProofsModel](x, rdm.MissingProofsType())
-	if err != nil {
-		return nil, fmt.Errorf("binding missing proofs error: %w", err)
-	}
-	return model.Proofs, nil
 }
