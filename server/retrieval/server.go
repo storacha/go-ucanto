@@ -1,24 +1,28 @@
 package retrieval
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/invocation/ran"
 	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/ipld/codec/json"
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/core/receipt"
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/principal"
 	"github.com/storacha/go-ucanto/server"
+	rdm "github.com/storacha/go-ucanto/server/retrieval/datamodel"
 	"github.com/storacha/go-ucanto/server/transaction"
 	"github.com/storacha/go-ucanto/transport"
 	"github.com/storacha/go-ucanto/transport/headercar"
@@ -66,9 +70,9 @@ type ServiceMethod[O ipld.Builder, X failure.IPLDBuilderFailure] func(
 // service implementation.
 type Service = map[ucan.Ability]ServiceMethod[ipld.Builder, failure.IPLDBuilderFailure]
 
-// CachingServer is a retrieval that also caches invocations/delegations to
-// allow invocations with delegations chains bigger than HTTP header size limits
-// to be executed as multiple requests.
+// CachingServer is a retrieval server that also caches invocations/delegations
+// to allow invocations with delegations chains bigger than HTTP header size
+// limits to be executed as multiple requests.
 type CachingServer interface {
 	server.Server[Service]
 	Cache() delegation.Store
@@ -229,6 +233,12 @@ func Handle(ctx context.Context, srv CachingServer, request transport.HTTPReques
 		return nil, fmt.Errorf("executing invocations: %w", err)
 	}
 
+	// if there is no agent message to respond with, we simply respond with the
+	// response from execution (i.e. missing proofs response)
+	if out == nil {
+		return thttp.NewResponse(execResp.Status, execResp.Body, execResp.Headers), nil
+	}
+
 	encResp, err := selection.Encoder().Encode(out)
 	if err != nil {
 		return nil, fmt.Errorf("encoding response message: %w", err)
@@ -282,15 +292,18 @@ func Execute(ctx context.Context, srv CachingServer, msg message.AgentMessage, r
 	if err != nil {
 		mpe := MissingProofs{}
 		if errors.As(err, &mpe) {
-			rcpt, err := receipt.Issue(srv.ID(), result.NewFailure(mpe), ran.FromLink(invs[0]))
+			body, err := json.Encode(&mpe, rdm.MissingProofsType())
 			if err != nil {
-				return nil, Response{}, fmt.Errorf("issuing missing proofs receipt: %w", err)
+				return nil, Response{}, fmt.Errorf("encoding missing proofs repsonse: %w", err)
 			}
-			out, err := message.Build(nil, []receipt.AnyReceipt{rcpt})
-			if err != nil {
-				return nil, Response{}, fmt.Errorf("building missing proofs error message: %w", err)
-			}
-			return out, Response{Status: http.StatusNotExtended}, nil
+			headers := http.Header{}
+			expiry := time.Now().Add(10 * time.Minute).Unix() // TODO: honour this?
+			headers.Set("X-UCAN-Cache-Expiry", fmt.Sprintf("%d", expiry))
+			return nil, Response{
+				Status:  http.StatusNotExtended,
+				Body:    bytes.NewReader(body),
+				Headers: headers,
+			}, nil
 		}
 		return nil, Response{}, err
 	}
