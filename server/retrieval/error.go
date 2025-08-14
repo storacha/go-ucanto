@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/storacha/go-ucanto/core/ipld"
-	"github.com/storacha/go-ucanto/core/result/failure"
 	rdm "github.com/storacha/go-ucanto/server/retrieval/datamodel"
 )
 
@@ -20,7 +19,11 @@ func (amie AgentMessageInvocationError) Name() string {
 }
 
 func (amie AgentMessageInvocationError) ToIPLD() (ipld.Node, error) {
-	return failure.FromError(amie).ToIPLD()
+	mdl := rdm.AgentMessageInvocationErrorModel{
+		Name:    amie.Name(),
+		Message: amie.Error(),
+	}
+	return ipld.WrapWithRecovery(&mdl, rdm.AgentMessageInvocationErrorType())
 }
 
 func NewAgentMessageInvocationError() AgentMessageInvocationError {

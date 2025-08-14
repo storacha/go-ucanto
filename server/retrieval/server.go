@@ -10,19 +10,19 @@ import (
 	"strings"
 	"time"
 
+	ipldprime "github.com/ipld/go-ipld-prime"
+	"github.com/ipld/go-ipld-prime/codec/dagjson"
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/invocation/ran"
 	"github.com/storacha/go-ucanto/core/ipld"
-	"github.com/storacha/go-ucanto/core/ipld/codec/json"
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/core/receipt"
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/principal"
 	"github.com/storacha/go-ucanto/server"
-	rdm "github.com/storacha/go-ucanto/server/retrieval/datamodel"
 	"github.com/storacha/go-ucanto/server/transaction"
 	"github.com/storacha/go-ucanto/transport"
 	"github.com/storacha/go-ucanto/transport/headercar"
@@ -292,7 +292,11 @@ func Execute(ctx context.Context, srv CachingServer, msg message.AgentMessage, r
 	if err != nil {
 		mpe := MissingProofs{}
 		if errors.As(err, &mpe) {
-			body, err := json.Encode(&mpe, rdm.MissingProofsType())
+			n, err := mpe.ToIPLD()
+			if err != nil {
+				return nil, Response{}, fmt.Errorf("building missing proofs IPLD view: %w", err)
+			}
+			body, err := ipldprime.Encode(n, dagjson.Encode)
 			if err != nil {
 				return nil, Response{}, fmt.Errorf("encoding missing proofs repsonse: %w", err)
 			}

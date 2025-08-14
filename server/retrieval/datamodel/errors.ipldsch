@@ -3,3 +3,8 @@ type MissingProofs struct {
 	message String
 	proofs [Link]
 }
+
+type AgentMessageInvocationError struct {
+	name String
+	message String
+}

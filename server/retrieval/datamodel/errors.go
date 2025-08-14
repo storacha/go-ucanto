@@ -37,3 +37,12 @@ type MissingProofsModel struct {
 	Message string
 	Proofs  []ipld.Link
 }
+
+func AgentMessageInvocationErrorType() schema.Type {
+	return errorTypeSystem.TypeByName("AgentMessageInvocationError")
+}
+
+type AgentMessageInvocationErrorModel struct {
+	Name    string
+	Message string
+}
