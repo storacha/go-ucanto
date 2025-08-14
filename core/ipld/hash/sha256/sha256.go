@@ -32,10 +32,6 @@ func (hasher) Sum(b []byte) (hash.Digest, error) {
 	sum := s256h.Sum(nil)
 
 	d, _ := multihash.Encode(sum, Code)
-	if err != nil {
-		return nil, err
-	}
-
 	return hash.NewDigest(Code, Size, sum, d), nil
 }
 

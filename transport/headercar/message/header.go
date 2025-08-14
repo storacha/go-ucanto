@@ -57,9 +57,12 @@ func DecodeHeader(h string) (message.AgentMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decoding CAR: %w", err)
 	}
+	if len(roots) != 1 {
+		return nil, fmt.Errorf("unexpected number of roots: %d", len(roots))
+	}
 	bstore, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(blocks))
 	if err != nil {
 		return nil, fmt.Errorf("creating blockstore: %w", err)
 	}
-	return message.NewMessage(roots, bstore)
+	return message.NewMessage(roots[0], bstore)
 }

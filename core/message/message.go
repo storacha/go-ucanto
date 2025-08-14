@@ -183,17 +183,13 @@ func Build(invocations []invocation.Invocation, receipts []receipt.AnyReceipt) (
 	}, nil
 }
 
-func NewMessage(roots []ipld.Link, blks blockstore.BlockReader) (AgentMessage, error) {
-	if len(roots) == 0 {
-		return nil, fmt.Errorf("missing roots")
-	}
-
-	rblock, ok, err := blks.Get(roots[0])
+func NewMessage(root ipld.Link, blks blockstore.BlockReader) (AgentMessage, error) {
+	rblock, ok, err := blks.Get(root)
 	if err != nil {
 		return nil, fmt.Errorf("getting root block: %w", err)
 	}
 	if !ok {
-		return nil, fmt.Errorf("missing root block: %s", roots[0])
+		return nil, fmt.Errorf("missing root block: %s", root)
 	}
 
 	msg := mdm.AgentMessageModel{}
