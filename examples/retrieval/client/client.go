@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"strconv"
 
@@ -48,7 +49,12 @@ func main() {
 		panic(fmt.Errorf("decoding digest: %w", err))
 	}
 
-	conn, err := retrieval.NewConnection(fixtures.Service, "http://localhost:3000/"+digestStr)
+	url, err := url.Parse("http://localhost:3000/" + digestStr)
+	if err != nil {
+		panic(fmt.Errorf("parsing retrieval URL: %w", err))
+	}
+
+	conn, err := retrieval.NewConnection(fixtures.Service, url)
 	if err != nil {
 		panic(fmt.Errorf("creating connection: %w", err))
 	}
