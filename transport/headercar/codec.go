@@ -5,6 +5,7 @@ import (
 
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/transport"
+	hcmsg "github.com/storacha/go-ucanto/transport/headercar/message"
 	"github.com/storacha/go-ucanto/transport/headercar/request"
 	"github.com/storacha/go-ucanto/transport/headercar/response"
 	thttp "github.com/storacha/go-ucanto/transport/http"
@@ -49,7 +50,7 @@ type InboundCodec struct {
 }
 
 func (ic *InboundCodec) Accept(req transport.HTTPRequest) (transport.InboundAcceptCodec, transport.HTTPError) {
-	msgHdr := req.Headers().Get("X-Agent-Message")
+	msgHdr := req.Headers().Get(hcmsg.HeaderName)
 	if msgHdr == "" {
 		return nil, thttp.NewHTTPError(
 			"The server cannot process the request because the payload format is not supported. Please send the X-Agent-Message header.",

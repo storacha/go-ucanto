@@ -27,6 +27,7 @@ import (
 	"github.com/storacha/go-ucanto/server/transaction"
 	"github.com/storacha/go-ucanto/transport"
 	"github.com/storacha/go-ucanto/transport/headercar"
+	hcmsg "github.com/storacha/go-ucanto/transport/headercar/message"
 	thttp "github.com/storacha/go-ucanto/transport/http"
 	"github.com/storacha/go-ucanto/ucan"
 )
@@ -190,6 +191,31 @@ func (srv *Server) Catch(err server.HandlerExecutionError[any]) {
 var _ CachingServer = (*Server)(nil)
 
 func Handle(ctx context.Context, srv CachingServer, request transport.HTTPRequest) (transport.HTTPResponse, error) {
+	resp, err := handle(ctx, srv, request)
+	if err != nil {
+		return nil, err
+	}
+
+	// ensure headers are not nil
+	headers := resp.Headers()
+	if headers == nil {
+		headers = http.Header{}
+	} else {
+		headers = headers.Clone()
+	}
+	// ensure the Vary header is set for ALL responses
+	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Vary
+	headers.Add("Vary", hcmsg.HeaderName)
+
+	// ensure body is not nil
+	body := resp.Body()
+	if body == nil {
+		body = io.NopCloser(strings.NewReader(""))
+	}
+	return thttp.NewResponse(resp.Status(), body, headers), nil
+}
+
+func handle(ctx context.Context, srv CachingServer, request transport.HTTPRequest) (transport.HTTPResponse, error) {
 	selection, aerr := srv.Codec().Accept(request)
 	if aerr != nil {
 		return thttp.NewResponse(aerr.Status(), io.NopCloser(strings.NewReader(aerr.Error())), aerr.Headers()), nil

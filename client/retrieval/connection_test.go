@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	prime "github.com/ipld/go-ipld-prime"
@@ -244,9 +245,12 @@ func TestExecute(t *testing.T) {
 			// specify the byte range we want to receive (inclusive)
 			contentRange := []int{100, 200}
 
+			url, err := url.Parse(httpServer.URL)
+			require.NoError(t, err)
+
 			// the URL doesn't really have a consequence on this test, but it can be
 			// used to idenitfy the data if not done so in the invocation caveats
-			conn, err := NewConnection(fixtures.Service, fmt.Sprintf("%s/blob/z%s", httpServer.URL, digest.B58String()))
+			conn, err := NewConnection(fixtures.Service, url.JoinPath("blob", "z"+digest.B58String()))
 			require.NoError(t, err)
 
 			inv, err := serve.Invoke(

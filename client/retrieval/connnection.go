@@ -29,14 +29,30 @@ import (
 	"github.com/storacha/go-ucanto/ucan"
 )
 
+// Option is an option configuring a retrieval connection.
+type Option func(cfg *config)
+
+type config struct {
+	client *http.Client
+}
+
+// WithClient configures the HTTP client the connection should use to make
+// requests.
+func WithClient(c *http.Client) Option {
+	return func(cfg *config) {
+		cfg.client = c
+	}
+}
+
 // NewConnection creates a new connection to a retrieval server that uses the
 // headercar transport.
-func NewConnection(id ucan.Principal, endpoint string) (*Connection, error) {
-	hasher := sha256.New
-	url, err := url.Parse(endpoint)
-	if err != nil {
-		return nil, err
+func NewConnection(id ucan.Principal, url *url.URL, opts ...Option) (*Connection, error) {
+	cfg := config{}
+	for _, o := range opts {
+		o(&cfg)
 	}
+
+	hasher := sha256.New
 	channel := thttp.NewChannel(
 		url,
 		thttp.WithMethod("GET"),
@@ -46,6 +62,7 @@ func NewConnection(id ucan.Principal, endpoint string) (*Connection, error) {
 			http.StatusNotExtended,                 // indicates further proof must be supplied
 			http.StatusRequestHeaderFieldsTooLarge, // indicates invocation is too large to fit in headers
 		),
+		thttp.WithClient(cfg.client),
 	)
 	codec := headercar.NewOutboundCodec()
 	return &Connection{id, channel, codec, hasher}, nil
