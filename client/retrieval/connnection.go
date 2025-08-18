@@ -24,6 +24,7 @@ import (
 	rdm "github.com/storacha/go-ucanto/server/retrieval/datamodel"
 	"github.com/storacha/go-ucanto/transport"
 	"github.com/storacha/go-ucanto/transport/headercar"
+	hcmsg "github.com/storacha/go-ucanto/transport/headercar/message"
 	thttp "github.com/storacha/go-ucanto/transport/http"
 	"github.com/storacha/go-ucanto/ucan"
 )
@@ -81,19 +82,34 @@ func Execute(ctx context.Context, inv invocation.Invocation, conn client.Connect
 		return nil, nil, fmt.Errorf("building message: %w", err)
 	}
 
+	var response transport.HTTPResponse
+	needMultipartRequest := false
+
 	req, err := conn.Codec().Encode(input)
 	if err != nil {
-		return nil, nil, fmt.Errorf("encoding message: %w", err)
-	}
+		if errors.Is(err, hcmsg.ErrHeaderTooLarge) {
+			needMultipartRequest = true
+		} else {
+			return nil, nil, fmt.Errorf("encoding message: %w", err)
+		}
+	} else {
+		response, err = conn.Channel().Request(ctx, req)
+		if err != nil {
+			return nil, nil, fmt.Errorf("sending message: %w", err)
+		}
 
-	response, err := conn.Channel().Request(ctx, req)
-	if err != nil {
-		return nil, nil, fmt.Errorf("sending message: %w", err)
+		if response.Status() == http.StatusRequestHeaderFieldsTooLarge {
+			needMultipartRequest = true
+			err := response.Body().Close() // we don't need this anymore
+			if err != nil {
+				return nil, nil, fmt.Errorf("closing response body: %w", err)
+			}
+		}
 	}
 
 	// if the header fields are too big, we need to split the delegation into
 	// multiple requests...
-	if response.Status() == http.StatusRequestHeaderFieldsTooLarge {
+	if needMultipartRequest {
 		br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(inv.Export()))
 		if err != nil {
 			return nil, nil, fmt.Errorf("reading invocation blocks: %w", err)
@@ -156,7 +172,7 @@ func Execute(ctx context.Context, inv invocation.Invocation, conn client.Connect
 				return nil, nil, fmt.Errorf("unexpected status code: %d", res.Status())
 			}
 
-			body, err := io.ReadAll(response.Body())
+			body, err := io.ReadAll(res.Body())
 			if err != nil {
 				return nil, nil, fmt.Errorf("reading not extended body: %w", err)
 			}

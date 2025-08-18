@@ -89,7 +89,7 @@ func (m *message) Receipt(root ipld.Link) (receipt.AnyReceipt, bool, error) {
 	if !ok || err != nil {
 		return nil, ok, err
 	}
-	rcpt, err := receipt.NewAnyReceipt[ipld.Node, ipld.Node](root, m.blks)
+	rcpt, err := receipt.NewAnyReceipt(root, m.blks)
 	if err != nil {
 		return nil, false, err
 	}

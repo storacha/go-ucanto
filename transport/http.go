@@ -3,6 +3,7 @@ package transport
 import (
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/storacha/go-ucanto/core/result/failure"
 )
@@ -14,13 +15,13 @@ type HTTPRequest interface {
 
 type InboundHTTPRequest interface {
 	HTTPRequest
-	URL() string
+	URL() *url.URL
 }
 
 type HTTPResponse interface {
 	Status() int
 	Headers() http.Header
-	Body() io.Reader
+	Body() io.ReadCloser
 }
 
 type HTTPError interface {

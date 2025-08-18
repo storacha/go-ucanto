@@ -1,9 +1,6 @@
 package retrieval
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/storacha/go-ucanto/core/ipld"
 	rdm "github.com/storacha/go-ucanto/server/retrieval/datamodel"
 )
@@ -35,11 +32,7 @@ type MissingProofs struct {
 }
 
 func (mpe MissingProofs) Error() string {
-	var links []string
-	for _, p := range mpe.proofs {
-		links = append(links, p.String())
-	}
-	return fmt.Sprintf("Missing proofs: %s", strings.Join(links, ", "))
+	return "proofs were missing, resubmit the invocation with the requested proofs"
 }
 
 func (mpe MissingProofs) Name() string {

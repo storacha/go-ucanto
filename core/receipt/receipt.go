@@ -12,7 +12,6 @@ import (
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
-	"github.com/storacha/go-ucanto/core/invocation/ran"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/ipld/block"
 	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
@@ -20,6 +19,7 @@ import (
 	"github.com/storacha/go-ucanto/core/iterable"
 	rdm "github.com/storacha/go-ucanto/core/receipt/datamodel"
 	"github.com/storacha/go-ucanto/core/receipt/fx"
+	"github.com/storacha/go-ucanto/core/receipt/ran"
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/ucan"
@@ -31,7 +31,7 @@ import (
 // included in the source DAG.
 type Receipt[O, X any] interface {
 	ipld.View
-	Ran() invocation.Invocation
+	Ran() ran.Ran
 	Out() result.Result[O, X]
 	Fx() fx.Effects
 	Meta() map[string]any
@@ -65,7 +65,10 @@ var _ Receipt[any, any] = (*receipt[any, any])(nil)
 
 func (r *receipt[O, X]) Blocks() iter.Seq2[block.Block, error] {
 	var iterators []iter.Seq2[block.Block, error]
-	iterators = append(iterators, r.Ran().Blocks())
+
+	if inv, ok := r.Ran().Invocation(); ok {
+		iterators = append(iterators, inv.Blocks())
+	}
 
 	for _, prf := range r.Proofs() {
 		if delegation, ok := prf.Delegation(); ok {
@@ -132,12 +135,17 @@ func (r *receipt[O, X]) Out() result.Result[O, X] {
 	return fromResultModel(r.data.Ocm.Out)
 }
 
-func (r *receipt[O, X]) Ran() invocation.Invocation {
+func (r *receipt[O, X]) Ran() ran.Ran {
+	_, ok, err := r.blks.Get(r.data.Ocm.Ran)
+	if !ok || err != nil {
+		return ran.FromLink(r.data.Ocm.Ran)
+	}
 	inv, err := invocation.NewInvocationView(r.data.Ocm.Ran, r.blks)
 	if err != nil {
 		fmt.Printf("Error: creating invocation view: %s\n", err)
+		return ran.FromLink(r.data.Ocm.Ran)
 	}
-	return inv
+	return ran.FromInvocation(inv)
 }
 
 func (r *receipt[O, X]) Root() block.Block {
@@ -172,7 +180,7 @@ func NewReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, typ sch
 	return &rcpt, nil
 }
 
-func NewAnyReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, opts ...bindnode.Option) (AnyReceipt, error) {
+func NewAnyReceipt(root ipld.Link, blocks blockstore.BlockReader, opts ...bindnode.Option) (AnyReceipt, error) {
 	anyReceiptType := rdm.TypeSystem().TypeByName("Receipt")
 	return NewReceipt[ipld.Node, ipld.Node](root, blocks, anyReceiptType, opts...)
 }

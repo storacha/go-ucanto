@@ -3,17 +3,18 @@ package http
 import (
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/storacha/go-ucanto/transport"
 )
 
 type Request struct {
-	url  string
+	url  *url.URL
 	hdrs http.Header
 	body io.Reader
 }
 
-func (req *Request) URL() string {
+func (req *Request) URL() *url.URL {
 	return req.url
 }
 
@@ -31,7 +32,7 @@ var _ transport.InboundHTTPRequest = (*Request)(nil)
 type Response struct {
 	status int
 	hdrs   http.Header
-	body   io.Reader
+	body   io.ReadCloser
 }
 
 func (res *Response) Status() int {
@@ -42,23 +43,23 @@ func (res *Response) Headers() http.Header {
 	return res.hdrs
 }
 
-func (res *Response) Body() io.Reader {
+func (res *Response) Body() io.ReadCloser {
 	return res.body
 }
 
 var _ transport.HTTPResponse = (*Response)(nil)
 
-func NewResponse(status int, body io.Reader, headers http.Header) *Response {
+func NewResponse(status int, body io.ReadCloser, headers http.Header) *Response {
 	return &Response{status, headers, body}
 }
 
 // NewRequest creates a [transport.HTTPRequest]
 func NewRequest(body io.Reader, headers http.Header) *Request {
-	return &Request{"", headers, body}
+	return &Request{nil, headers, body}
 }
 
 // NewInboundRequest creates a [transport.InboundHTTPRequest] - a request that
 // also has a URL.
-func NewInboundRequest(url string, body io.Reader, headers http.Header) *Request {
+func NewInboundRequest(url *url.URL, body io.Reader, headers http.Header) *Request {
 	return &Request{url, headers, body}
 }

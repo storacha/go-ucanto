@@ -8,9 +8,9 @@ import (
 	ipldprime "github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/schema"
 	"github.com/storacha/go-ucanto/core/invocation"
-	"github.com/storacha/go-ucanto/core/invocation/ran"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/receipt/fx"
+	"github.com/storacha/go-ucanto/core/receipt/ran"
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/core/result/ok"
 	"github.com/storacha/go-ucanto/testing/fixtures"
@@ -121,6 +121,50 @@ type someErrorType struct {
 
 func (s someErrorType) ToIPLD() (ipld.Node, error) {
 	return ipld.WrapWithRecovery(&s, someTS.TypeByName("someErrorType"))
+}
+
+func TestIssue(t *testing.T) {
+	t.Run("ran as invocation", func(t *testing.T) {
+		inv, err := invocation.Invoke(
+			fixtures.Alice,
+			fixtures.Bob,
+			ucan.NewCapability("ran/invoke", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+		)
+		require.NoError(t, err)
+		ran := ran.FromInvocation(inv)
+
+		out := result.Ok[someOkType, someErrorType](someOkType{SomeOkProperty: "some ok value"})
+
+		issuedRcpt, err := Issue(fixtures.Alice, out, ran)
+		require.NoError(t, err)
+
+		ranInv, ok := issuedRcpt.Ran().Invocation()
+		require.True(t, ok)
+		require.Equal(t, inv.Link().String(), ranInv.Link().String())
+	})
+
+	t.Run("ran as link", func(t *testing.T) {
+		inv, err := invocation.Invoke(
+			fixtures.Alice,
+			fixtures.Bob,
+			ucan.NewCapability("ran/invoke", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+		)
+		require.NoError(t, err)
+		ran := ran.FromLink(inv.Link())
+
+		out := result.Ok[someOkType, someErrorType](someOkType{SomeOkProperty: "some ok value"})
+
+		issuedRcpt, err := Issue(fixtures.Alice, out, ran)
+		require.NoError(t, err)
+
+		ranInv, ok := issuedRcpt.Ran().Invocation()
+		require.False(t, ok)
+		require.Nil(t, ranInv)
+
+		ranInvLink := issuedRcpt.Ran().Link()
+		require.NotNil(t, ranInvLink)
+		require.Equal(t, inv.Link().String(), ranInvLink.String())
+	})
 }
 
 func TestAnyReceiptReader(t *testing.T) {

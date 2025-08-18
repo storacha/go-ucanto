@@ -34,3 +34,23 @@ func TestRoundTrip(t *testing.T) {
 	_, err = DecodeHeader(s)
 	require.NoError(t, err)
 }
+
+func TestEncodeHeaderTooLarge(t *testing.T) {
+	inv, err := invocation.Invoke(
+		fixtures.Alice,
+		fixtures.Service,
+		ucan.NewCapability(
+			"test/invoke",
+			fixtures.Alice.DID().String(),
+			ucan.NoCaveats{},
+		),
+	)
+	require.NoError(t, err)
+
+	msg, err := message.Build([]invocation.Invocation{inv}, nil)
+	require.NoError(t, err)
+
+	s, err := EncodeHeader(msg, WithMaxSize(1))
+	require.Empty(t, s)
+	require.ErrorIs(t, err, ErrHeaderTooLarge)
+}

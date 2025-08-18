@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -15,10 +16,10 @@ import (
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
-	"github.com/storacha/go-ucanto/core/invocation/ran"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/core/receipt"
+	"github.com/storacha/go-ucanto/core/receipt/ran"
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/principal"
@@ -32,7 +33,7 @@ import (
 
 type Request struct {
 	// Relative URL requested.
-	URL string
+	URL *url.URL
 	// Headers are the HTTP headers sent in the HTTP request to the server.
 	Headers http.Header
 }
@@ -46,10 +47,10 @@ type Response struct {
 	// Content-Range for byte range responses.
 	Headers http.Header
 	// Body is the data to return in the response body.
-	Body io.Reader
+	Body io.ReadCloser
 }
 
-func NewResponse(status int, headers http.Header, body io.Reader) Response {
+func NewResponse(status int, headers http.Header, body io.ReadCloser) Response {
 	return Response{Status: status, Headers: headers, Body: body}
 }
 
@@ -191,12 +192,12 @@ var _ CachingServer = (*Server)(nil)
 func Handle(ctx context.Context, srv CachingServer, request transport.HTTPRequest) (transport.HTTPResponse, error) {
 	selection, aerr := srv.Codec().Accept(request)
 	if aerr != nil {
-		return thttp.NewResponse(aerr.Status(), strings.NewReader(aerr.Error()), aerr.Headers()), nil
+		return thttp.NewResponse(aerr.Status(), io.NopCloser(strings.NewReader(aerr.Error())), aerr.Headers()), nil
 	}
 
 	msg, err := selection.Decoder().Decode(request)
 	if err != nil {
-		return thttp.NewResponse(http.StatusBadRequest, strings.NewReader("The server failed to decode the request payload. Please format the payload according to the specified media type."), nil), nil
+		return thttp.NewResponse(http.StatusBadRequest, io.NopCloser(strings.NewReader("The server failed to decode the request payload. Please format the payload according to the specified media type.")), nil), nil
 	}
 
 	// retrieval server supports only 1 invocation in the agent message, since
@@ -305,7 +306,7 @@ func Execute(ctx context.Context, srv CachingServer, msg message.AgentMessage, r
 			headers.Set("X-UCAN-Cache-Expiry", fmt.Sprintf("%d", expiry))
 			return nil, Response{
 				Status:  http.StatusNotExtended,
-				Body:    bytes.NewReader(body),
+				Body:    io.NopCloser(bytes.NewReader(body)),
 				Headers: headers,
 			}, nil
 		}
@@ -330,6 +331,7 @@ func ExtractInvocation(ctx context.Context, root ipld.Link, msg message.AgentMes
 	}
 
 	var dlgs []delegation.Delegation
+	var newdlgs []delegation.Delegation
 	chkpfs := []ipld.Link{root}
 	var missingpfs []ipld.Link
 	for len(chkpfs) > 0 {
@@ -347,6 +349,7 @@ func ExtractInvocation(ctx context.Context, root ipld.Link, msg message.AgentMes
 			if err != nil {
 				return nil, fmt.Errorf("creating delegation %s: %w", prf.String(), err)
 			}
+			newdlgs = append(newdlgs, dlg)
 		} else {
 			dlg, ok, err = cache.Get(ctx, prf)
 			if err != nil {
@@ -363,8 +366,8 @@ func ExtractInvocation(ctx context.Context, root ipld.Link, msg message.AgentMes
 	}
 
 	if len(missingpfs) > 0 {
-		for _, dlg := range dlgs {
-			err := cache.Put(ctx, dlg) // cache for subsequent request
+		for _, dlg := range newdlgs {
+			err := cache.Put(ctx, dlg) // cache new delegations for subsequent request
 			if err != nil {
 				return nil, fmt.Errorf("caching delegation %s: %w", dlg.Link().String(), err)
 			}

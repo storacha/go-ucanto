@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -12,10 +13,10 @@ import (
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
-	"github.com/storacha/go-ucanto/core/invocation/ran"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/core/receipt"
+	"github.com/storacha/go-ucanto/core/receipt/ran"
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/did"
@@ -224,12 +225,12 @@ var _ ServerView[Service] = (*server)(nil)
 func Handle(ctx context.Context, server Server[Service], request transport.HTTPRequest) (transport.HTTPResponse, error) {
 	selection, aerr := server.Codec().Accept(request)
 	if aerr != nil {
-		return thttp.NewResponse(aerr.Status(), strings.NewReader(aerr.Error()), aerr.Headers()), nil
+		return thttp.NewResponse(aerr.Status(), io.NopCloser(strings.NewReader(aerr.Error())), aerr.Headers()), nil
 	}
 
 	msg, err := selection.Decoder().Decode(request)
 	if err != nil {
-		return thttp.NewResponse(http.StatusBadRequest, strings.NewReader("The server failed to decode the request payload. Please format the payload according to the specified media type."), nil), nil
+		return thttp.NewResponse(http.StatusBadRequest, io.NopCloser(strings.NewReader("The server failed to decode the request payload. Please format the payload according to the specified media type.")), nil), nil
 	}
 
 	result, err := Execute(ctx, server, msg)

@@ -3,6 +3,7 @@ package message
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 
@@ -13,11 +14,38 @@ import (
 	"github.com/storacha/go-ucanto/core/message"
 )
 
-// AgentMessageHeader is the default name of the HTTP header.
-var AgentMessageHeader = "X-Agent-Message"
+var (
+	// HeaderName is the default name of the HTTP header.
+	HeaderName = "X-Agent-Message"
+	// Maximum size in bytes the header value may be.
+	MaxHeaderSizeBytes = 4 * 1024
+	ErrHeaderTooLarge  = errors.New("maximum agent message header size exceeded")
+)
+
+type encodeConfig struct {
+	maxSize int
+}
+
+type EncodeOption func(c *encodeConfig)
+
+// WithMaxSize configures the maximum size allowed for the header value. The
+// default is [MaxHeaderSizeBytes]. Set to -1 to disable the size restriction.
+func WithMaxSize(size int) EncodeOption {
+	return func(c *encodeConfig) {
+		c.maxSize = size
+	}
+}
 
 // EncodeHeader encodes a [message.AgentMessage] as a HTTP header string.
-func EncodeHeader(msg message.AgentMessage) (string, error) {
+func EncodeHeader(msg message.AgentMessage, opts ...EncodeOption) (string, error) {
+	cfg := encodeConfig{}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	if cfg.maxSize == 0 {
+		cfg.maxSize = MaxHeaderSizeBytes
+	}
+
 	data := car.Encode([]ipld.Link{msg.Root().Link()}, msg.Blocks())
 
 	r, w := io.Pipe()
@@ -37,6 +65,10 @@ func EncodeHeader(msg message.AgentMessage) (string, error) {
 	h, err := multibase.Encode(multibase.Base64, b.Bytes())
 	if err != nil {
 		return "", fmt.Errorf("multibase encoding: %w", err)
+	}
+
+	if cfg.maxSize != -1 && len(h) > cfg.maxSize {
+		return "", ErrHeaderTooLarge
 	}
 
 	return h, nil
