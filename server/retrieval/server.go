@@ -330,6 +330,7 @@ func Execute(ctx context.Context, srv CachingServer, msg message.AgentMessage, r
 			headers := http.Header{}
 			expiry := time.Now().Add(10 * time.Minute).Unix() // TODO: honour this?
 			headers.Set("X-UCAN-Cache-Expiry", fmt.Sprintf("%d", expiry))
+			headers.Set("Content-Type", "application/json")
 			return nil, Response{
 				Status:  http.StatusNotExtended,
 				Body:    io.NopCloser(bytes.NewReader(body)),
