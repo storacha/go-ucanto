@@ -207,12 +207,10 @@ func Handle(ctx context.Context, srv CachingServer, request transport.HTTPReques
 	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Vary
 	headers.Add("Vary", hcmsg.HeaderName)
 
-	// ensure body is not nil
-	body := resp.Body()
-	if body == nil {
-		body = io.NopCloser(strings.NewReader(""))
+	if resp.Body() == nil {
+		return thttp.NewResponse(resp.Status(), http.NoBody, headers), nil
 	}
-	return thttp.NewResponse(resp.Status(), body, headers), nil
+	return thttp.NewResponse(resp.Status(), resp.Body(), headers), nil
 }
 
 func handle(ctx context.Context, srv CachingServer, request transport.HTTPRequest) (transport.HTTPResponse, error) {
