@@ -72,6 +72,9 @@ func (m *message) Invocation(root ipld.Link) (invocation.Invocation, bool, error
 
 func (m *message) Receipts() []ipld.Link {
 	var rcpts []ipld.Link
+	if m.data.Report == nil {
+		return rcpts
+	}
 	for _, k := range m.data.Report.Keys {
 		l, ok := m.data.Report.Values[k]
 		if ok {
