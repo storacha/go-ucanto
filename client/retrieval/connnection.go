@@ -29,10 +29,6 @@ import (
 	"github.com/storacha/go-ucanto/ucan"
 )
 
-// MaxPartialInvocationReqs is the maximum number of requests we'll send in
-// order to get an invocation executed.
-const MaxPartialInvocationReqs = 50
-
 // Option is an option configuring a retrieval connection.
 type Option func(cfg *config)
 
@@ -204,7 +200,13 @@ func sendPartialInvocations(ctx context.Context, inv invocation.Invocation, conn
 	}
 
 	// now send the parts
-	for range MaxPartialInvocationReqs {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		input, err := newPartialInvocationMessage(inv.Link(), part)
 		if err != nil {
 			return nil, fmt.Errorf("building message: %w", err)
@@ -233,9 +235,14 @@ func sendPartialInvocations(ctx context.Context, inv invocation.Invocation, conn
 			return nil, fmt.Errorf("unexpected status code: %d", res.Status())
 		}
 
-		body, err := io.ReadAll(res.Body())
+		bodyReader := res.Body()
+		body, err := io.ReadAll(bodyReader)
 		if err != nil {
+			bodyReader.Close()
 			return nil, fmt.Errorf("reading not extended body: %w", err)
+		}
+		if err = bodyReader.Close(); err != nil {
+			return nil, fmt.Errorf("closing response body: %w", err)
 		}
 
 		var model rdm.MissingProofsModel
@@ -254,8 +261,6 @@ func sendPartialInvocations(ctx context.Context, inv invocation.Invocation, conn
 		part = p
 		delete(parts, p.Link().String())
 	}
-
-	return nil, fmt.Errorf("maximum partial invocation requests exceeded: %d", MaxPartialInvocationReqs)
 }
 
 func omitProofs(dlg delegation.Delegation) (delegation.Delegation, error) {
