@@ -29,10 +29,6 @@ import (
 	"github.com/storacha/go-ucanto/ucan"
 )
 
-// MaxPartialInvocationReqs is the maximum number of requests we'll send in
-// order to get an invocation executed.
-const MaxPartialInvocationReqs = 50
-
 // Option is an option configuring a retrieval connection.
 type Option func(cfg *config)
 
@@ -204,58 +200,66 @@ func sendPartialInvocations(ctx context.Context, inv invocation.Invocation, conn
 	}
 
 	// now send the parts
-	for range MaxPartialInvocationReqs {
-		input, err := newPartialInvocationMessage(inv.Link(), part)
-		if err != nil {
-			return nil, fmt.Errorf("building message: %w", err)
-		}
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			input, err := newPartialInvocationMessage(inv.Link(), part)
+			if err != nil {
+				return nil, fmt.Errorf("building message: %w", err)
+			}
 
-		req, err := conn.Codec().Encode(input)
-		if err != nil {
-			return nil, fmt.Errorf("encoding message: %w", err)
-		}
+			req, err := conn.Codec().Encode(input)
+			if err != nil {
+				return nil, fmt.Errorf("encoding message: %w", err)
+			}
 
-		res, err := conn.Channel().Request(ctx, req)
-		if err != nil {
-			return nil, fmt.Errorf("sending message: %w", err)
-		}
+			res, err := conn.Channel().Request(ctx, req)
+			if err != nil {
+				return nil, fmt.Errorf("sending message: %w", err)
+			}
 
-		if res.Status() == http.StatusPartialContent || res.Status() == http.StatusOK {
-			return res, nil
-		}
+			if res.Status() == http.StatusPartialContent || res.Status() == http.StatusOK {
+				return res, nil
+			}
 
-		// if still too big, then fail
-		if res.Status() == http.StatusRequestHeaderFieldsTooLarge {
-			return nil, errors.New("invocation is too big to send in HTTP headers")
-		}
+			// if still too big, then fail
+			if res.Status() == http.StatusRequestHeaderFieldsTooLarge {
+				return nil, errors.New("invocation is too big to send in HTTP headers")
+			}
 
-		if res.Status() != http.StatusNotExtended {
-			return nil, fmt.Errorf("unexpected status code: %d", res.Status())
-		}
+			if res.Status() != http.StatusNotExtended {
+				return nil, fmt.Errorf("unexpected status code: %d", res.Status())
+			}
 
-		body, err := io.ReadAll(res.Body())
-		if err != nil {
-			return nil, fmt.Errorf("reading not extended body: %w", err)
-		}
+			bodyReader := res.Body()
+			body, err := io.ReadAll(bodyReader)
+			if err != nil {
+				bodyReader.Close()
+				return nil, fmt.Errorf("reading not extended body: %w", err)
+			}
+			if err = bodyReader.Close(); err != nil {
+				return nil, fmt.Errorf("closing response body: %w", err)
+			}
 
-		var model rdm.MissingProofsModel
-		err = json.Decode(body, &model, rdm.MissingProofsType())
-		if err != nil {
-			return nil, fmt.Errorf("decoding body: %w", err)
-		}
-		if len(model.Proofs) == 0 {
-			return nil, errors.New("server did not include missing proofs in response")
-		}
+			var model rdm.MissingProofsModel
+			err = json.Decode(body, &model, rdm.MissingProofsType())
+			if err != nil {
+				return nil, fmt.Errorf("decoding body: %w", err)
+			}
+			if len(model.Proofs) == 0 {
+				return nil, errors.New("server did not include missing proofs in response")
+			}
 
-		p, ok := parts[model.Proofs[0].String()]
-		if !ok {
-			return nil, fmt.Errorf("missing proof not found or was already sent: %s", model.Proofs[0].String())
+			p, ok := parts[model.Proofs[0].String()]
+			if !ok {
+				return nil, fmt.Errorf("missing proof not found or was already sent: %s", model.Proofs[0].String())
+			}
+			part = p
+			delete(parts, p.Link().String())
 		}
-		part = p
-		delete(parts, p.Link().String())
 	}
-
-	return nil, fmt.Errorf("maximum partial invocation requests exceeded: %d", MaxPartialInvocationReqs)
 }
 
 func omitProofs(dlg delegation.Delegation) (delegation.Delegation, error) {
