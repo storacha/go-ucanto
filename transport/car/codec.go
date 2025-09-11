@@ -23,7 +23,7 @@ func (oc *carOutbound) Decode(res transport.HTTPResponse) (message.AgentMessage,
 
 var _ transport.OutboundCodec = (*carOutbound)(nil)
 
-func NewCAROutboundCodec() transport.OutboundCodec {
+func NewOutboundCodec() transport.OutboundCodec {
 	return &carOutbound{}
 }
 
@@ -82,6 +82,6 @@ func (ic *carInbound) Accept(req transport.HTTPRequest) (transport.InboundAccept
 
 var _ transport.InboundCodec = (*carInbound)(nil)
 
-func NewCARInboundCodec() transport.InboundCodec {
+func NewInboundCodec() transport.InboundCodec {
 	return &carInbound{codec: &carInboundAcceptCodec{}}
 }

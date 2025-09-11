@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -12,10 +13,10 @@ import (
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
-	"github.com/storacha/go-ucanto/core/invocation/ran"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/core/receipt"
+	"github.com/storacha/go-ucanto/core/receipt/ran"
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/did"
@@ -57,22 +58,22 @@ type Service = map[ucan.Ability]ServiceMethod[ipld.Builder, failure.IPLDBuilderF
 
 type ServiceInvocation = invocation.IssuedInvocation
 
-type Server interface {
+type Server[S any] interface {
 	// ID is the DID which will be used to verify that received invocation
 	// audience matches it.
 	ID() principal.Signer
 	Codec() transport.InboundCodec
 	Context() InvocationContext
 	// Service is the actual service providing capability handlers.
-	Service() Service
+	Service() S
 	Catch(err HandlerExecutionError[any])
 }
 
 // Server is a materialized service that is configured to use a specific
 // transport channel. It has a invocation context which contains the DID of the
 // service itself, among other things.
-type ServerView interface {
-	Server
+type ServerView[S any] interface {
+	Server[S]
 	transport.Channel
 	// Run executes a single invocation and returns a receipt.
 	Run(ctx context.Context, invocation ServiceInvocation) (receipt.AnyReceipt, error)
@@ -82,7 +83,7 @@ type ServerView interface {
 // to be logged.
 type ErrorHandlerFunc func(err HandlerExecutionError[any])
 
-func NewServer(id principal.Signer, options ...Option) (ServerView, error) {
+func NewServer(id principal.Signer, options ...Option) (ServerView[Service], error) {
 	cfg := srvConfig{service: Service{}}
 	for _, opt := range options {
 		if err := opt(&cfg); err != nil {
@@ -92,7 +93,7 @@ func NewServer(id principal.Signer, options ...Option) (ServerView, error) {
 
 	codec := cfg.codec
 	if codec == nil {
-		codec = car.NewCARInboundCodec()
+		codec = car.NewInboundCodec()
 	}
 
 	canIssue := cfg.canIssue
@@ -219,17 +220,17 @@ func (srv *server) Catch(err HandlerExecutionError[any]) {
 }
 
 var _ transport.Channel = (*server)(nil)
-var _ ServerView = (*server)(nil)
+var _ ServerView[Service] = (*server)(nil)
 
-func Handle(ctx context.Context, server Server, request transport.HTTPRequest) (transport.HTTPResponse, error) {
+func Handle(ctx context.Context, server Server[Service], request transport.HTTPRequest) (transport.HTTPResponse, error) {
 	selection, aerr := server.Codec().Accept(request)
 	if aerr != nil {
-		return thttp.NewHTTPResponse(aerr.Status(), strings.NewReader(aerr.Error()), aerr.Headers()), nil
+		return thttp.NewResponse(aerr.Status(), io.NopCloser(strings.NewReader(aerr.Error())), aerr.Headers()), nil
 	}
 
 	msg, err := selection.Decoder().Decode(request)
 	if err != nil {
-		return thttp.NewHTTPResponse(http.StatusBadRequest, strings.NewReader("The server failed to decode the request payload. Please format the payload according to the specified media type."), nil), nil
+		return thttp.NewResponse(http.StatusBadRequest, io.NopCloser(strings.NewReader("The server failed to decode the request payload. Please format the payload according to the specified media type.")), nil), nil
 	}
 
 	result, err := Execute(ctx, server, msg)
@@ -240,7 +241,7 @@ func Handle(ctx context.Context, server Server, request transport.HTTPRequest) (
 	return selection.Encoder().Encode(result)
 }
 
-func Execute(ctx context.Context, server Server, msg message.AgentMessage) (message.AgentMessage, error) {
+func Execute(ctx context.Context, server Server[Service], msg message.AgentMessage) (message.AgentMessage, error) {
 	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(msg.Blocks()))
 	if err != nil {
 		return nil, err
@@ -283,7 +284,7 @@ func Execute(ctx context.Context, server Server, msg message.AgentMessage) (mess
 	return message.Build(nil, rcpts)
 }
 
-func Run(ctx context.Context, server Server, invocation ServiceInvocation) (receipt.AnyReceipt, error) {
+func Run(ctx context.Context, server Server[Service], invocation ServiceInvocation) (receipt.AnyReceipt, error) {
 	caps := invocation.Capabilities()
 	// Invocation needs to have one single capability
 	if len(caps) != 1 {
