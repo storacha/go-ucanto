@@ -106,7 +106,7 @@ func NewServer(id principal.Signer, options ...Option) (*Server, error) {
 
 	dlgCache := cfg.delegationCache
 	if dlgCache == nil {
-		dc, err := NewMemoryDelegationCache(-1)
+		dc, err := NewMemoryDelegationCache(MemoryDelegationCacheSize)
 		if err != nil {
 			return nil, err
 		}
@@ -221,7 +221,8 @@ func handle(ctx context.Context, srv CachingServer, request transport.HTTPReques
 
 	msg, err := selection.Decoder().Decode(request)
 	if err != nil {
-		return thttp.NewResponse(http.StatusBadRequest, io.NopCloser(strings.NewReader("The server failed to decode the request payload. Please format the payload according to the specified media type.")), nil), nil
+		msg := fmt.Sprintf("The server failed to decode the request payload. Please format the payload according to the specified media type: %s", err.Error())
+		return thttp.NewResponse(http.StatusBadRequest, io.NopCloser(strings.NewReader(msg)), nil), nil
 	}
 
 	// retrieval server supports only 1 invocation in the agent message, since
@@ -229,7 +230,7 @@ func handle(ctx context.Context, srv CachingServer, request transport.HTTPReques
 	invs := msg.Invocations()
 	if len(invs) != 1 {
 		var rcpts []receipt.AnyReceipt
-		res := result.NewFailure(NewAgentMessageInvocationError())
+		res := result.NewFailure(NewAgentMessageInvocationCountError())
 		for _, l := range invs {
 			rcpt, err := receipt.Issue(srv.ID(), res, ran.FromLink(l))
 			if err != nil {
@@ -298,7 +299,7 @@ func Execute(ctx context.Context, srv CachingServer, msg message.AgentMessage, r
 	invs := msg.Invocations()
 	if len(invs) != 1 {
 		var rcpts []receipt.AnyReceipt
-		res := result.NewFailure(NewAgentMessageInvocationError())
+		res := result.NewFailure(NewAgentMessageInvocationCountError())
 		for _, l := range invs {
 			rcpt, err := receipt.Issue(srv.ID(), res, ran.FromLink(l))
 			if err != nil {

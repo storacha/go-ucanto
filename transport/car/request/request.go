@@ -29,7 +29,7 @@ func Decode(req transport.HTTPRequest) (message.AgentMessage, error) {
 		return nil, fmt.Errorf("decoding CAR: %w", err)
 	}
 	if len(roots) != 1 {
-		return nil, fmt.Errorf("unexpected number of roots: %d", len(roots))
+		return nil, fmt.Errorf("unexpected number of roots: %d, expected: 1", len(roots))
 	}
 	bstore, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(blocks))
 	if err != nil {

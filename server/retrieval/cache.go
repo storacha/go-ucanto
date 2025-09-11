@@ -9,7 +9,7 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld"
 )
 
-var MemoryDelegationCacheSize = 100
+const MemoryDelegationCacheSize = 100
 
 type MemoryDelegationCache struct {
 	data *lru.Cache[string, delegation.Delegation]

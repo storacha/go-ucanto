@@ -5,17 +5,17 @@ import (
 	rdm "github.com/storacha/go-ucanto/server/retrieval/datamodel"
 )
 
-type AgentMessageInvocationError struct{}
+type AgentMessageInvocationCountError struct{}
 
-func (amie AgentMessageInvocationError) Error() string {
+func (amie AgentMessageInvocationCountError) Error() string {
 	return "Agent Message is required to have a single invocation."
 }
 
-func (amie AgentMessageInvocationError) Name() string {
+func (amie AgentMessageInvocationCountError) Name() string {
 	return "AgentMessageInvocationError"
 }
 
-func (amie AgentMessageInvocationError) ToIPLD() (ipld.Node, error) {
+func (amie AgentMessageInvocationCountError) ToIPLD() (ipld.Node, error) {
 	mdl := rdm.AgentMessageInvocationErrorModel{
 		Name:    amie.Name(),
 		Message: amie.Error(),
@@ -23,8 +23,8 @@ func (amie AgentMessageInvocationError) ToIPLD() (ipld.Node, error) {
 	return ipld.WrapWithRecovery(&mdl, rdm.AgentMessageInvocationErrorType())
 }
 
-func NewAgentMessageInvocationError() AgentMessageInvocationError {
-	return AgentMessageInvocationError{}
+func NewAgentMessageInvocationCountError() AgentMessageInvocationCountError {
+	return AgentMessageInvocationCountError{}
 }
 
 type MissingProofs struct {

@@ -29,6 +29,10 @@ import (
 	"github.com/storacha/go-ucanto/ucan"
 )
 
+// MaxPartialInvocationReqs is the maximum number of requests we'll send in
+// order to get an invocation executed.
+const MaxPartialInvocationReqs = 50
+
 // Option is an option configuring a retrieval connection.
 type Option func(cfg *config)
 
@@ -93,6 +97,32 @@ func (c *Connection) Hasher() hash.Hash {
 	return c.hasher()
 }
 
+// Execute performs a UCAN invocation using the headercar transport,
+// implementing a "probe and retry" pattern to handle HTTP header size
+// limitations when the invocation is too large to fit.
+//
+// The method first attempts to send the complete invocation (including all
+// proofs) in HTTP headers. If this fails due to size constraints (typically 4KB
+// header limit), it falls back to a multipart negotiation protocol:
+//
+// 1. Send invocation with ALL proofs omitted
+// 2. Server responds with 510 (Not Extended) listing missing proof CID(s)
+// 3. Send partial invocations with each missing proof attached one by one
+// 4. Repeat until server has all required proofs (200/206 response)
+//
+// This approach optimizes for the common case (shallow delegation chains that
+// fit in headers) while also handling deep proof chains that require
+// multiple round trips. The server caches proofs between requests, so each
+// proof only needs to be sent once per session.
+//
+// Note: The current implementation processes missing proofs sequentially rather
+// than in batches, which means deep delegation chains will result in multiple
+// HTTP round trips. This trade-off prioritizes implementation simplicity over
+// network efficiency, which is acceptable given current delegation chain depths
+// but may need optimization as authorization hierarchies grow deeper.
+//
+// Returns the execution response, the final HTTP response, and any error
+// encountered.
 func Execute(ctx context.Context, inv invocation.Invocation, conn client.Connection) (client.ExecutionResponse, transport.HTTPResponse, error) {
 	input, err := message.Build([]invocation.Invocation{inv}, nil)
 	if err != nil {
@@ -100,12 +130,12 @@ func Execute(ctx context.Context, inv invocation.Invocation, conn client.Connect
 	}
 
 	var response transport.HTTPResponse
-	needMultipartRequest := false
+	multi := false
 
 	req, err := conn.Codec().Encode(input)
 	if err != nil {
 		if errors.Is(err, hcmsg.ErrHeaderTooLarge) {
-			needMultipartRequest = true
+			multi = true
 		} else {
 			return nil, nil, fmt.Errorf("encoding message: %w", err)
 		}
@@ -116,7 +146,7 @@ func Execute(ctx context.Context, inv invocation.Invocation, conn client.Connect
 		}
 
 		if response.Status() == http.StatusRequestHeaderFieldsTooLarge {
-			needMultipartRequest = true
+			multi = true
 			err := response.Body().Close() // we don't need this anymore
 			if err != nil {
 				return nil, nil, fmt.Errorf("closing response body: %w", err)
@@ -126,89 +156,10 @@ func Execute(ctx context.Context, inv invocation.Invocation, conn client.Connect
 
 	// if the header fields are too big, we need to split the delegation into
 	// multiple requests...
-	if needMultipartRequest {
-		br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(inv.Export()))
+	if multi {
+		response, err = sendPartialInvocations(ctx, inv, conn)
 		if err != nil {
-			return nil, nil, fmt.Errorf("reading invocation blocks: %w", err)
-		}
-		part, err := omitProofs(inv)
-		if err != nil {
-			return nil, nil, fmt.Errorf("creating invocation %s with omitted proofs: %w", inv.Link().String(), err)
-		}
-
-		parts := map[string]delegation.Delegation{}
-		prfs := inv.Proofs()
-		for len(prfs) > 0 {
-			root := prfs[0]
-			prfs = prfs[1:]
-			prf, err := delegation.NewDelegationView(root, br)
-			if err != nil {
-				return nil, nil, fmt.Errorf("creating delegation: %w", err)
-			}
-			prfs = append(prfs, prf.Proofs()...)
-			// now export without proofs
-			prf, err = omitProofs(prf)
-			if err != nil {
-				return nil, nil, fmt.Errorf("creating delegation %s with omitted proofs: %w", prf.Link().String(), err)
-			}
-			parts[prf.Link().String()] = prf
-		}
-		// we already tried this
-		if len(parts) == 0 {
-			return nil, nil, errors.New("invocation is too big to send in HTTP headers")
-		}
-
-		// now send the parts
-		for {
-			input, err := newPartialInvocationMessage(inv.Link(), part)
-			if err != nil {
-				return nil, nil, fmt.Errorf("building message: %w", err)
-			}
-
-			req, err := conn.Codec().Encode(input)
-			if err != nil {
-				return nil, nil, fmt.Errorf("encoding message: %w", err)
-			}
-
-			res, err := conn.Channel().Request(ctx, req)
-			if err != nil {
-				return nil, nil, fmt.Errorf("sending message: %w", err)
-			}
-
-			if res.Status() == http.StatusPartialContent || res.Status() == http.StatusOK {
-				response = res
-				break
-			}
-
-			// if still too big, then fail
-			if res.Status() == http.StatusRequestHeaderFieldsTooLarge {
-				return nil, nil, errors.New("invocation is too big to send in HTTP headers")
-			}
-
-			if res.Status() != http.StatusNotExtended {
-				return nil, nil, fmt.Errorf("unexpected status code: %d", res.Status())
-			}
-
-			body, err := io.ReadAll(res.Body())
-			if err != nil {
-				return nil, nil, fmt.Errorf("reading not extended body: %w", err)
-			}
-
-			var model rdm.MissingProofsModel
-			err = json.Decode(body, &model, rdm.MissingProofsType())
-			if err != nil {
-				return nil, nil, fmt.Errorf("decoding body: %w", err)
-			}
-			if len(model.Proofs) == 0 {
-				return nil, nil, fmt.Errorf("missing missing proofs: %w", err)
-			}
-
-			p, ok := parts[model.Proofs[0].String()]
-			if !ok {
-				return nil, nil, fmt.Errorf("missing proof not found or was already sent: %s", model.Proofs[0].String())
-			}
-			part = p
-			delete(parts, p.Link().String())
+			return nil, nil, fmt.Errorf("sending partial invocations: %w", err)
 		}
 	}
 
@@ -218,6 +169,93 @@ func Execute(ctx context.Context, inv invocation.Invocation, conn client.Connect
 	}
 
 	return client.ExecutionResponse(output), response, nil
+}
+
+func sendPartialInvocations(ctx context.Context, inv invocation.Invocation, conn client.Connection) (transport.HTTPResponse, error) {
+	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(inv.Export()))
+	if err != nil {
+		return nil, fmt.Errorf("reading invocation blocks: %w", err)
+	}
+	part, err := omitProofs(inv)
+	if err != nil {
+		return nil, fmt.Errorf("creating invocation %s with omitted proofs: %w", inv.Link().String(), err)
+	}
+
+	parts := map[string]delegation.Delegation{}
+	prfs := inv.Proofs()
+	for len(prfs) > 0 {
+		root := prfs[0]
+		prfs = prfs[1:]
+		prf, err := delegation.NewDelegationView(root, br)
+		if err != nil {
+			return nil, fmt.Errorf("creating delegation: %w", err)
+		}
+		prfs = append(prfs, prf.Proofs()...)
+		// now export without proofs
+		prf, err = omitProofs(prf)
+		if err != nil {
+			return nil, fmt.Errorf("creating delegation %s with omitted proofs: %w", prf.Link().String(), err)
+		}
+		parts[prf.Link().String()] = prf
+	}
+	// we already tried this
+	if len(parts) == 0 {
+		return nil, errors.New("invocation is too big to send in HTTP headers")
+	}
+
+	// now send the parts
+	for range MaxPartialInvocationReqs {
+		input, err := newPartialInvocationMessage(inv.Link(), part)
+		if err != nil {
+			return nil, fmt.Errorf("building message: %w", err)
+		}
+
+		req, err := conn.Codec().Encode(input)
+		if err != nil {
+			return nil, fmt.Errorf("encoding message: %w", err)
+		}
+
+		res, err := conn.Channel().Request(ctx, req)
+		if err != nil {
+			return nil, fmt.Errorf("sending message: %w", err)
+		}
+
+		if res.Status() == http.StatusPartialContent || res.Status() == http.StatusOK {
+			return res, nil
+		}
+
+		// if still too big, then fail
+		if res.Status() == http.StatusRequestHeaderFieldsTooLarge {
+			return nil, errors.New("invocation is too big to send in HTTP headers")
+		}
+
+		if res.Status() != http.StatusNotExtended {
+			return nil, fmt.Errorf("unexpected status code: %d", res.Status())
+		}
+
+		body, err := io.ReadAll(res.Body())
+		if err != nil {
+			return nil, fmt.Errorf("reading not extended body: %w", err)
+		}
+
+		var model rdm.MissingProofsModel
+		err = json.Decode(body, &model, rdm.MissingProofsType())
+		if err != nil {
+			return nil, fmt.Errorf("decoding body: %w", err)
+		}
+		if len(model.Proofs) == 0 {
+			return nil, errors.New("server did not include missing proofs in response")
+		}
+
+		p, ok := parts[model.Proofs[0].String()]
+		if !ok {
+			return nil, fmt.Errorf("missing proof not found or was already sent: %s", model.Proofs[0].String())
+		}
+		part = p
+		delete(parts, p.Link().String())
+	}
+
+	return nil, fmt.Errorf("maximum partial invocation requests exceeded: %d", MaxPartialInvocationReqs)
 }
 
 func omitProofs(dlg delegation.Delegation) (delegation.Delegation, error) {

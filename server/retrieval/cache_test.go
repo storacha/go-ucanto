@@ -1,6 +1,7 @@
 package retrieval
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/storacha/go-ucanto/core/delegation"
@@ -51,5 +52,31 @@ func TestMemoryDelegationCache(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, ok)
 		require.Nil(t, cached)
+	})
+
+	t.Run("uses default size if not specified", func(t *testing.T) {
+		cache, err := NewMemoryDelegationCache(-1)
+		require.NoError(t, err)
+
+		for i := range MemoryDelegationCacheSize + 1 {
+			dlg, err := delegation.Delegate(
+				fixtures.Alice,
+				fixtures.Alice,
+				[]ucan.Capability[ucan.NoCaveats]{
+					ucan.NewCapability(
+						"test/cache",
+						fixtures.Alice.DID().String(),
+						ucan.NoCaveats{},
+					),
+				},
+				delegation.WithNonce(fmt.Sprintf("%d", i)),
+			)
+			require.NoError(t, err)
+
+			err = cache.Put(t.Context(), dlg)
+			require.NoError(t, err)
+		}
+
+		require.Equal(t, MemoryDelegationCacheSize, cache.data.Len())
 	})
 }
