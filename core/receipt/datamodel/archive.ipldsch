@@ -1,0 +1,3 @@
+type Archive struct {
+	UcanReceipt0_9_1 Link (rename "ucan/receipt@0.9.1")
+}
