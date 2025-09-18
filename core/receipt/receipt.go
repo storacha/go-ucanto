@@ -2,13 +2,17 @@ package receipt
 
 import (
 	// for go:embed
+
+	"bytes"
 	_ "embed"
 	"fmt"
+	"io"
 	"iter"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/node/bindnode"
 	"github.com/ipld/go-ipld-prime/schema"
+	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
@@ -38,6 +42,8 @@ type Receipt[O, X any] interface {
 	Issuer() ucan.Principal
 	Proofs() delegation.Proofs
 	Signature() signature.SignatureView
+	Archive() io.Reader
+	Export() iter.Seq2[block.Block, error]
 }
 
 func toResultModel[O, X any](res result.Result[O, X]) rdm.ResultModel[O, X] {
@@ -55,30 +61,45 @@ func fromResultModel[O, X any](resultModel rdm.ResultModel[O, X]) result.Result[
 	return result.Error[O, X](*resultModel.Error)
 }
 
+var _ Receipt[any, any] = (*receipt[any, any])(nil)
+
 type receipt[O, X any] struct {
 	rt   block.Block
 	blks blockstore.BlockReader
 	data *rdm.ReceiptModel[O, X]
 }
 
-var _ Receipt[any, any] = (*receipt[any, any])(nil)
+func NewReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, typ schema.Type, opts ...bindnode.Option) (Receipt[O, X], error) {
+	rblock, ok, err := blocks.Get(root)
+	if err != nil {
+		return nil, fmt.Errorf("getting receipt root block: %w", err)
+	}
+	if !ok {
+		return nil, fmt.Errorf("missing receipt root block: %s", root)
+	}
+
+	rmdl := rdm.ReceiptModel[O, X]{}
+	err = block.Decode(rblock, &rmdl, typ, cbor.Codec, sha256.Hasher, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("decoding receipt: %w", err)
+	}
+
+	rcpt := receipt[O, X]{
+		rt:   rblock,
+		blks: blocks,
+		data: &rmdl,
+	}
+
+	return &rcpt, nil
+}
+
+func NewAnyReceipt(root ipld.Link, blocks blockstore.BlockReader, opts ...bindnode.Option) (AnyReceipt, error) {
+	anyReceiptType := rdm.TypeSystem().TypeByName("Receipt")
+	return NewReceipt[ipld.Node, ipld.Node](root, blocks, anyReceiptType, opts...)
+}
 
 func (r *receipt[O, X]) Blocks() iter.Seq2[block.Block, error] {
-	var iterators []iter.Seq2[block.Block, error]
-
-	if inv, ok := r.Ran().Invocation(); ok {
-		iterators = append(iterators, inv.Blocks())
-	}
-
-	for _, prf := range r.Proofs() {
-		if delegation, ok := prf.Delegation(); ok {
-			iterators = append(iterators, delegation.Blocks())
-		}
-	}
-
-	iterators = append(iterators, func(yield func(block.Block, error) bool) { yield(r.Root(), nil) })
-
-	return iterable.Concat2(iterators...)
+	return r.blks.Iterator()
 }
 
 func (r *receipt[O, X]) Fx() fx.Effects {
@@ -156,33 +177,48 @@ func (r *receipt[O, X]) Signature() signature.SignatureView {
 	return signature.NewSignatureView(signature.Decode(r.data.Sig))
 }
 
-func NewReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, typ schema.Type, opts ...bindnode.Option) (Receipt[O, X], error) {
-	rblock, ok, err := blocks.Get(root)
+func (r *receipt[O, X]) Archive() io.Reader {
+	// We create a descriptor block to describe what this DAG represents
+	variant, err := block.Encode(
+		&rdm.ArchiveModel{UcanReceipt0_9_1: r.rt.Link()},
+		rdm.ArchiveType(),
+		cbor.Codec,
+		sha256.Hasher,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("getting receipt root block: %w", err)
-	}
-	if !ok {
-		return nil, fmt.Errorf("missing receipt root block: %s", root)
-	}
-
-	rmdl := rdm.ReceiptModel[O, X]{}
-	err = block.Decode(rblock, &rmdl, typ, cbor.Codec, sha256.Hasher, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("decoding receipt: %w", err)
+		reader, _ := io.Pipe()
+		reader.CloseWithError(fmt.Errorf("hashing variant block bytes: %w", err))
+		return reader
 	}
 
-	rcpt := receipt[O, X]{
-		rt:   rblock,
-		blks: blocks,
-		data: &rmdl,
-	}
-
-	return &rcpt, nil
+	return car.Encode([]ipld.Link{variant.Link()}, func(yield func(ipld.Block, error) bool) {
+		for b, err := range r.Export() {
+			if !yield(b, err) || err != nil {
+				return
+			}
+		}
+		yield(variant, nil)
+	})
 }
 
-func NewAnyReceipt(root ipld.Link, blocks blockstore.BlockReader, opts ...bindnode.Option) (AnyReceipt, error) {
-	anyReceiptType := rdm.TypeSystem().TypeByName("Receipt")
-	return NewReceipt[ipld.Node, ipld.Node](root, blocks, anyReceiptType, opts...)
+// Export ONLY the blocks that comprise the receipt, its original invocation and its proofs
+// This differs from Blocks(), which simply returns all the blocks in the backing blockstore
+func (r *receipt[O, X]) Export() iter.Seq2[block.Block, error] {
+	var iterators []iter.Seq2[block.Block, error]
+
+	if inv, ok := r.Ran().Invocation(); ok {
+		iterators = append(iterators, inv.Export())
+	}
+
+	for _, prf := range r.Proofs() {
+		if delegation, ok := prf.Delegation(); ok {
+			iterators = append(iterators, delegation.Export())
+		}
+	}
+
+	iterators = append(iterators, func(yield func(block.Block, error) bool) { yield(r.Root(), nil) })
+
+	return iterable.Concat2(iterators...)
 }
 
 type ReceiptReader[O, X any] interface {
@@ -231,6 +267,46 @@ func Rebind[O, X any](from AnyReceipt, successType schema.Type, errorType schema
 		return nil, err
 	}
 	return rdr.Read(from.Root().Link(), from.Blocks())
+}
+
+func Extract(b []byte) (AnyReceipt, error) {
+	roots, blks, err := car.Decode(bytes.NewReader(b))
+	if err != nil {
+		return nil, fmt.Errorf("decoding CAR: %s", err)
+	}
+	if len(roots) == 0 {
+		return nil, fmt.Errorf("missing root CID in receipt archive")
+	}
+	if len(roots) > 1 {
+		return nil, fmt.Errorf("unexpected number of root CIDs in archive: %d", len(roots))
+	}
+
+	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(blks))
+	if err != nil {
+		return nil, fmt.Errorf("creating block reader: %w", err)
+	}
+
+	rt, ok, err := br.Get(roots[0])
+	if err != nil {
+		return nil, fmt.Errorf("getting root block: %w", err)
+	}
+	if !ok {
+		return nil, fmt.Errorf("missing root block: %s", roots[0])
+	}
+
+	model := rdm.ArchiveModel{}
+	err = block.Decode(
+		rt,
+		&model,
+		rdm.ArchiveType(),
+		cbor.Codec,
+		sha256.Hasher,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("decoding root block: %w", err)
+	}
+
+	return NewAnyReceipt(model.UcanReceipt0_9_1, br)
 }
 
 // Option is an option configuring a UCAN delegation.
