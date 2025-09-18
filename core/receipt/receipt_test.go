@@ -2,13 +2,17 @@ package receipt
 
 import (
 	"fmt"
+	"io"
 	"slices"
 	"testing"
 
 	ipldprime "github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/schema"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/ipld/block"
 	"github.com/storacha/go-ucanto/core/receipt/fx"
 	"github.com/storacha/go-ucanto/core/receipt/ran"
 	"github.com/storacha/go-ucanto/core/result"
@@ -165,6 +169,145 @@ func TestIssue(t *testing.T) {
 		require.NotNil(t, ranInvLink)
 		require.Equal(t, inv.Link().String(), ranInvLink.String())
 	})
+}
+
+func TestArchiveExtract(t *testing.T) {
+	prf, err := delegation.Delegate(
+		fixtures.Alice,
+		fixtures.Bob,
+		[]ucan.Capability[ucan.NoCaveats]{
+			ucan.NewCapability("test/proof", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+		},
+	)
+	require.NoError(t, err)
+
+	inv, err := invocation.Invoke(
+		fixtures.Alice,
+		fixtures.Bob,
+		ucan.NewCapability("test/attach", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+	)
+	require.NoError(t, err)
+
+	ran := ran.FromInvocation(inv)
+	ok := someOkType{SomeOkProperty: "some ok value"}
+	rcpt, err := Issue(
+		fixtures.Alice,
+		result.Ok[someOkType, someErrorType](ok),
+		ran,
+		WithProofs(delegation.Proofs{
+			delegation.FromDelegation(prf),
+			// include an absent proof to prove things don't break - PUN INTENDED
+			delegation.FromLink(helpers.RandomCID()),
+		}),
+	)
+	require.NoError(t, err)
+
+	archive := rcpt.Archive()
+
+	archiveBytes, err := io.ReadAll(archive)
+	require.NoError(t, err)
+	extracted, err := Extract(archiveBytes)
+	require.NoError(t, err)
+
+	var rcptBlks []ipld.Block
+	for b, err := range rcpt.Export() {
+		require.NoError(t, err)
+		rcptBlks = append(rcptBlks, b)
+	}
+
+	var extractedBlks []ipld.Block
+	for b, err := range extracted.Export() {
+		require.NoError(t, err)
+		extractedBlks = append(extractedBlks, b)
+	}
+
+	require.Equal(t, len(rcptBlks), len(extractedBlks))
+	for i, b := range rcptBlks {
+		require.Equal(t, b.Link().String(), extractedBlks[i].Link().String())
+	}
+}
+
+func TestExport(t *testing.T) {
+	prf, err := delegation.Delegate(
+		fixtures.Alice,
+		fixtures.Bob,
+		[]ucan.Capability[ucan.NoCaveats]{
+			ucan.NewCapability("test/proof", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+		},
+	)
+	require.NoError(t, err)
+
+	inv, err := invocation.Invoke(
+		fixtures.Alice,
+		fixtures.Bob,
+		ucan.NewCapability("test/export", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+	)
+	require.NoError(t, err)
+
+	ran := ran.FromInvocation(inv)
+	ok := someOkType{SomeOkProperty: "some ok value"}
+	rcpt, err := Issue(
+		fixtures.Alice,
+		result.Ok[someOkType, someErrorType](ok),
+		ran,
+		WithProofs(delegation.Proofs{
+			delegation.FromDelegation(prf),
+			// include an absent proof to prove things don't break - PUN INTENDED
+			delegation.FromLink(helpers.RandomCID()),
+		}),
+	)
+	require.NoError(t, err)
+
+	bs, err := blockstore.NewBlockStore()
+	require.NoError(t, err)
+
+	var blks []ipld.Block
+	for b, err := range rcpt.Blocks() {
+		require.NoError(t, err)
+		require.NoError(t, bs.Put(b))
+		blks = append(blks, b)
+	}
+	require.Len(t, blks, 3)
+	require.True(t, slices.ContainsFunc(blks, func(b ipld.Block) bool {
+		return b.Link().String() == prf.Link().String()
+	}))
+	require.True(t, slices.ContainsFunc(blks, func(b ipld.Block) bool {
+		return b.Link().String() == inv.Link().String()
+	}))
+	require.True(t, slices.ContainsFunc(blks, func(b ipld.Block) bool {
+		return b.Link().String() == rcpt.Root().Link().String()
+	}))
+
+	// add an additional block to the blockstore that is not linked to by the receipt
+	otherblk := block.NewBlock(helpers.RandomCID(), helpers.RandomBytes(32))
+	err = bs.Put(otherblk)
+	require.NoError(t, err)
+
+	// reinstantiate receipt with our new blockstore
+	rcpt, err = NewAnyReceipt(rcpt.Root().Link(), bs)
+	require.NoError(t, err)
+
+	var exblks []ipld.Block
+	// export the receipt from the blockstore
+	for b, err := range rcpt.Export() {
+		require.NoError(t, err)
+		exblks = append(exblks, b)
+	}
+
+	// expect exblks to have the same blocks in the same order and it should not
+	// include otherblk
+	require.Len(t, exblks, len(blks))
+	for i, b := range blks {
+		require.Equal(t, b.Link().String(), exblks[i].Link().String())
+	}
+
+	// expect rcpt.Blocks() to include otherblk though...
+	var blklnks []string
+	for b, err := range rcpt.Blocks() {
+		require.NoError(t, err)
+		blklnks = append(blklnks, b.Link().String())
+	}
+	require.Contains(t, blklnks, otherblk.Link().String())
 }
 
 func TestAnyReceiptReader(t *testing.T) {

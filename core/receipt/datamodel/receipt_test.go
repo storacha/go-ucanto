@@ -20,7 +20,7 @@ type resultErr struct {
 	Message string
 }
 
-func TestEncodeDecode(t *testing.T) {
+func TestReceiptEncodeDecode(t *testing.T) {
 	typ, err := rdm.NewReceiptModelType([]byte(`
 		type Result union {
 			| Ok "ok"
