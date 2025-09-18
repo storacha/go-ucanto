@@ -20,6 +20,7 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld/block"
 	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
 	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
+	"github.com/storacha/go-ucanto/core/iterable"
 	rdm "github.com/storacha/go-ucanto/core/receipt/datamodel"
 	"github.com/storacha/go-ucanto/core/receipt/fx"
 	"github.com/storacha/go-ucanto/core/receipt/ran"
@@ -99,21 +100,6 @@ func NewAnyReceipt(root ipld.Link, blocks blockstore.BlockReader, opts ...bindno
 
 func (r *receipt[O, X]) Blocks() iter.Seq2[block.Block, error] {
 	return r.blks.Iterator()
-	// var iterators []iter.Seq2[block.Block, error]
-
-	// if inv, ok := r.Ran().Invocation(); ok {
-	// 	iterators = append(iterators, inv.Export())
-	// }
-
-	// for _, prf := range r.Proofs() {
-	// 	if delegation, ok := prf.Delegation(); ok {
-	// 		iterators = append(iterators, delegation.Export())
-	// 	}
-	// }
-
-	// iterators = append(iterators, func(yield func(block.Block, error) bool) { yield(r.Root(), nil) })
-
-	// return iterable.Concat2(iterators...)
 }
 
 func (r *receipt[O, X]) Fx() fx.Effects {
@@ -218,44 +204,21 @@ func (r *receipt[O, X]) Archive() io.Reader {
 // Export ONLY the blocks that comprise the receipt, its original invocation and its proofs
 // This differs from Blocks(), which simply returns all the blocks in the backing blockstore
 func (r *receipt[O, X]) Export() iter.Seq2[block.Block, error] {
-	return func(yield func(ipld.Block, error) bool) {
-		if inv, ok := r.Ran().Invocation(); ok {
-			for b, err := range inv.Export() {
-				if !yield(b, err) {
-					return
-				}
-				if err != nil {
-					return
-				}
-			}
-		}
+	var iterators []iter.Seq2[block.Block, error]
 
-		for _, p := range r.Proofs() {
-			proofblk, ok, err := r.blks.Get(p.Link())
-			if err != nil {
-				yield(nil, err)
-				return
-			}
-			if !ok {
-				continue
-			}
-			prf, err := delegation.NewDelegation(proofblk, r.blks)
-			if err != nil {
-				yield(nil, err)
-				return
-			}
-			for b, err := range prf.Export() {
-				if !yield(b, err) {
-					return
-				}
-				if err != nil {
-					return
-				}
-			}
-		}
-
-		yield(r.rt, nil)
+	if inv, ok := r.Ran().Invocation(); ok {
+		iterators = append(iterators, inv.Export())
 	}
+
+	for _, prf := range r.Proofs() {
+		if delegation, ok := prf.Delegation(); ok {
+			iterators = append(iterators, delegation.Export())
+		}
+	}
+
+	iterators = append(iterators, func(yield func(block.Block, error) bool) { yield(r.Root(), nil) })
+
+	return iterable.Concat2(iterators...)
 }
 
 type ReceiptReader[O, X any] interface {
