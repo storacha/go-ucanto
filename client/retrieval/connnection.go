@@ -101,10 +101,10 @@ func (c *Connection) Hasher() hash.Hash {
 // proofs) in HTTP headers. If this fails due to size constraints (typically 4KB
 // header limit), it falls back to a multipart negotiation protocol:
 //
-// 1. Send invocation with ALL proofs omitted
-// 2. Server responds with 510 (Not Extended) listing missing proof CID(s)
-// 3. Send partial invocations with each missing proof attached one by one
-// 4. Repeat until server has all required proofs (200/206 response)
+//  1. Send invocation with ALL proofs omitted
+//  2. Server responds with 510 (Not Extended) listing missing proof CID(s)
+//  3. Send partial invocations with each missing proof attached one by one
+//  4. Repeat until server has all required proofs (200/206 response)
 //
 // This approach optimizes for the common case (shallow delegation chains that
 // fit in headers) while also handling deep proof chains that require
