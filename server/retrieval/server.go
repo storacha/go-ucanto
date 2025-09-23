@@ -121,6 +121,9 @@ func NewServer(id principal.Signer, options ...Option) (*Server, error) {
 	if cfg.catch != nil {
 		srvOpts = append(srvOpts, server.WithErrorHandler(cfg.catch))
 	}
+	if cfg.logReceipt != nil {
+		srvOpts = append(srvOpts, server.WithReceiptLogger(cfg.logReceipt))
+	}
 	if cfg.validateAuthorization != nil {
 		srvOpts = append(srvOpts, server.WithRevocationChecker(cfg.validateAuthorization))
 	}
@@ -186,6 +189,10 @@ func (srv *Server) Cache() delegation.Store {
 
 func (srv *Server) Catch(err server.HandlerExecutionError[any]) {
 	srv.server.Catch(err)
+}
+
+func (srv *Server) LogReceipt(rcpt receipt.AnyReceipt) {
+	srv.server.LogReceipt(rcpt)
 }
 
 var _ CachingServer = (*Server)(nil)
@@ -420,6 +427,7 @@ func ExtractInvocation(ctx context.Context, root ipld.Link, msg message.AgentMes
 // Run is similar to [server.Run] except the receipts that are issued do not
 // include the invocation block(s) in order to save bytes when transmitting the
 // receipt in HTTP headers.
+// Logged receipts will contain the invocation block(s).
 func Run(ctx context.Context, srv server.Server[Service], invocation server.ServiceInvocation, req Request) (receipt.AnyReceipt, Response, error) {
 	caps := invocation.Capabilities()
 	// Invocation needs to have one single capability
@@ -462,5 +470,14 @@ func Run(ctx context.Context, srv server.Server[Service], invocation server.Serv
 		return nil, Response{}, err
 	}
 
+	// Add the invocation block(s) to the logged receipt
+	fullRcpt, err := rcpt.WithInvocation(invocation)
+	if err != nil {
+		return nil, Response{}, err
+	}
+
+	srv.LogReceipt(fullRcpt)
+
+	// Return the receipt without the invocation block(s) to save space in the headers
 	return rcpt, resp, nil
 }
