@@ -225,7 +225,7 @@ func (r *receipt[O, X]) Export() iter.Seq2[block.Block, error] {
 
 // Clone returns a new Receipt by copying r's backing blockstore.
 func (r *receipt[O, X]) Clone() (Receipt[O, X], error) {
-	blks, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(r.blks.Iterator()))
+	blks, err := blockstore.NewBlockStore(blockstore.WithBlocksIterator(r.blks.Iterator()))
 	if err != nil {
 		return nil, fmt.Errorf("creating block reader: %w", err)
 	}
@@ -251,12 +251,23 @@ func (r *receipt[O, X]) AttachInvocation(invocation invocation.Invocation) error
 		return nil
 	}
 
-	blks, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(iterable.Concat2(r.blks.Iterator(), invocation.Blocks())))
-	if err != nil {
-		return fmt.Errorf("creating block reader: %w", err)
+	// no need to copy receipt blocks if the backing BlockReader is actually a BlockStore
+	if bs, ok := r.blks.(blockstore.BlockStore); ok {
+		for b, err := range invocation.Export() {
+			if err != nil {
+				return fmt.Errorf("attaching invocation blocks: %w", err)
+			}
+			bs.Put(b)
+		}
+	} else {
+		blks, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(iterable.Concat2(r.blks.Iterator(), invocation.Export())))
+		if err != nil {
+			return fmt.Errorf("creating block reader: %w", err)
+		}
+
+		r.blks = blks
 	}
 
-	r.blks = blks
 	return nil
 }
 
