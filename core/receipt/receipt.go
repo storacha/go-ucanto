@@ -44,7 +44,8 @@ type Receipt[O, X any] interface {
 	Signature() signature.SignatureView
 	Archive() io.Reader
 	Export() iter.Seq2[block.Block, error]
-	WithInvocation(invocation invocation.Invocation) (Receipt[O, X], error)
+	Clone() (Receipt[O, X], error)
+	AttachInvocation(invocation invocation.Invocation) error
 }
 
 func toResultModel[O, X any](res result.Result[O, X]) rdm.ResultModel[O, X] {
@@ -222,31 +223,41 @@ func (r *receipt[O, X]) Export() iter.Seq2[block.Block, error] {
 	return iterable.Concat2(iterators...)
 }
 
-// WithInvocation returns a new Receipt by copying r's backing blockstore and adding the invocation's blocks to it.
-// If r already has an invocation, it returns r unchanged.
-// If the invocation doesn't match r's ran, it returns an error.
-func (r *receipt[O, X]) WithInvocation(invocation invocation.Invocation) (Receipt[O, X], error) {
-	// confirm the invocation matches the receipt
-	ran := r.Ran()
-	if ran.Link().String() != invocation.Link().String() {
-		return nil, fmt.Errorf("expected invocation with CID %s, got %s", ran.Link(), invocation.Link())
-	}
-
-	// don't add the invocation if it's already there
-	if _, ok := ran.Invocation(); ok {
-		return r, nil
-	}
-
-	blks, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(iterable.Concat2(r.blks.Iterator(), invocation.Blocks())))
+// Clone returns a new Receipt by copying r's backing blockstore.
+func (r *receipt[O, X]) Clone() (Receipt[O, X], error) {
+	blks, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(r.blks.Iterator()))
 	if err != nil {
 		return nil, fmt.Errorf("creating block reader: %w", err)
 	}
-
 	return &receipt[O, X]{
 		rt:   r.rt,
 		blks: blks,
 		data: r.data,
 	}, nil
+}
+
+// AttachInvocation adds the invocation's blocks to the receipt's blockstore.
+// If r already has an invocation, it returns r unchanged.
+// If the invocation doesn't match r's ran, it returns an error.
+func (r *receipt[O, X]) AttachInvocation(invocation invocation.Invocation) error {
+	// confirm the invocation matches the receipt
+	ran := r.Ran()
+	if ran.Link().String() != invocation.Link().String() {
+		return fmt.Errorf("expected invocation with CID %s, got %s", ran.Link(), invocation.Link())
+	}
+
+	// don't add the invocation if it's already there
+	if _, ok := ran.Invocation(); ok {
+		return nil
+	}
+
+	blks, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(iterable.Concat2(r.blks.Iterator(), invocation.Blocks())))
+	if err != nil {
+		return fmt.Errorf("creating block reader: %w", err)
+	}
+
+	r.blks = blks
+	return nil
 }
 
 type ReceiptReader[O, X any] interface {

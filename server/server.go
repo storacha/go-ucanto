@@ -67,7 +67,7 @@ type Server[S any] interface {
 	// Service is the actual service providing capability handlers.
 	Service() S
 	Catch(err HandlerExecutionError[any])
-	LogReceipt(rcpt receipt.AnyReceipt)
+	LogReceipt(rcpt receipt.AnyReceipt, inv invocation.Invocation)
 }
 
 // Server is a materialized service that is configured to use a specific
@@ -85,7 +85,8 @@ type ServerView[S any] interface {
 type ErrorHandlerFunc func(err HandlerExecutionError[any])
 
 // ReceiptLoggerFunc allows receipts generated during handler execution to be logged.
-type ReceiptLoggerFunc func(receipt.AnyReceipt)
+// The original invocation is also provided for reference.
+type ReceiptLoggerFunc func(receipt.AnyReceipt, invocation.Invocation)
 
 func NewServer(id principal.Signer, options ...Option) (ServerView[Service], error) {
 	cfg := srvConfig{service: Service{}}
@@ -112,11 +113,6 @@ func NewServer(id principal.Signer, options ...Option) (ServerView[Service], err
 		}
 	}
 
-	logReceipt := cfg.logReceipt
-	if logReceipt == nil {
-		logReceipt = func(receipt.AnyReceipt) {}
-	}
-
 	validateAuthorization := cfg.validateAuthorization
 	if validateAuthorization == nil {
 		validateAuthorization = func(context.Context, validator.Authorization[any]) validator.Revoked {
@@ -140,7 +136,7 @@ func NewServer(id principal.Signer, options ...Option) (ServerView[Service], err
 	}
 
 	ctx := serverContext{id, canIssue, validateAuthorization, resolveProof, parsePrincipal, resolveDIDKey, cfg.authorityProofs, cfg.altAudiences}
-	svr := &server{id, cfg.service, ctx, codec, catch, logReceipt}
+	svr := &server{id, cfg.service, ctx, codec, catch, cfg.logReceipt}
 	return svr, nil
 }
 
@@ -229,8 +225,10 @@ func (srv *server) Catch(err HandlerExecutionError[any]) {
 	srv.catch(err)
 }
 
-func (srv *server) LogReceipt(rcpt receipt.AnyReceipt) {
-	srv.logReceipt(rcpt)
+func (srv *server) LogReceipt(rcpt receipt.AnyReceipt, inv invocation.Invocation) {
+	if srv.logReceipt != nil {
+		srv.logReceipt(rcpt, inv)
+	}
 }
 
 var _ transport.Channel = (*server)(nil)
@@ -336,7 +334,7 @@ func Run(ctx context.Context, server Server[Service], invocation ServiceInvocati
 		return receipt.Issue(server.ID(), result.NewFailure(herr), ran.FromInvocation(invocation))
 	}
 
-	server.LogReceipt(rcpt)
+	server.LogReceipt(rcpt, invocation)
 
 	return rcpt, nil
 }

@@ -310,7 +310,7 @@ func TestExport(t *testing.T) {
 	require.Contains(t, blklnks, otherblk.Link().String())
 }
 
-func TestWithInvocation(t *testing.T) {
+func TestAttachInvocation(t *testing.T) {
 	inv, err := invocation.Invoke(
 		fixtures.Alice,
 		fixtures.Bob,
@@ -328,23 +328,12 @@ func TestWithInvocation(t *testing.T) {
 		require.False(t, ok)
 		require.Nil(t, ranInv)
 
-		fullRcpt, err := issuedRcpt.WithInvocation(inv)
+		err = issuedRcpt.AttachInvocation(inv)
 		require.NoError(t, err)
 
-		fullRanInv, ok := fullRcpt.Ran().Invocation()
+		ranInv, ok = issuedRcpt.Ran().Invocation()
 		require.True(t, ok)
-		require.Equal(t, inv.Link().String(), fullRanInv.Link().String())
-
-		// the original receipt's blockstore should be unchanged
-		issuedRcptNumBlocks := 0
-		for range issuedRcpt.Blocks() {
-			issuedRcptNumBlocks++
-		}
-		fullRcptNumBlocks := 0
-		for range fullRcpt.Blocks() {
-			fullRcptNumBlocks++
-		}
-		require.True(t, fullRcptNumBlocks > issuedRcptNumBlocks)
+		require.Equal(t, inv.Link().String(), ranInv.Link().String())
 	})
 
 	t.Run("doesn't fail if receipt already has invocation and invocations match", func(t *testing.T) {
@@ -355,7 +344,7 @@ func TestWithInvocation(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, inv.Link().String(), ranInv.Link().String())
 
-		_, err = issuedRcpt.WithInvocation(inv)
+		err = issuedRcpt.AttachInvocation(inv)
 		require.NoError(t, err)
 	})
 
@@ -370,9 +359,40 @@ func TestWithInvocation(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		_, err = issuedRcpt.WithInvocation(inv2)
+		err = issuedRcpt.AttachInvocation(inv2)
 		require.Error(t, err)
 	})
+}
+
+func TestClone(t *testing.T) {
+	inv, err := invocation.Invoke(
+		fixtures.Alice,
+		fixtures.Bob,
+		ucan.NewCapability("ran/invoke", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+	)
+	require.NoError(t, err)
+
+	out := result.Ok[someOkType, someErrorType](someOkType{SomeOkProperty: "some ok value"})
+
+	rcpt1, err := Issue(fixtures.Alice, out, ran.FromLink(inv.Link()))
+	require.NoError(t, err)
+
+	rcpt2, err := rcpt1.Clone()
+	require.NoError(t, err)
+
+	// attach an invocation to rcpt2 and confirm it doesn't affect rcpt1
+	err = rcpt2.AttachInvocation(inv)
+	require.NoError(t, err)
+
+	rcpt1NumBlocks := 0
+	for range rcpt1.Blocks() {
+		rcpt1NumBlocks++
+	}
+	rcpt2NumBlocks := 0
+	for range rcpt2.Blocks() {
+		rcpt2NumBlocks++
+	}
+	require.True(t, rcpt2NumBlocks > rcpt1NumBlocks)
 }
 
 func TestAnyReceiptReader(t *testing.T) {
