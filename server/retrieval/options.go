@@ -28,6 +28,7 @@ type srvConfig struct {
 	authorityProofs       []delegation.Delegation
 	altAudiences          []ucan.Principal
 	catch                 server.ErrorHandlerFunc
+	logReceipt            server.ReceiptLoggerFunc
 	delegationCache       delegation.Store
 }
 
@@ -63,6 +64,15 @@ func WithRevocationChecker(fn validator.RevocationCheckerFunc[any]) Option {
 func WithErrorHandler(fn server.ErrorHandlerFunc) Option {
 	return func(cfg *srvConfig) error {
 		cfg.catch = fn
+		return nil
+	}
+}
+
+// WithReceiptLogger configures a function to be called when a receipt is generated,
+// allowing access to the receipts produced by the server.
+func WithReceiptLogger(fn server.ReceiptLoggerFunc) Option {
+	return func(cfg *srvConfig) error {
+		cfg.logReceipt = fn
 		return nil
 	}
 }

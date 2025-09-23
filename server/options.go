@@ -28,6 +28,7 @@ type srvConfig struct {
 	authorityProofs       []delegation.Delegation
 	altAudiences          []ucan.Principal
 	catch                 ErrorHandlerFunc
+	logReceipt            ReceiptLoggerFunc
 }
 
 func WithServiceMethod[O ipld.Builder, X failure.IPLDBuilderFailure](can string, handleFunc ServiceMethod[O, X]) Option {
@@ -71,6 +72,15 @@ func WithRevocationChecker(fn validator.RevocationCheckerFunc[any]) Option {
 func WithErrorHandler(fn ErrorHandlerFunc) Option {
 	return func(cfg *srvConfig) error {
 		cfg.catch = fn
+		return nil
+	}
+}
+
+// WithReceiptLogger configures a function to be called when a receipt is
+// issued.
+func WithReceiptLogger(fn ReceiptLoggerFunc) Option {
+	return func(cfg *srvConfig) error {
+		cfg.logReceipt = fn
 		return nil
 	}
 }
