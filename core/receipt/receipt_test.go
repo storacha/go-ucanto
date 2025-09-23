@@ -310,6 +310,71 @@ func TestExport(t *testing.T) {
 	require.Contains(t, blklnks, otherblk.Link().String())
 }
 
+func TestWithInvocation(t *testing.T) {
+	inv, err := invocation.Invoke(
+		fixtures.Alice,
+		fixtures.Bob,
+		ucan.NewCapability("ran/invoke", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+	)
+	require.NoError(t, err)
+
+	out := result.Ok[someOkType, someErrorType](someOkType{SomeOkProperty: "some ok value"})
+
+	t.Run("adds invocation to receipt without one", func(t *testing.T) {
+		issuedRcpt, err := Issue(fixtures.Alice, out, ran.FromLink(inv.Link()))
+		require.NoError(t, err)
+
+		ranInv, ok := issuedRcpt.Ran().Invocation()
+		require.False(t, ok)
+		require.Nil(t, ranInv)
+
+		fullRcpt, err := issuedRcpt.WithInvocation(inv)
+		require.NoError(t, err)
+
+		fullRanInv, ok := fullRcpt.Ran().Invocation()
+		require.True(t, ok)
+		require.Equal(t, inv.Link().String(), fullRanInv.Link().String())
+
+		// the original receipt's blockstore should be unchanged
+		issuedRcptNumBlocks := 0
+		for range issuedRcpt.Blocks() {
+			issuedRcptNumBlocks++
+		}
+		fullRcptNumBlocks := 0
+		for range fullRcpt.Blocks() {
+			fullRcptNumBlocks++
+		}
+		require.True(t, fullRcptNumBlocks > issuedRcptNumBlocks)
+	})
+
+	t.Run("doesn't fail if receipt already has invocation and invocations match", func(t *testing.T) {
+		issuedRcpt, err := Issue(fixtures.Alice, out, ran.FromInvocation(inv))
+		require.NoError(t, err)
+
+		ranInv, ok := issuedRcpt.Ran().Invocation()
+		require.True(t, ok)
+		require.Equal(t, inv.Link().String(), ranInv.Link().String())
+
+		_, err = issuedRcpt.WithInvocation(inv)
+		require.NoError(t, err)
+	})
+
+	t.Run("fails if receipt invocations don't match", func(t *testing.T) {
+		issuedRcpt, err := Issue(fixtures.Alice, out, ran.FromLink(inv.Link()))
+		require.NoError(t, err)
+
+		inv2, err := invocation.Invoke(
+			fixtures.Alice,
+			fixtures.Service, // previous invocation's audience is Bob
+			ucan.NewCapability("ran/invoke", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+		)
+		require.NoError(t, err)
+
+		_, err = issuedRcpt.WithInvocation(inv2)
+		require.Error(t, err)
+	})
+}
+
 func TestAnyReceiptReader(t *testing.T) {
 	ranInv, err := invocation.Invoke(
 		fixtures.Alice,
