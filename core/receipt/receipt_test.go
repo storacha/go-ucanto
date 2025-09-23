@@ -310,6 +310,91 @@ func TestExport(t *testing.T) {
 	require.Contains(t, blklnks, otherblk.Link().String())
 }
 
+func TestAttachInvocation(t *testing.T) {
+	inv, err := invocation.Invoke(
+		fixtures.Alice,
+		fixtures.Bob,
+		ucan.NewCapability("ran/invoke", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+	)
+	require.NoError(t, err)
+
+	out := result.Ok[someOkType, someErrorType](someOkType{SomeOkProperty: "some ok value"})
+
+	t.Run("adds invocation to receipt without one", func(t *testing.T) {
+		issuedRcpt, err := Issue(fixtures.Alice, out, ran.FromLink(inv.Link()))
+		require.NoError(t, err)
+
+		ranInv, ok := issuedRcpt.Ran().Invocation()
+		require.False(t, ok)
+		require.Nil(t, ranInv)
+
+		err = issuedRcpt.AttachInvocation(inv)
+		require.NoError(t, err)
+
+		ranInv, ok = issuedRcpt.Ran().Invocation()
+		require.True(t, ok)
+		require.Equal(t, inv.Link().String(), ranInv.Link().String())
+	})
+
+	t.Run("doesn't fail if receipt already has invocation and invocations match", func(t *testing.T) {
+		issuedRcpt, err := Issue(fixtures.Alice, out, ran.FromInvocation(inv))
+		require.NoError(t, err)
+
+		ranInv, ok := issuedRcpt.Ran().Invocation()
+		require.True(t, ok)
+		require.Equal(t, inv.Link().String(), ranInv.Link().String())
+
+		err = issuedRcpt.AttachInvocation(inv)
+		require.NoError(t, err)
+	})
+
+	t.Run("fails if receipt invocations don't match", func(t *testing.T) {
+		issuedRcpt, err := Issue(fixtures.Alice, out, ran.FromLink(inv.Link()))
+		require.NoError(t, err)
+
+		inv2, err := invocation.Invoke(
+			fixtures.Alice,
+			fixtures.Service, // previous invocation's audience is Bob
+			ucan.NewCapability("ran/invoke", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+		)
+		require.NoError(t, err)
+
+		err = issuedRcpt.AttachInvocation(inv2)
+		require.Error(t, err)
+	})
+}
+
+func TestClone(t *testing.T) {
+	inv, err := invocation.Invoke(
+		fixtures.Alice,
+		fixtures.Bob,
+		ucan.NewCapability("ran/invoke", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+	)
+	require.NoError(t, err)
+
+	out := result.Ok[someOkType, someErrorType](someOkType{SomeOkProperty: "some ok value"})
+
+	rcpt1, err := Issue(fixtures.Alice, out, ran.FromLink(inv.Link()))
+	require.NoError(t, err)
+
+	rcpt2, err := rcpt1.Clone()
+	require.NoError(t, err)
+
+	// attach an invocation to rcpt2 and confirm it doesn't affect rcpt1
+	err = rcpt2.AttachInvocation(inv)
+	require.NoError(t, err)
+
+	rcpt1NumBlocks := 0
+	for range rcpt1.Blocks() {
+		rcpt1NumBlocks++
+	}
+	rcpt2NumBlocks := 0
+	for range rcpt2.Blocks() {
+		rcpt2NumBlocks++
+	}
+	require.True(t, rcpt2NumBlocks > rcpt1NumBlocks)
+}
+
 func TestAnyReceiptReader(t *testing.T) {
 	ranInv, err := invocation.Invoke(
 		fixtures.Alice,

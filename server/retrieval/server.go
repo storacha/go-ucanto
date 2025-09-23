@@ -121,6 +121,9 @@ func NewServer(id principal.Signer, options ...Option) (*Server, error) {
 	if cfg.catch != nil {
 		srvOpts = append(srvOpts, server.WithErrorHandler(cfg.catch))
 	}
+	if cfg.logReceipt != nil {
+		srvOpts = append(srvOpts, server.WithReceiptLogger(cfg.logReceipt))
+	}
 	if cfg.validateAuthorization != nil {
 		srvOpts = append(srvOpts, server.WithRevocationChecker(cfg.validateAuthorization))
 	}
@@ -186,6 +189,10 @@ func (srv *Server) Cache() delegation.Store {
 
 func (srv *Server) Catch(err server.HandlerExecutionError[any]) {
 	srv.server.Catch(err)
+}
+
+func (srv *Server) LogReceipt(rcpt receipt.AnyReceipt, inv invocation.Invocation) {
+	srv.server.LogReceipt(rcpt, inv)
 }
 
 var _ CachingServer = (*Server)(nil)
@@ -461,6 +468,8 @@ func Run(ctx context.Context, srv server.Server[Service], invocation server.Serv
 	if err != nil {
 		return nil, Response{}, err
 	}
+
+	srv.LogReceipt(rcpt, invocation)
 
 	return rcpt, resp, nil
 }
