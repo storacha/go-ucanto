@@ -71,7 +71,7 @@ func Decode(b []byte) (principal.Signer, error) {
 		return nil, fmt.Errorf("reading public key codec: %w", err)
 	}
 	if puc != verifier.Code {
-		return nil, fmt.Errorf("invalid public key codec: %d", prc)
+		return nil, fmt.Errorf("invalid public key codec: %d", puc)
 	}
 
 	_, err = verifier.Decode(b[pubKeyOffset:])

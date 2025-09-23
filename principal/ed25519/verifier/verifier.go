@@ -45,14 +45,6 @@ func Decode(b []byte) (principal.Verifier, error) {
 		return nil, fmt.Errorf("invalid public key codec: %d", prc)
 	}
 
-	puc, err := varint.ReadUvarint(bytes.NewReader(b))
-	if err != nil {
-		return nil, fmt.Errorf("reading public key codec: %w", err)
-	}
-	if puc != Code {
-		return nil, fmt.Errorf("invalid public key codec: %d", prc)
-	}
-
 	v := make(Ed25519Verifier, size)
 	copy(v, b)
 
