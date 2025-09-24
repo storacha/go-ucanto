@@ -2,6 +2,7 @@ package json
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagjson"
@@ -35,7 +36,7 @@ func Encode(val any, typ schema.Type, opts ...bindnode.Option) (bytes []byte, er
 			} else if asErr, ok := r.(error); ok {
 				err = asErr
 			} else {
-				err = errors.New("unknown panic encoding JSON")
+				err = fmt.Errorf("unknown panic encoding JSON: %+v", r)
 			}
 		}
 	}()

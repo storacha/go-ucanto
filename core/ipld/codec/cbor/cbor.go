@@ -2,6 +2,7 @@ package cbor
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
@@ -35,7 +36,7 @@ func Encode(val any, typ schema.Type, opts ...bindnode.Option) (bytes []byte, er
 			} else if asErr, ok := r.(error); ok {
 				err = asErr
 			} else {
-				err = errors.New("unknown panic encoding CBOR")
+				err = fmt.Errorf("unknown panic encoding CBOR: %+v", r)
 			}
 		}
 	}()
