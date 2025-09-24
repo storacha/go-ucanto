@@ -1,6 +1,8 @@
 package json
 
 import (
+	"errors"
+
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagjson"
 	"github.com/ipld/go-ipld-prime/node/bindnode"
@@ -25,8 +27,20 @@ func (codec) Decode(b []byte, bind any, typ schema.Type, opts ...bindnode.Option
 
 var Codec = codec{}
 
-func Encode(val any, typ schema.Type, opts ...bindnode.Option) ([]byte, error) {
-	return ipld.Marshal(dagjson.Encode, val, typ, opts...)
+func Encode(val any, typ schema.Type, opts ...bindnode.Option) (bytes []byte, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if asStr, ok := r.(string); ok {
+				err = errors.New(asStr)
+			} else if asErr, ok := r.(error); ok {
+				err = asErr
+			} else {
+				err = errors.New("unknown panic encoding JSON")
+			}
+		}
+	}()
+	bytes, err = ipld.Marshal(dagjson.Encode, val, typ, opts...)
+	return
 }
 
 func Decode(b []byte, bind any, typ schema.Type, opts ...bindnode.Option) error {
