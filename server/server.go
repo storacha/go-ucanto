@@ -67,7 +67,7 @@ type Server[S any] interface {
 	// Service is the actual service providing capability handlers.
 	Service() S
 	Catch(err HandlerExecutionError[any])
-	LogReceipt(rcpt receipt.AnyReceipt, inv invocation.Invocation)
+	LogReceipt(ctx context.Context, rcpt receipt.AnyReceipt, inv invocation.Invocation)
 }
 
 // Server is a materialized service that is configured to use a specific
@@ -86,7 +86,7 @@ type ErrorHandlerFunc func(err HandlerExecutionError[any])
 
 // ReceiptLoggerFunc allows receipts generated during handler execution to be logged.
 // The original invocation is also provided for reference.
-type ReceiptLoggerFunc func(receipt.AnyReceipt, invocation.Invocation)
+type ReceiptLoggerFunc func(ctx context.Context, rcpt receipt.AnyReceipt, inv invocation.Invocation)
 
 func NewServer(id principal.Signer, options ...Option) (ServerView[Service], error) {
 	cfg := srvConfig{service: Service{}}
@@ -225,9 +225,9 @@ func (srv *server) Catch(err HandlerExecutionError[any]) {
 	srv.catch(err)
 }
 
-func (srv *server) LogReceipt(rcpt receipt.AnyReceipt, inv invocation.Invocation) {
+func (srv *server) LogReceipt(ctx context.Context, rcpt receipt.AnyReceipt, inv invocation.Invocation) {
 	if srv.logReceipt != nil {
-		srv.logReceipt(rcpt, inv)
+		srv.logReceipt(ctx, rcpt, inv)
 	}
 }
 
@@ -334,7 +334,7 @@ func Run(ctx context.Context, server Server[Service], invocation ServiceInvocati
 		return receipt.Issue(server.ID(), result.NewFailure(herr), ran.FromInvocation(invocation))
 	}
 
-	server.LogReceipt(rcpt, invocation)
+	server.LogReceipt(ctx, rcpt, invocation)
 
 	return rcpt, nil
 }

@@ -191,8 +191,8 @@ func (srv *Server) Catch(err server.HandlerExecutionError[any]) {
 	srv.server.Catch(err)
 }
 
-func (srv *Server) LogReceipt(rcpt receipt.AnyReceipt, inv invocation.Invocation) {
-	srv.server.LogReceipt(rcpt, inv)
+func (srv *Server) LogReceipt(ctx context.Context, rcpt receipt.AnyReceipt, inv invocation.Invocation) {
+	srv.server.LogReceipt(ctx, rcpt, inv)
 }
 
 var _ CachingServer = (*Server)(nil)
@@ -469,7 +469,7 @@ func Run(ctx context.Context, srv server.Server[Service], invocation server.Serv
 		return nil, Response{}, err
 	}
 
-	srv.LogReceipt(rcpt, invocation)
+	srv.LogReceipt(ctx, rcpt, invocation)
 
 	return rcpt, resp, nil
 }
