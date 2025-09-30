@@ -95,7 +95,7 @@ func TestBind(t *testing.T) {
 	t.Run("missing message", func(t *testing.T) {
 		np := basicnode.Prototype.Any
 		nb := np.NewBuilder()
-		ma, err := nb.BeginMap(3)
+		ma, err := nb.BeginMap(2)
 		require.NoError(t, err)
 		na, err := ma.AssembleEntry("name")
 		require.NoError(t, err)
