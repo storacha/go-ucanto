@@ -216,6 +216,10 @@ func TestExecute(t *testing.T) {
 							nb := cap.Nb()
 							result := result.Ok[serveOk, failure.IPLDBuilderFailure](serveOk(nb))
 							start, end := nb.Range[0], nb.Range[1]
+							// ensure the requested range matches the HTTP request headers
+							if req.Headers.Get("Range") != fmt.Sprintf("bytes=%d-%d", start, end) {
+								return nil, nil, retrieval.Response{Status: http.StatusBadRequest}, nil
+							}
 							length := end - start + 1
 							headers := http.Header{}
 							headers.Set("Content-Length", fmt.Sprintf("%d", length))
@@ -248,9 +252,16 @@ func TestExecute(t *testing.T) {
 			url, err := url.Parse(httpServer.URL)
 			require.NoError(t, err)
 
+			headers := http.Header{}
+			headers.Set("Range", fmt.Sprintf("bytes=%d-%d", contentRange[0], contentRange[1]))
+
 			// the URL doesn't really have a consequence on this test, but it can be
 			// used to idenitfy the data if not done so in the invocation caveats
-			conn, err := NewConnection(fixtures.Service, url.JoinPath("blob", "z"+digest.B58String()))
+			conn, err := NewConnection(
+				fixtures.Service,
+				url.JoinPath("blob", "z"+digest.B58String()),
+				WithHeaders(headers),
+			)
 			require.NoError(t, err)
 
 			inv, err := serve.Invoke(

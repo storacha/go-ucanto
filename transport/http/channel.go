@@ -18,6 +18,7 @@ type chanConfig struct {
 	client   *http.Client
 	method   string
 	statuses []int
+	headers  http.Header
 }
 
 // WithClient configures the HTTP client the channel should use to make
@@ -44,9 +45,17 @@ func WithSuccessStatusCode(codes ...int) Option {
 	}
 }
 
+// WithHeaders configures additional HTTP headers to send with requests.
+func WithHeaders(h http.Header) Option {
+	return func(cfg *chanConfig) {
+		cfg.headers = h
+	}
+}
+
 type Channel struct {
 	url      *url.URL
 	client   *http.Client
+	headers  http.Header
 	method   string
 	statuses []int
 }
@@ -57,7 +66,7 @@ func (c *Channel) Request(ctx context.Context, req transport.HTTPRequest) (trans
 		return nil, fmt.Errorf("creating HTTP request: %w", err)
 	}
 
-	hr.Header = req.Headers()
+	addAllHeaders(hr.Header, req.Headers(), c.headers)
 	res, err := c.client.Do(hr)
 	if err != nil {
 		return nil, fmt.Errorf("doing HTTP request: %w", err)
@@ -67,6 +76,16 @@ func (c *Channel) Request(ctx context.Context, req transport.HTTPRequest) (trans
 	}
 
 	return NewResponse(res.StatusCode, res.Body, res.Header), nil
+}
+
+func addAllHeaders(dst http.Header, srcs ...http.Header) {
+	for _, src := range srcs {
+		for name, values := range src {
+			for _, value := range values {
+				dst.Add(name, value)
+			}
+		}
+	}
 }
 
 var _ transport.Channel = (*Channel)(nil)
@@ -88,6 +107,7 @@ func NewChannel(url *url.URL, options ...Option) *Channel {
 	return &Channel{
 		url:      url,
 		client:   cfg.client,
+		headers:  cfg.headers,
 		method:   cfg.method,
 		statuses: cfg.statuses,
 	}
