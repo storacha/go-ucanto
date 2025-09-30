@@ -67,7 +67,7 @@ type Server[S any] interface {
 	// Service is the actual service providing capability handlers.
 	Service() S
 	Catch(err HandlerExecutionError[any])
-	LogReceipt(ctx context.Context, rcpt receipt.AnyReceipt, inv invocation.Invocation)
+	LogReceipt(ctx context.Context, rcpt receipt.AnyReceipt, inv invocation.Invocation) error
 }
 
 // Server is a materialized service that is configured to use a specific
@@ -86,7 +86,9 @@ type ErrorHandlerFunc func(err HandlerExecutionError[any])
 
 // ReceiptLoggerFunc allows receipts generated during handler execution to be logged.
 // The original invocation is also provided for reference.
-type ReceiptLoggerFunc func(ctx context.Context, rcpt receipt.AnyReceipt, inv invocation.Invocation)
+// Returning an error from this function will cause the server to fail the request and send an error response
+// back to the client, use judiciously.
+type ReceiptLoggerFunc func(ctx context.Context, rcpt receipt.AnyReceipt, inv invocation.Invocation) error
 
 func NewServer(id principal.Signer, options ...Option) (ServerView[Service], error) {
 	cfg := srvConfig{service: Service{}}
@@ -225,10 +227,12 @@ func (srv *server) Catch(err HandlerExecutionError[any]) {
 	srv.catch(err)
 }
 
-func (srv *server) LogReceipt(ctx context.Context, rcpt receipt.AnyReceipt, inv invocation.Invocation) {
-	if srv.logReceipt != nil {
-		srv.logReceipt(ctx, rcpt, inv)
+func (srv *server) LogReceipt(ctx context.Context, rcpt receipt.AnyReceipt, inv invocation.Invocation) error {
+	if srv.logReceipt == nil {
+		return nil
 	}
+
+	return srv.logReceipt(ctx, rcpt, inv)
 }
 
 var _ transport.Channel = (*server)(nil)
@@ -334,7 +338,11 @@ func Run(ctx context.Context, server Server[Service], invocation ServiceInvocati
 		return receipt.Issue(server.ID(), result.NewFailure(herr), ran.FromInvocation(invocation))
 	}
 
-	server.LogReceipt(ctx, rcpt, invocation)
+	if err := server.LogReceipt(ctx, rcpt, invocation); err != nil {
+		herr := NewHandlerExecutionError(err, cap)
+		server.Catch(herr)
+		return receipt.Issue(server.ID(), result.NewFailure(herr), ran.FromInvocation(invocation))
+	}
 
 	return rcpt, nil
 }
