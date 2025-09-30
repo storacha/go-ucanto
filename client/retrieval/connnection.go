@@ -33,7 +33,8 @@ import (
 type Option func(cfg *config)
 
 type config struct {
-	client *http.Client
+	client  *http.Client
+	headers http.Header
 }
 
 // WithClient configures the HTTP client the connection should use to make
@@ -41,6 +42,13 @@ type config struct {
 func WithClient(c *http.Client) Option {
 	return func(cfg *config) {
 		cfg.client = c
+	}
+}
+
+// WithHeaders configures additional HTTP headers to send with requests.
+func WithHeaders(h http.Header) Option {
+	return func(cfg *config) {
+		cfg.headers = h
 	}
 }
 
@@ -63,6 +71,7 @@ func NewConnection(id ucan.Principal, url *url.URL, opts ...Option) (*Connection
 			http.StatusRequestHeaderFieldsTooLarge, // indicates invocation is too large to fit in headers
 		),
 		thttp.WithClient(cfg.client),
+		thttp.WithHeaders(cfg.headers),
 	)
 	codec := headercar.NewOutboundCodec()
 	return &Connection{id, channel, codec, hasher}, nil
