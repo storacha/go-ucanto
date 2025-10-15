@@ -118,14 +118,8 @@ type ClaimContext interface {
 	AuthorityProver
 }
 
-type ValidationContext[Caveats any] interface {
-	ClaimContext
-	Capability() CapabilityParser[Caveats]
-}
-
-type validationContext[Caveats any] struct {
+type claimContext struct {
 	authority             principal.Verifier
-	capability            CapabilityParser[Caveats]
 	canIssue              CanIssueFunc[any]
 	validateAuthorization RevocationCheckerFunc[any]
 	resolveProof          ProofResolverFunc
@@ -134,36 +128,62 @@ type validationContext[Caveats any] struct {
 	authorityProofs       []delegation.Delegation
 }
 
-func (vc validationContext[Caveats]) Authority() principal.Verifier {
-	return vc.authority
+func NewClaimContext(
+	authority principal.Verifier,
+	canIssue CanIssueFunc[any],
+	validateAuthorization RevocationCheckerFunc[any],
+	resolveProof ProofResolverFunc,
+	parsePrincipal PrincipalParserFunc,
+	resolveDIDKey PrincipalResolverFunc,
+	authorityProofs ...delegation.Delegation,
+) ClaimContext {
+	return claimContext{
+		authority,
+		canIssue,
+		validateAuthorization,
+		resolveProof,
+		parsePrincipal,
+		resolveDIDKey,
+		authorityProofs,
+	}
 }
 
-func (vc validationContext[Caveats]) Capability() CapabilityParser[Caveats] {
-	return vc.capability
+func (cc claimContext) Authority() principal.Verifier {
+	return cc.authority
 }
 
-func (vc validationContext[Caveats]) CanIssue(capability ucan.Capability[any], issuer did.DID) bool {
-	return vc.canIssue(capability, issuer)
+func (cc claimContext) CanIssue(capability ucan.Capability[any], issuer did.DID) bool {
+	return cc.canIssue(capability, issuer)
 }
 
-func (vc validationContext[Caveats]) ValidateAuthorization(ctx context.Context, auth Authorization[any]) Revoked {
-	return vc.validateAuthorization(ctx, auth)
+func (cc claimContext) ValidateAuthorization(ctx context.Context, auth Authorization[any]) Revoked {
+	return cc.validateAuthorization(ctx, auth)
 }
 
-func (vc validationContext[Caveats]) ResolveProof(ctx context.Context, proof ucan.Link) (delegation.Delegation, UnavailableProof) {
-	return vc.resolveProof(ctx, proof)
+func (cc claimContext) ResolveProof(ctx context.Context, proof ucan.Link) (delegation.Delegation, UnavailableProof) {
+	return cc.resolveProof(ctx, proof)
 }
 
-func (vc validationContext[Caveats]) ParsePrincipal(str string) (principal.Verifier, error) {
-	return vc.parsePrincipal(str)
+func (cc claimContext) ParsePrincipal(str string) (principal.Verifier, error) {
+	return cc.parsePrincipal(str)
 }
 
-func (vc validationContext[Caveats]) ResolveDIDKey(ctx context.Context, did did.DID) (did.DID, UnresolvedDID) {
-	return vc.resolveDIDKey(ctx, did)
+func (cc claimContext) ResolveDIDKey(ctx context.Context, did did.DID) (did.DID, UnresolvedDID) {
+	return cc.resolveDIDKey(ctx, did)
 }
 
-func (vc validationContext[Caveats]) AuthorityProofs() []delegation.Delegation {
-	return vc.authorityProofs
+func (cc claimContext) AuthorityProofs() []delegation.Delegation {
+	return cc.authorityProofs
+}
+
+type ValidationContext[Caveats any] interface {
+	ClaimContext
+	Capability() CapabilityParser[Caveats]
+}
+
+type validationContext[Caveats any] struct {
+	claimContext
+	capability CapabilityParser[Caveats]
 }
 
 func NewValidationContext[Caveats any](
@@ -177,15 +197,21 @@ func NewValidationContext[Caveats any](
 	authorityProofs ...delegation.Delegation,
 ) ValidationContext[Caveats] {
 	return validationContext[Caveats]{
-		authority,
+		claimContext{
+			authority,
+			canIssue,
+			validateAuthorization,
+			resolveProof,
+			parsePrincipal,
+			resolveDIDKey,
+			authorityProofs,
+		},
 		capability,
-		canIssue,
-		validateAuthorization,
-		resolveProof,
-		parsePrincipal,
-		resolveDIDKey,
-		authorityProofs,
 	}
+}
+
+func (vc validationContext[Caveats]) Capability() CapabilityParser[Caveats] {
+	return vc.capability
 }
 
 // Access finds a valid path in a proof chain of the given
