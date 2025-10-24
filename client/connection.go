@@ -62,7 +62,7 @@ func NewConnection(id ucan.Principal, channel transport.Channel, options ...Opti
 
 	codec := cfg.codec
 	if codec == nil {
-		codec = car.NewCAROutboundCodec()
+		codec = car.NewOutboundCodec()
 	}
 
 	c := conn{id, codec, channel, hasher}
@@ -117,6 +117,7 @@ func Execute(ctx context.Context, invocations []invocation.Invocation, conn Conn
 	if err != nil {
 		return nil, fmt.Errorf("sending message: %w", err)
 	}
+	defer res.Body().Close()
 
 	output, err := conn.Codec().Decode(res)
 	if err != nil {

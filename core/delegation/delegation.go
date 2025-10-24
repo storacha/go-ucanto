@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"slices"
 
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multibase"
@@ -23,6 +24,19 @@ import (
 	udm "github.com/storacha/go-ucanto/ucan/datamodel/ucan"
 )
 
+type exportConfig struct {
+	omitProofs []ipld.Link
+}
+
+type ExportOption func(c *exportConfig)
+
+// WithOmitProof excludes the specified proof blocks from the export.
+func WithOmitProof(proof ...ipld.Link) ExportOption {
+	return func(c *exportConfig) {
+		c.omitProofs = append(c.omitProofs, proof...)
+	}
+}
+
 // Delagation is a materialized view of a UCAN delegation, which can be encoded
 // into a UCAN token and used as proof for an invocation or further delegations.
 type Delegation interface {
@@ -39,7 +53,7 @@ type Delegation interface {
 	//
 	// Note: this differs from calling Blocks - which simply iterates over all
 	// blocks in the block reader that backs this [ipld.View].
-	Export() iter.Seq2[block.Block, error]
+	Export(options ...ExportOption) iter.Seq2[block.Block, error]
 	// Attach a block to the delegation DAG so it will be included in the block
 	// iterator. You should only attach blocks that are referenced from
 	// `Capabilities` or `Facts`.
@@ -71,8 +85,8 @@ func (d *delegation) Blocks() iter.Seq2[ipld.Block, error] {
 	return iterable.Concat2(d.blks.Iterator(), d.atchblks.Iterator())
 }
 
-func (d *delegation) Export() iter.Seq2[ipld.Block, error] {
-	return export(d.ucan, d.rt, d.blks, d.atchblks)
+func (d *delegation) Export(options ...ExportOption) iter.Seq2[ipld.Block, error] {
+	return export(d.ucan, d.rt, d.blks, d.atchblks, options...)
 }
 
 func (d *delegation) Archive() io.Reader {
@@ -148,9 +162,18 @@ func NewDelegationView(root ipld.Link, bs blockstore.BlockReader) (Delegation, e
 
 // export the blocks that comprise the delegation, including all extra attached
 // blocks.
-func export(rt ucan.View, rtblk ipld.Block, blks blockstore.BlockReader, atchblks blockstore.BlockReader) iter.Seq2[ipld.Block, error] {
+func export(rt ucan.View, rtblk ipld.Block, blks blockstore.BlockReader, atchblks blockstore.BlockReader, options ...ExportOption) iter.Seq2[ipld.Block, error] {
+	config := exportConfig{}
+	for _, o := range options {
+		o(&config)
+	}
 	return func(yield func(ipld.Block, error) bool) {
 		for _, p := range rt.Proofs() {
+			if slices.ContainsFunc(config.omitProofs, func(link ipld.Link) bool {
+				return link.String() == p.String()
+			}) {
+				continue
+			}
 			proofblk, ok, err := blks.Get(p)
 			if err != nil {
 				yield(nil, err)
@@ -164,7 +187,7 @@ func export(rt ucan.View, rtblk ipld.Block, blks blockstore.BlockReader, atchblk
 				yield(nil, err)
 				return
 			}
-			for b, err := range export(prf, proofblk, blks, nil) {
+			for b, err := range export(prf, proofblk, blks, nil, options...) {
 				if !yield(b, err) {
 					return
 				}

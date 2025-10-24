@@ -20,7 +20,7 @@ import (
 // See https://www.iana.org/assignments/media-types/application/vnd.ipld.car
 const ContentType = "application/vnd.ipld.car"
 
-func Encode(roots []ipld.Link, blocks iter.Seq2[ipld.Block, error]) io.Reader {
+func Encode(roots []ipld.Link, blocks iter.Seq2[ipld.Block, error]) io.ReadCloser {
 	reader, writer := io.Pipe()
 	go func() {
 		cids := []cid.Cid{}

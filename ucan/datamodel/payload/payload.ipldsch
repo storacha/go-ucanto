@@ -18,7 +18,7 @@ type Capability struct {
   # Must be all lower-case `/` delimeted with at least one path segment.
   can String
   # Any additional domain specific details and/or restrictions of the capability
-  nb Any
+  nb optional Any
 }
 
 type Fact { String: Any }

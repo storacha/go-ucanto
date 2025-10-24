@@ -3,6 +3,7 @@ module github.com/storacha/go-ucanto
 go 1.24.4
 
 require (
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-ipld-cbor v0.1.0
 	github.com/ipld/go-car v0.6.2

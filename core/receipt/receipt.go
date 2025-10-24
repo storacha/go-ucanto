@@ -2,17 +2,20 @@ package receipt
 
 import (
 	// for go:embed
+
+	"bytes"
 	_ "embed"
 	"fmt"
+	"io"
 	"iter"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/node/bindnode"
 	"github.com/ipld/go-ipld-prime/schema"
+	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
-	"github.com/storacha/go-ucanto/core/invocation/ran"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/ipld/block"
 	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
@@ -20,6 +23,7 @@ import (
 	"github.com/storacha/go-ucanto/core/iterable"
 	rdm "github.com/storacha/go-ucanto/core/receipt/datamodel"
 	"github.com/storacha/go-ucanto/core/receipt/fx"
+	"github.com/storacha/go-ucanto/core/receipt/ran"
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/ucan"
@@ -31,13 +35,17 @@ import (
 // included in the source DAG.
 type Receipt[O, X any] interface {
 	ipld.View
-	Ran() invocation.Invocation
+	Ran() ran.Ran
 	Out() result.Result[O, X]
 	Fx() fx.Effects
 	Meta() map[string]any
 	Issuer() ucan.Principal
 	Proofs() delegation.Proofs
 	Signature() signature.SignatureView
+	Archive() io.Reader
+	Export() iter.Seq2[block.Block, error]
+	Clone() (Receipt[O, X], error)
+	AttachInvocation(invocation invocation.Invocation) error
 }
 
 func toResultModel[O, X any](res result.Result[O, X]) rdm.ResultModel[O, X] {
@@ -55,27 +63,45 @@ func fromResultModel[O, X any](resultModel rdm.ResultModel[O, X]) result.Result[
 	return result.Error[O, X](*resultModel.Error)
 }
 
+var _ Receipt[any, any] = (*receipt[any, any])(nil)
+
 type receipt[O, X any] struct {
 	rt   block.Block
 	blks blockstore.BlockReader
 	data *rdm.ReceiptModel[O, X]
 }
 
-var _ Receipt[any, any] = (*receipt[any, any])(nil)
-
-func (r *receipt[O, X]) Blocks() iter.Seq2[block.Block, error] {
-	var iterators []iter.Seq2[block.Block, error]
-	iterators = append(iterators, r.Ran().Blocks())
-
-	for _, prf := range r.Proofs() {
-		if delegation, ok := prf.Delegation(); ok {
-			iterators = append(iterators, delegation.Blocks())
-		}
+func NewReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, typ schema.Type, opts ...bindnode.Option) (Receipt[O, X], error) {
+	rblock, ok, err := blocks.Get(root)
+	if err != nil {
+		return nil, fmt.Errorf("getting receipt root block: %w", err)
+	}
+	if !ok {
+		return nil, fmt.Errorf("missing receipt root block: %s", root)
 	}
 
-	iterators = append(iterators, func(yield func(block.Block, error) bool) { yield(r.Root(), nil) })
+	rmdl := rdm.ReceiptModel[O, X]{}
+	err = block.Decode(rblock, &rmdl, typ, cbor.Codec, sha256.Hasher, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("decoding receipt: %w", err)
+	}
 
-	return iterable.Concat2(iterators...)
+	rcpt := receipt[O, X]{
+		rt:   rblock,
+		blks: blocks,
+		data: &rmdl,
+	}
+
+	return &rcpt, nil
+}
+
+func NewAnyReceipt(root ipld.Link, blocks blockstore.BlockReader, opts ...bindnode.Option) (AnyReceipt, error) {
+	anyReceiptType := rdm.TypeSystem().TypeByName("Receipt")
+	return NewReceipt[ipld.Node, ipld.Node](root, blocks, anyReceiptType, opts...)
+}
+
+func (r *receipt[O, X]) Blocks() iter.Seq2[block.Block, error] {
+	return r.blks.Iterator()
 }
 
 func (r *receipt[O, X]) Fx() fx.Effects {
@@ -132,12 +158,17 @@ func (r *receipt[O, X]) Out() result.Result[O, X] {
 	return fromResultModel(r.data.Ocm.Out)
 }
 
-func (r *receipt[O, X]) Ran() invocation.Invocation {
+func (r *receipt[O, X]) Ran() ran.Ran {
+	_, ok, err := r.blks.Get(r.data.Ocm.Ran)
+	if !ok || err != nil {
+		return ran.FromLink(r.data.Ocm.Ran)
+	}
 	inv, err := invocation.NewInvocationView(r.data.Ocm.Ran, r.blks)
 	if err != nil {
 		fmt.Printf("Error: creating invocation view: %s\n", err)
+		return ran.FromLink(r.data.Ocm.Ran)
 	}
-	return inv
+	return ran.FromInvocation(inv)
 }
 
 func (r *receipt[O, X]) Root() block.Block {
@@ -148,28 +179,96 @@ func (r *receipt[O, X]) Signature() signature.SignatureView {
 	return signature.NewSignatureView(signature.Decode(r.data.Sig))
 }
 
-func NewReceipt[O, X any](root ipld.Link, blocks blockstore.BlockReader, typ schema.Type, opts ...bindnode.Option) (Receipt[O, X], error) {
-	rblock, ok, err := blocks.Get(root)
+func (r *receipt[O, X]) Archive() io.Reader {
+	// We create a descriptor block to describe what this DAG represents
+	variant, err := block.Encode(
+		&rdm.ArchiveModel{UcanReceipt0_9_1: r.rt.Link()},
+		rdm.ArchiveType(),
+		cbor.Codec,
+		sha256.Hasher,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("getting receipt root block: %w", err)
-	}
-	if !ok {
-		return nil, fmt.Errorf("missing receipt root block: %s", root)
+		reader, _ := io.Pipe()
+		reader.CloseWithError(fmt.Errorf("hashing variant block bytes: %w", err))
+		return reader
 	}
 
-	rmdl := rdm.ReceiptModel[O, X]{}
-	err = block.Decode(rblock, &rmdl, typ, cbor.Codec, sha256.Hasher, opts...)
+	return car.Encode([]ipld.Link{variant.Link()}, func(yield func(ipld.Block, error) bool) {
+		for b, err := range r.Export() {
+			if !yield(b, err) || err != nil {
+				return
+			}
+		}
+		yield(variant, nil)
+	})
+}
+
+// Export ONLY the blocks that comprise the receipt, its original invocation and its proofs
+// This differs from Blocks(), which simply returns all the blocks in the backing blockstore
+func (r *receipt[O, X]) Export() iter.Seq2[block.Block, error] {
+	var iterators []iter.Seq2[block.Block, error]
+
+	if inv, ok := r.Ran().Invocation(); ok {
+		iterators = append(iterators, inv.Export())
+	}
+
+	for _, prf := range r.Proofs() {
+		if delegation, ok := prf.Delegation(); ok {
+			iterators = append(iterators, delegation.Export())
+		}
+	}
+
+	iterators = append(iterators, func(yield func(block.Block, error) bool) { yield(r.Root(), nil) })
+
+	return iterable.Concat2(iterators...)
+}
+
+// Clone returns a new Receipt by copying r's backing blockstore.
+func (r *receipt[O, X]) Clone() (Receipt[O, X], error) {
+	blks, err := blockstore.NewBlockStore(blockstore.WithBlocksIterator(r.blks.Iterator()))
 	if err != nil {
-		return nil, fmt.Errorf("decoding receipt: %w", err)
+		return nil, fmt.Errorf("creating block reader: %w", err)
+	}
+	return &receipt[O, X]{
+		rt:   r.rt,
+		blks: blks,
+		data: r.data,
+	}, nil
+}
+
+// AttachInvocation adds the invocation's blocks to the receipt's blockstore.
+// If r already has an invocation, it returns r unchanged.
+// If the invocation doesn't match r's ran, it returns an error.
+func (r *receipt[O, X]) AttachInvocation(invocation invocation.Invocation) error {
+	// confirm the invocation matches the receipt
+	ran := r.Ran()
+	if ran.Link().String() != invocation.Link().String() {
+		return fmt.Errorf("expected invocation with CID %s, got %s", ran.Link(), invocation.Link())
 	}
 
-	rcpt := receipt[O, X]{
-		rt:   rblock,
-		blks: blocks,
-		data: &rmdl,
+	// don't add the invocation if it's already there
+	if _, ok := ran.Invocation(); ok {
+		return nil
 	}
 
-	return &rcpt, nil
+	// no need to copy receipt blocks if the backing BlockReader is actually a BlockStore
+	if bs, ok := r.blks.(blockstore.BlockStore); ok {
+		for b, err := range invocation.Export() {
+			if err != nil {
+				return fmt.Errorf("attaching invocation blocks: %w", err)
+			}
+			bs.Put(b)
+		}
+	} else {
+		blks, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(iterable.Concat2(r.blks.Iterator(), invocation.Export())))
+		if err != nil {
+			return fmt.Errorf("creating block reader: %w", err)
+		}
+
+		r.blks = blks
+	}
+
+	return nil
 }
 
 type ReceiptReader[O, X any] interface {
@@ -218,6 +317,46 @@ func Rebind[O, X any](from AnyReceipt, successType schema.Type, errorType schema
 		return nil, err
 	}
 	return rdr.Read(from.Root().Link(), from.Blocks())
+}
+
+func Extract(b []byte) (AnyReceipt, error) {
+	roots, blks, err := car.Decode(bytes.NewReader(b))
+	if err != nil {
+		return nil, fmt.Errorf("decoding CAR: %s", err)
+	}
+	if len(roots) == 0 {
+		return nil, fmt.Errorf("missing root CID in receipt archive")
+	}
+	if len(roots) > 1 {
+		return nil, fmt.Errorf("unexpected number of root CIDs in archive: %d", len(roots))
+	}
+
+	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(blks))
+	if err != nil {
+		return nil, fmt.Errorf("creating block reader: %w", err)
+	}
+
+	rt, ok, err := br.Get(roots[0])
+	if err != nil {
+		return nil, fmt.Errorf("getting root block: %w", err)
+	}
+	if !ok {
+		return nil, fmt.Errorf("missing root block: %s", roots[0])
+	}
+
+	model := rdm.ArchiveModel{}
+	err = block.Decode(
+		rt,
+		&model,
+		rdm.ArchiveType(),
+		cbor.Codec,
+		sha256.Hasher,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("decoding root block: %w", err)
+	}
+
+	return NewAnyReceipt(model.UcanReceipt0_9_1, br)
 }
 
 // Option is an option configuring a UCAN delegation.

@@ -88,6 +88,46 @@ func TestExport(t *testing.T) {
 	require.Contains(t, blklnks, otherblk.Link().String())
 }
 
+func TestExportOmitsProofs(t *testing.T) {
+	prf, err := Delegate(
+		fixtures.Alice,
+		fixtures.Bob,
+		[]ucan.Capability[ucan.NoCaveats]{
+			ucan.NewCapability("test/proof", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+		},
+	)
+	require.NoError(t, err)
+	dlg, err := Delegate(
+		fixtures.Bob,
+		fixtures.Mallory,
+		[]ucan.Capability[ucan.NoCaveats]{
+			ucan.NewCapability("test/proof", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+		},
+		WithProof(
+			FromDelegation(prf),
+			// include an absent proof to prove things don't break - PUN INTENDED
+			FromLink(helpers.RandomCID()),
+		),
+	)
+	require.NoError(t, err)
+
+	blks := map[string]struct{}{}
+	for b, err := range dlg.Export() {
+		require.NoError(t, err)
+		blks[b.Link().String()] = struct{}{}
+	}
+
+	exblks := map[string]struct{}{}
+	// export the delegation from the blockstore, excluding the proof
+	for b, err := range dlg.Export(WithOmitProof(prf.Link())) {
+		require.NoError(t, err)
+		exblks[b.Link().String()] = struct{}{}
+	}
+
+	require.Contains(t, blks, prf.Link().String())
+	require.NotContains(t, exblks, prf.Link().String())
+}
+
 func TestAttach(t *testing.T) {
 	dlg, err := Delegate(
 		fixtures.Alice,
