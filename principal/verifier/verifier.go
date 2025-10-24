@@ -1,11 +1,15 @@
 package verifier
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 
+	"github.com/multiformats/go-varint"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
+	ed25519verifier "github.com/storacha/go-ucanto/principal/ed25519/verifier"
+	rsaverifier "github.com/storacha/go-ucanto/principal/rsa/verifier"
 	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 )
 
@@ -56,4 +60,22 @@ func Wrap(key principal.Verifier, id did.DID) (WrappedVerifier, error) {
 		return nil, fmt.Errorf("verifier is not a did:key")
 	}
 	return wrapvf{id, key}, nil
+}
+
+// decodes a multiformat encoded verifier back to the appropriate
+// implementation (Ed25519 or RSA) based on the codec prefix.
+func Decode(encoded []byte) (principal.Verifier, error) {
+	code, err := varint.ReadUvarint(bytes.NewReader(encoded))
+	if err != nil {
+		return nil, fmt.Errorf("reading verifier codec: %w", err)
+	}
+
+	switch code {
+	case ed25519verifier.Code:
+		return ed25519verifier.Decode(encoded)
+	case rsaverifier.Code:
+		return rsaverifier.Decode(encoded)
+	default:
+		return nil, fmt.Errorf("unsupported verifier codec: 0x%x", code)
+	}
 }
