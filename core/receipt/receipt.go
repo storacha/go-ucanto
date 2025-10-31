@@ -42,6 +42,7 @@ type Receipt[O, X any] interface {
 	Issuer() ucan.Principal
 	Proofs() delegation.Proofs
 	Signature() signature.SignatureView
+	VerifySignature(verifier signature.Verifier) (bool, error)
 	Archive() io.Reader
 	Export() iter.Seq2[block.Block, error]
 	Clone() (Receipt[O, X], error)
@@ -177,6 +178,51 @@ func (r *receipt[O, X]) Root() block.Block {
 
 func (r *receipt[O, X]) Signature() signature.SignatureView {
 	return signature.NewSignatureView(signature.Decode(r.data.Sig))
+}
+
+func (r *receipt[O, X]) VerifySignature(verifier signature.Verifier) (bool, error) {
+	res := r.Out()
+	nodeResult, err := result.MapResultR1(
+		res,
+		func(b O) (ipld.Node, error) {
+			switch b := any(b).(type) {
+			case ipld.Node:
+				return b, nil
+			case ipld.Builder:
+				return b.ToIPLD()
+			default:
+				return nil, fmt.Errorf("expected IPLD node or builder, got %T", b)
+			}
+		}, func(b X) (ipld.Node, error) {
+			switch b := any(b).(type) {
+			case ipld.Node:
+				return b, nil
+			case ipld.Builder:
+				return b.ToIPLD()
+			default:
+				return nil, fmt.Errorf("expected IPLD node or builder, got %T", b)
+			}
+		},
+	)
+	if err != nil {
+		return false, err
+	}
+
+	resultModel := toResultModel(nodeResult)
+	outcomeModel := rdm.OutcomeModel[ipld.Node, ipld.Node]{
+		Ran:  r.data.Ocm.Ran,
+		Out:  resultModel,
+		Fx:   r.data.Ocm.Fx,
+		Meta: r.data.Ocm.Meta,
+		Iss:  r.data.Ocm.Iss,
+		Prf:  r.data.Ocm.Prf,
+	}
+	outcomeBytes, err := cbor.Encode(&outcomeModel, rdm.TypeSystem().TypeByName("Outcome"))
+	if err != nil {
+		return false, err
+	}
+
+	return r.Signature().Verify(outcomeBytes, verifier), nil
 }
 
 func (r *receipt[O, X]) Archive() io.Reader {

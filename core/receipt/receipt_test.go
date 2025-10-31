@@ -20,6 +20,7 @@ import (
 	"github.com/storacha/go-ucanto/testing/fixtures"
 	"github.com/storacha/go-ucanto/testing/helpers"
 	"github.com/storacha/go-ucanto/ucan"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -168,6 +169,47 @@ func TestIssue(t *testing.T) {
 		ranInvLink := issuedRcpt.Ran().Link()
 		require.NotNil(t, ranInvLink)
 		require.Equal(t, inv.Link().String(), ranInvLink.String())
+	})
+}
+
+func TestVerifySignature(t *testing.T) {
+	// Setup test data
+	r := ran.FromLink(helpers.RandomCID())
+	out := result.Ok[someOkType, someErrorType](someOkType{SomeOkProperty: "foo"})
+
+	// Create a valid receipt
+	rcpt, err := Issue(fixtures.Alice, out, r)
+	require.NoError(t, err)
+
+	t.Run("verifies valid signature", func(t *testing.T) {
+		valid, err := rcpt.VerifySignature(fixtures.Alice.Verifier())
+		require.NoError(t, err)
+		require.True(t, valid)
+	})
+
+	t.Run("fails with wrong verifier", func(t *testing.T) {
+		valid, err := rcpt.VerifySignature(fixtures.Bob.Verifier())
+		require.NoError(t, err)
+		require.False(t, valid)
+	})
+
+	t.Run("fails with tampered receipt", func(t *testing.T) {
+		// Create a new receipt with the same data but different signature
+		someRcpt, err := Rebind[someOkType, someErrorType](rcpt, someTS.TypeByName("someOkType"), someTS.TypeByName("someErrorType"))
+		require.NoError(t, err)
+
+		tamperedRcpt, ok := someRcpt.(*receipt[someOkType, someErrorType])
+		require.True(t, ok)
+
+		// Tamper with the receipt data
+		// SomeOkProperty was "foo" in the original receipt
+		assert.Equal(t, tamperedRcpt.data.Ocm.Out.Ok, &someOkType{SomeOkProperty: "foo"})
+		tamperedRcpt.data.Ocm.Out.Ok = &someOkType{SomeOkProperty: "bar"}
+
+		// Should fail with original verifier
+		valid, err := tamperedRcpt.VerifySignature(fixtures.Alice.Verifier())
+		require.NoError(t, err)
+		require.False(t, valid)
 	})
 }
 
