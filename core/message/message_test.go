@@ -21,6 +21,9 @@ func TestMessageReceipts(t *testing.T) {
 
 		rcpts := msg.Receipts()
 		require.Len(t, rcpts, 0)
+
+		_, ok := msg.Get(helpers.RandomCID())
+		require.False(t, ok)
 	})
 
 	t.Run("one receipt", func(t *testing.T) {
