@@ -181,29 +181,7 @@ func (r *receipt[O, X]) Signature() signature.SignatureView {
 }
 
 func (r *receipt[O, X]) VerifySignature(verifier signature.Verifier) (bool, error) {
-	res := r.Out()
-	nodeResult, err := result.MapResultR1(
-		res,
-		func(b O) (ipld.Node, error) {
-			switch b := any(b).(type) {
-			case ipld.Node:
-				return b, nil
-			case ipld.Builder:
-				return b.ToIPLD()
-			default:
-				return nil, fmt.Errorf("expected IPLD node or builder, got %T", b)
-			}
-		}, func(b X) (ipld.Node, error) {
-			switch b := any(b).(type) {
-			case ipld.Node:
-				return b, nil
-			case ipld.Builder:
-				return b.ToIPLD()
-			default:
-				return nil, fmt.Errorf("expected IPLD node or builder, got %T", b)
-			}
-		},
-	)
+	nodeResult, err := result.MapResultR1(r.Out(), toIPLDNode, toIPLDNode)
 	if err != nil {
 		return false, err
 	}
@@ -223,6 +201,17 @@ func (r *receipt[O, X]) VerifySignature(verifier signature.Verifier) (bool, erro
 	}
 
 	return r.Signature().Verify(outcomeBytes, verifier), nil
+}
+
+func toIPLDNode[T any](b T) (ipld.Node, error) {
+	switch b := any(b).(type) {
+	case ipld.Node:
+		return b, nil
+	case ipld.Builder:
+		return b.ToIPLD()
+	default:
+		return nil, fmt.Errorf("expected IPLD node or builder, got %T", b)
+	}
 }
 
 func (r *receipt[O, X]) Archive() io.Reader {
