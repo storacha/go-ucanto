@@ -101,6 +101,9 @@ func (m *message) Receipt(root ipld.Link) (receipt.AnyReceipt, bool, error) {
 }
 
 func (m *message) Get(link ipld.Link) (ipld.Link, bool) {
+	if m.data.Report == nil {
+		return nil, false
+	}
 	var rcpt ipld.Link
 	found := false
 	for _, k := range m.data.Report.Keys {
