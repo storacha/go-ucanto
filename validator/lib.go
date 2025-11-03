@@ -33,6 +33,17 @@ func FailDIDKeyResolution(ctx context.Context, d did.DID) (did.DID, UnresolvedDI
 	return did.Undef, NewDIDKeyResolutionError(d, fmt.Errorf("no DID resolver configured"))
 }
 
+func NotExpiredNotTooEarly(dlg delegation.Delegation) InvalidProof {
+	if ucan.IsExpired(dlg) {
+		return NewExpiredError(dlg)
+	}
+	if ucan.IsTooEarly(dlg) {
+		return NewNotValidBeforeError(dlg)
+	}
+
+	return nil
+}
+
 // PrincipalParser provides verifier instances that can validate UCANs issued
 // by a given principal.
 type PrincipalParser interface {
@@ -108,6 +119,12 @@ type Validator interface {
 	Authority() principal.Verifier
 }
 
+type TimeBoundsValidator interface {
+	ValidateTimeBounds(dlg delegation.Delegation) InvalidProof
+}
+
+type TimeBoundsValidatorFunc func(dlg delegation.Delegation) InvalidProof
+
 type ClaimContext interface {
 	Validator
 	RevocationChecker[any]
@@ -116,6 +133,7 @@ type ClaimContext interface {
 	PrincipalParser
 	PrincipalResolver
 	AuthorityProver
+	TimeBoundsValidator
 }
 
 type claimContext struct {
@@ -125,6 +143,7 @@ type claimContext struct {
 	resolveProof          ProofResolverFunc
 	parsePrincipal        PrincipalParserFunc
 	resolveDIDKey         PrincipalResolverFunc
+	validateTimeBounds    TimeBoundsValidatorFunc
 	authorityProofs       []delegation.Delegation
 }
 
@@ -135,6 +154,7 @@ func NewClaimContext(
 	resolveProof ProofResolverFunc,
 	parsePrincipal PrincipalParserFunc,
 	resolveDIDKey PrincipalResolverFunc,
+	validateTimeBounds TimeBoundsValidatorFunc,
 	authorityProofs ...delegation.Delegation,
 ) ClaimContext {
 	return claimContext{
@@ -144,6 +164,7 @@ func NewClaimContext(
 		resolveProof,
 		parsePrincipal,
 		resolveDIDKey,
+		validateTimeBounds,
 		authorityProofs,
 	}
 }
@@ -172,6 +193,10 @@ func (cc claimContext) ResolveDIDKey(ctx context.Context, did did.DID) (did.DID,
 	return cc.resolveDIDKey(ctx, did)
 }
 
+func (cc claimContext) ValidateTimeBounds(dlg delegation.Delegation) InvalidProof {
+	return cc.validateTimeBounds(dlg)
+}
+
 func (cc claimContext) AuthorityProofs() []delegation.Delegation {
 	return cc.authorityProofs
 }
@@ -194,6 +219,7 @@ func NewValidationContext[Caveats any](
 	resolveProof ProofResolverFunc,
 	parsePrincipal PrincipalParserFunc,
 	resolveDIDKey PrincipalResolverFunc,
+	validateTimeBounds TimeBoundsValidatorFunc,
 	authorityProofs ...delegation.Delegation,
 ) ValidationContext[Caveats] {
 	return validationContext[Caveats]{
@@ -204,6 +230,7 @@ func NewValidationContext[Caveats any](
 			resolveProof,
 			parsePrincipal,
 			resolveDIDKey,
+			validateTimeBounds,
 			authorityProofs,
 		},
 		capability,
@@ -310,12 +337,10 @@ func ResolveProofs(ctx context.Context, proofs []delegation.Proof, resolver Proo
 // Validate a delegation to check it is within the time bound and that it is
 // authorized by the issuer.
 func Validate(ctx context.Context, dlg delegation.Delegation, prfs []delegation.Delegation, cctx ClaimContext) (delegation.Delegation, InvalidProof) {
-	if ucan.IsExpired(dlg) {
-		return nil, NewExpiredError(dlg)
+	if invalid := cctx.ValidateTimeBounds(dlg); invalid != nil {
+		return nil, invalid
 	}
-	if ucan.IsTooEarly(dlg) {
-		return nil, NewNotValidBeforeError(dlg)
-	}
+
 	return VerifyAuthorization(ctx, dlg, prfs, cctx)
 }
 

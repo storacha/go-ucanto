@@ -136,6 +136,7 @@ func TestSession(t *testing.T) {
 			ProofUnavailable,
 			parseEdPrincipal,
 			FailDIDKeyResolution,
+			NotExpiredNotTooEarly,
 		)
 
 		a, x := Access(t.Context(), inv, vctx)
@@ -206,6 +207,7 @@ func TestSession(t *testing.T) {
 
 				return FailDIDKeyResolution(ctx, d)
 			},
+			NotExpiredNotTooEarly,
 			auth,
 		)
 
@@ -295,6 +297,7 @@ func TestSession(t *testing.T) {
 			ProofUnavailable,
 			parseEdPrincipal,
 			FailDIDKeyResolution,
+			NotExpiredNotTooEarly,
 		)
 
 		a, x := Access(t.Context(), inv, vctx)
@@ -325,6 +328,7 @@ func TestSession(t *testing.T) {
 			ProofUnavailable,
 			parseEdPrincipal,
 			FailDIDKeyResolution,
+			NotExpiredNotTooEarly,
 		)
 
 		a, x := Access(t.Context(), inv, vctx)
@@ -370,6 +374,7 @@ func TestSession(t *testing.T) {
 			ProofUnavailable,
 			parseEdPrincipal,
 			FailDIDKeyResolution,
+			NotExpiredNotTooEarly,
 		)
 
 		a, x := Access(t.Context(), inv, vctx)
@@ -438,6 +443,7 @@ func TestSession(t *testing.T) {
 			ProofUnavailable,
 			parseEdPrincipal,
 			FailDIDKeyResolution,
+			NotExpiredNotTooEarly,
 		)
 
 		a, x := Access(t.Context(), inv, vctx)
@@ -500,6 +506,7 @@ func TestSession(t *testing.T) {
 
 				return FailDIDKeyResolution(ctx, d)
 			},
+			NotExpiredNotTooEarly,
 		)
 
 		a, x := Access(t.Context(), inv, vctx)
@@ -533,6 +540,7 @@ func TestSession(t *testing.T) {
 			func(ctx context.Context, d did.DID) (did.DID, UnresolvedDID) {
 				return fixtures.Alice.DID(), nil
 			},
+			NotExpiredNotTooEarly,
 		)
 
 		a, x := Access(t.Context(), inv, vctx)
@@ -586,6 +594,7 @@ func TestSession(t *testing.T) {
 			ProofUnavailable,
 			parseEdPrincipal,
 			FailDIDKeyResolution,
+			NotExpiredNotTooEarly,
 		)
 
 		a, x := Access(t.Context(), inv, vctx)
@@ -638,6 +647,7 @@ func TestSession(t *testing.T) {
 			ProofUnavailable,
 			parseEdPrincipal,
 			FailDIDKeyResolution,
+			NotExpiredNotTooEarly,
 		)
 
 		a, x := Access(t.Context(), inv, vctx)
@@ -676,6 +686,7 @@ func TestSession(t *testing.T) {
 			ProofUnavailable,
 			parseEdPrincipal,
 			FailDIDKeyResolution,
+			NotExpiredNotTooEarly,
 		)
 
 		a, x := Access(t.Context(), inv, vctx)
@@ -739,6 +750,7 @@ func TestSession(t *testing.T) {
 			ProofUnavailable,
 			parseEdPrincipal,
 			FailDIDKeyResolution,
+			NotExpiredNotTooEarly,
 		)
 
 		a, x := Access(t.Context(), inv, vctx)

@@ -25,6 +25,7 @@ type srvConfig struct {
 	resolveProof          validator.ProofResolverFunc
 	parsePrincipal        validator.PrincipalParserFunc
 	resolveDIDKey         validator.PrincipalResolverFunc
+	validateTimeBounds    validator.TimeBoundsValidatorFunc
 	authorityProofs       []delegation.Delegation
 	altAudiences          []ucan.Principal
 	catch                 ErrorHandlerFunc
@@ -119,6 +120,14 @@ func WithPrincipalParser(fn validator.PrincipalParserFunc) Option {
 func WithPrincipalResolver(fn validator.PrincipalResolverFunc) Option {
 	return func(cfg *srvConfig) error {
 		cfg.resolveDIDKey = fn
+		return nil
+	}
+}
+
+// WithTimeBoundsValidator configures a function that validates the time bounds of a delegation.
+func WithTimeBoundsValidator(fn validator.TimeBoundsValidatorFunc) Option {
+	return func(cfg *srvConfig) error {
+		cfg.validateTimeBounds = fn
 		return nil
 	}
 }
