@@ -105,6 +105,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -141,6 +142,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -186,6 +188,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -237,6 +240,7 @@ func TestAccess(t *testing.T) {
 				},
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -250,6 +254,40 @@ func TestAccess(t *testing.T) {
 			require.Equal(t, fixtures.Alice.DID().String(), a.Proofs()[0].Capability().With())
 			require.Equal(t, fixtures.Alice.DID(), a.Proofs()[0].Issuer().DID())
 			require.Equal(t, fixtures.Bob.DID(), a.Proofs()[0].Audience().DID())
+		})
+
+		t.Run("expiration and not valid before can be ignored", func(t *testing.T) {
+			exp := ucan.Now() - 5
+			nbf := ucan.Now() + 500
+			inv, err := storeAdd.Invoke(
+				fixtures.Alice,
+				fixtures.Service,
+				fixtures.Alice.DID().String(),
+				storeAddCaveats{Link: testLink},
+				delegation.WithExpiration(exp),
+				delegation.WithNotBefore(nbf),
+			)
+			require.NoError(t, err)
+
+			vctx := NewValidationContext(
+				fixtures.Service.Verifier(),
+				storeAdd,
+				IsSelfIssued,
+				validateAuthOk,
+				ProofUnavailable,
+				parseEdPrincipal,
+				FailDIDKeyResolution,
+				func(dlg delegation.Delegation) InvalidProof {
+					return nil
+				},
+			)
+
+			a, x := Access(t.Context(), inv, vctx)
+			require.NoError(t, x)
+			require.Equal(t, storeAdd.Can(), a.Capability().Can())
+			require.Equal(t, fixtures.Alice.DID().String(), a.Capability().With())
+			require.Equal(t, fixtures.Alice.DID(), a.Issuer().DID())
+			require.Equal(t, fixtures.Service.DID(), a.Audience().DID())
 		})
 	})
 
@@ -273,6 +311,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -305,6 +344,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -337,6 +377,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -370,6 +411,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -404,6 +446,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -447,6 +490,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -491,6 +535,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -554,6 +599,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -597,6 +643,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -641,6 +688,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -684,6 +732,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -727,6 +776,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -770,6 +820,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			a, x := Access(t.Context(), inv, vctx)
@@ -822,6 +873,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			cstr := fmt.Sprintf(`{"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}}`, storeAdd.Can(), fixtures.Service.DID(), testLink)
@@ -869,6 +921,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			cstr := fmt.Sprintf(`{"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}}`, storeAdd.Can(), fixtures.Alice.DID(), testLink)
@@ -915,6 +968,7 @@ func TestAccess(t *testing.T) {
 				ProofUnavailable,
 				parseEdPrincipal,
 				FailDIDKeyResolution,
+				NotExpiredNotTooEarly,
 			)
 
 			cstr := fmt.Sprintf(`{"can":"%s","with":"%s","nb":{"Link":{"/":"%s"},"Origin":null}}`, storeAdd.Can(), space.DID(), testLink)
@@ -952,6 +1006,7 @@ func TestClaim(t *testing.T) {
 			ProofUnavailable,
 			parseEdPrincipal,
 			FailDIDKeyResolution,
+			NotExpiredNotTooEarly,
 		)
 
 		a, x := Claim(t.Context(), storeAdd, []delegation.Proof{delegation.FromLink(dlg.Link())}, vctx)
@@ -992,6 +1047,7 @@ func TestClaim(t *testing.T) {
 			ProofUnavailable,
 			parseEdPrincipal,
 			FailDIDKeyResolution,
+			NotExpiredNotTooEarly,
 		)
 
 		a, x := Claim(t.Context(), storeAdd, []delegation.Proof{delegation.FromDelegation(dlg)}, vctx)

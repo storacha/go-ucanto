@@ -37,6 +37,7 @@ type InvocationContext interface {
 	validator.ProofResolver
 	validator.PrincipalParser
 	validator.PrincipalResolver
+	validator.TimeBoundsValidator
 	validator.AuthorityProver
 	// ID is the DID of the service the invocation was sent to.
 	ID() principal.Signer
@@ -137,7 +138,12 @@ func NewServer(id principal.Signer, options ...Option) (ServerView[Service], err
 		resolveDIDKey = validator.FailDIDKeyResolution
 	}
 
-	ctx := serverContext{id, canIssue, validateAuthorization, resolveProof, parsePrincipal, resolveDIDKey, cfg.authorityProofs, cfg.altAudiences}
+	validateTimeBounds := cfg.validateTimeBounds
+	if validateTimeBounds == nil {
+		validateTimeBounds = validator.NotExpiredNotTooEarly
+	}
+
+	ctx := serverContext{id, canIssue, validateAuthorization, resolveProof, parsePrincipal, resolveDIDKey, validateTimeBounds, cfg.authorityProofs, cfg.altAudiences}
 	svr := &server{id, cfg.service, ctx, codec, catch, cfg.logReceipt}
 	return svr, nil
 }
@@ -154,6 +160,7 @@ type serverContext struct {
 	resolveProof          validator.ProofResolverFunc
 	parsePrincipal        validator.PrincipalParserFunc
 	resolveDIDKey         validator.PrincipalResolverFunc
+	validateTimeBounds    validator.TimeBoundsValidatorFunc
 	authorityProofs       []delegation.Delegation
 	altAudiences          []ucan.Principal
 }
@@ -180,6 +187,10 @@ func (sctx serverContext) ParsePrincipal(str string) (principal.Verifier, error)
 
 func (sctx serverContext) ResolveDIDKey(ctx context.Context, did did.DID) (did.DID, validator.UnresolvedDID) {
 	return sctx.resolveDIDKey(ctx, did)
+}
+
+func (sctx serverContext) ValidateTimeBounds(dlg delegation.Delegation) validator.InvalidProof {
+	return sctx.validateTimeBounds(dlg)
 }
 
 func (sctx serverContext) AuthorityProofs() []delegation.Delegation {

@@ -37,6 +37,7 @@ func Provide[C any, O ipld.Builder, X failure.IPLDBuilderFailure](
 			ictx.ResolveProof,
 			ictx.ParsePrincipal,
 			ictx.ResolveDIDKey,
+			ictx.ValidateTimeBounds,
 			ictx.AuthorityProofs()...,
 		)
 
