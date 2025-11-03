@@ -210,6 +210,8 @@ func VerifySignature(ucan View, verifier Verifier) (bool, error) {
 		Prf: prfstrs,
 		Exp: ucan.Expiration(),
 		Fct: ucan.Model().Fct,
+		Nnc: ucan.Model().Nnc,
+		Nbf: ucan.Model().Nbf,
 	}
 
 	msg, err := encodeSignaturePayload(payload, ucan.Version(), alg)
