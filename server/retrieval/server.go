@@ -136,6 +136,9 @@ func NewServer(id principal.Signer, options ...Option) (*Server, error) {
 	if cfg.resolveDIDKey != nil {
 		srvOpts = append(srvOpts, server.WithPrincipalResolver(cfg.resolveDIDKey))
 	}
+	if len(cfg.authorityProofs) > 0 {
+		srvOpts = append(srvOpts, server.WithAuthorityProofs(cfg.authorityProofs...))
+	}
 
 	srv, err := server.NewServer(id, srvOpts...)
 	if err != nil {
