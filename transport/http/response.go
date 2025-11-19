@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -30,6 +31,7 @@ var _ transport.HTTPRequest = (*Request)(nil)
 var _ transport.InboundHTTPRequest = (*Request)(nil)
 
 type Response struct {
+	ctx    context.Context
 	status int
 	hdrs   http.Header
 	body   io.ReadCloser
@@ -47,10 +49,24 @@ func (res *Response) Body() io.ReadCloser {
 	return res.body
 }
 
+func (res *Response) Context() context.Context {
+	if res.ctx == nil {
+		return context.Background()
+	}
+	return res.ctx
+}
+
 var _ transport.HTTPResponse = (*Response)(nil)
 
 func NewResponse(status int, body io.ReadCloser, headers http.Header) *Response {
-	return &Response{status, headers, body}
+	return NewResponseWithContext(context.Background(), status, body, headers)
+}
+
+func NewResponseWithContext(ctx context.Context, status int, body io.ReadCloser, headers http.Header) *Response {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return &Response{ctx: ctx, status: status, hdrs: headers, body: body}
 }
 
 // NewRequest creates a [transport.HTTPRequest]
