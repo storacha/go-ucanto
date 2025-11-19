@@ -8,6 +8,9 @@ import (
 
 	"slices"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+
 	"github.com/storacha/go-ucanto/transport"
 )
 
@@ -67,6 +70,8 @@ func (c *Channel) Request(ctx context.Context, req transport.HTTPRequest) (trans
 	}
 
 	addAllHeaders(hr.Header, req.Headers(), c.headers)
+	injectTraceContext(ctx, hr)
+
 	res, err := c.client.Do(hr)
 	if err != nil {
 		return nil, fmt.Errorf("doing HTTP request: %w", err)
@@ -75,7 +80,8 @@ func (c *Channel) Request(ctx context.Context, req transport.HTTPRequest) (trans
 		return nil, NewHTTPError(fmt.Sprintf("HTTP Request failed. %s %s → %d", hr.Method, c.url.String(), res.StatusCode), res.StatusCode, res.Header)
 	}
 
-	return NewResponse(res.StatusCode, res.Body, res.Header), nil
+	ctx = extractTraceContext(ctx, res.Header)
+	return NewResponseWithContext(ctx, res.StatusCode, res.Body, res.Header), nil
 }
 
 func addAllHeaders(dst http.Header, srcs ...http.Header) {
@@ -86,6 +92,20 @@ func addAllHeaders(dst http.Header, srcs ...http.Header) {
 			}
 		}
 	}
+}
+
+func injectTraceContext(ctx context.Context, req *http.Request) {
+	if ctx == nil || req == nil {
+		return
+	}
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+}
+
+func extractTraceContext(ctx context.Context, headers http.Header) context.Context {
+	if ctx == nil || headers == nil {
+		return ctx
+	}
+	return otel.GetTextMapPropagator().Extract(ctx, propagation.HeaderCarrier(headers))
 }
 
 var _ transport.Channel = (*Channel)(nil)
