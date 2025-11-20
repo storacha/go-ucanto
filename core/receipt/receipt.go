@@ -248,11 +248,9 @@ func (r *receipt[O, X]) Export() iter.Seq2[block.Block, error] {
 	}
 
 	for _, f := range r.Fx().Fork() {
-		inv, ok := f.Invocation()
-		if !ok {
-			continue
+		if inv, ok := f.Invocation(); ok {
+			iterators = append(iterators, inv.Export())
 		}
-		iterators = append(iterators, inv.Export())
 	}
 
 	if inv, ok := r.Fx().Join().Invocation(); ok {
