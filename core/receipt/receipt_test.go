@@ -312,7 +312,7 @@ func TestExport(t *testing.T) {
 		fixtures.Alice,
 		result.Ok[someOkType, someErrorType](ok),
 		ran,
-		WithFork(forkFx),
+		WithFork(forkFx, fx.FromLink(helpers.RandomCID())),
 		WithJoin(joinFx),
 		WithProofs(delegation.Proofs{
 			delegation.FromDelegation(prf),
