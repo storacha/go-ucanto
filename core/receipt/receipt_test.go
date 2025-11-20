@@ -286,12 +286,34 @@ func TestExport(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	forkFx := fx.FromInvocation(
+		helpers.Must(
+			invocation.Invoke(
+				fixtures.Alice,
+				fixtures.Bob,
+				ucan.NewCapability("test/fx/fork", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+			),
+		),
+	)
+
+	joinFx := fx.FromInvocation(
+		helpers.Must(
+			invocation.Invoke(
+				fixtures.Alice,
+				fixtures.Bob,
+				ucan.NewCapability("test/fx/join", fixtures.Alice.DID().String(), ucan.NoCaveats{}),
+			),
+		),
+	)
+
 	ran := ran.FromInvocation(inv)
 	ok := someOkType{SomeOkProperty: "some ok value"}
 	rcpt, err := Issue(
 		fixtures.Alice,
 		result.Ok[someOkType, someErrorType](ok),
 		ran,
+		WithFork(forkFx),
+		WithJoin(joinFx),
 		WithProofs(delegation.Proofs{
 			delegation.FromDelegation(prf),
 			// include an absent proof to prove things don't break - PUN INTENDED
@@ -309,7 +331,7 @@ func TestExport(t *testing.T) {
 		require.NoError(t, bs.Put(b))
 		blks = append(blks, b)
 	}
-	require.Len(t, blks, 3)
+	require.Len(t, blks, 5)
 	require.True(t, slices.ContainsFunc(blks, func(b ipld.Block) bool {
 		return b.Link().String() == prf.Link().String()
 	}))

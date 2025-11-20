@@ -247,6 +247,18 @@ func (r *receipt[O, X]) Export() iter.Seq2[block.Block, error] {
 		iterators = append(iterators, inv.Export())
 	}
 
+	for _, f := range r.Fx().Fork() {
+		inv, ok := f.Invocation()
+		if !ok {
+			continue
+		}
+		iterators = append(iterators, inv.Export())
+	}
+
+	if inv, ok := r.Fx().Join().Invocation(); ok {
+		iterators = append(iterators, inv.Export())
+	}
+
 	for _, prf := range r.Proofs() {
 		if delegation, ok := prf.Delegation(); ok {
 			iterators = append(iterators, delegation.Export())
@@ -458,12 +470,6 @@ func Issue[O, X ipld.Builder](issuer ucan.Signer, out result.Result[O, X], ran r
 		return nil, err
 	}
 
-	// copy proof blocks into store
-	prooflinks, err := cfg.prf.WriteInto(bs)
-	if err != nil {
-		return nil, err
-	}
-
 	var forks []ipld.Link
 	for _, effect := range cfg.forks {
 		if inv, ok := effect.Invocation(); ok {
@@ -483,6 +489,12 @@ func Issue[O, X ipld.Builder](issuer ucan.Signer, out result.Result[O, X], ran r
 	effectsModel := rdm.EffectsModel{
 		Fork: forks,
 		Join: join,
+	}
+
+	// copy proof blocks into store
+	prooflinks, err := cfg.prf.WriteInto(bs)
+	if err != nil {
+		return nil, err
 	}
 
 	metaModel := rdm.MetaModel{}
