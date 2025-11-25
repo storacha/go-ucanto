@@ -170,7 +170,7 @@ func Execute(ctx context.Context, inv invocation.Invocation, conn client.Connect
 
 	output, err := conn.Codec().Decode(response)
 	if err != nil {
-		return nil, nil, fmt.Errorf("decoding message: %w", err)
+		return nil, response, fmt.Errorf("decoding message: %w", err)
 	}
 
 	return client.ExecutionResponse(output), response, nil
