@@ -21,7 +21,10 @@ const (
 	MaxHeaderSizeBytes = 4 * 1024
 )
 
-var ErrHeaderTooLarge = errors.New("maximum agent message header size exceeded")
+var (
+	ErrHeaderTooLarge = errors.New("maximum agent message header size exceeded")
+	ErrMissingHeader  = fmt.Errorf("missing %s header", HeaderName)
+)
 
 type encodeConfig struct {
 	maxSize int

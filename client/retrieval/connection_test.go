@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
+	"strings"
 	"testing"
 
 	prime "github.com/ipld/go-ipld-prime"
@@ -305,4 +307,57 @@ func TestExecute(t *testing.T) {
 			require.Equal(t, data[100:200+1], body)
 		})
 	}
+}
+
+func TestExecuteWithPublicRetrieval(t *testing.T) {
+	data := helpers.RandomBytes(512)
+	digest, err := multihash.Sum(data, multihash.SHA2_256, -1)
+	require.NoError(t, err)
+
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rangeStr := r.Header.Get("Range")
+		byteRange := strings.Split(strings.TrimPrefix(rangeStr, "bytes="), "-")
+		start, err := strconv.Atoi(byteRange[0])
+		require.NoError(t, err)
+		end, err := strconv.Atoi(byteRange[1])
+		require.NoError(t, err)
+		w.Write(data[start : end+1])
+	}))
+	defer httpServer.Close()
+
+	// specify the byte range we want to receive (inclusive)
+	contentRange := []int{100, 200}
+
+	url, err := url.Parse(httpServer.URL)
+	require.NoError(t, err)
+
+	headers := http.Header{}
+	headers.Set("Range", fmt.Sprintf("bytes=%d-%d", contentRange[0], contentRange[1]))
+
+	conn, err := NewConnection(
+		fixtures.Service,
+		url.JoinPath("blob", "z"+digest.B58String()),
+		WithHeaders(headers),
+	)
+	require.NoError(t, err)
+
+	dlg := mkDelegationChain(t, fixtures.Service, fixtures.Alice, serve.Can(), 1)
+	inv, err := serve.Invoke(
+		fixtures.Alice,
+		fixtures.Service,
+		fixtures.Service.DID().String(),
+		serveCaveats{Digest: digest, Range: contentRange},
+		delegation.WithProof(delegation.FromDelegation(dlg)),
+	)
+	require.NoError(t, err)
+
+	// allow public retrieval
+	xRes, hRes, err := Execute(t.Context(), inv, conn, WithPublicRetrieval())
+	require.NoError(t, err)
+	require.Nil(t, xRes)
+	require.NotNil(t, hRes)
+
+	body, err := io.ReadAll(hRes.Body())
+	require.NoError(t, err)
+	require.Equal(t, data[contentRange[0]:contentRange[1]+1], body)
 }
