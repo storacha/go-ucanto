@@ -102,6 +102,32 @@ func (c *Connection) Hasher() hash.Hash {
 	return c.hasher()
 }
 
+// ExecutionOption is an option configuring a retrieval execution.
+type ExecutionOption func(cfg *execConfig)
+
+type execConfig struct {
+	allowPublicRetrieval bool
+}
+
+// WithPublicRetrieval configures the client to allow retrievals from public
+// buckets.
+//
+// This means that responses that do not include an X-Agent-Message header will
+// be treated as valid rather than errors. It is up to the caller to inspect the
+// response data to determine if it is acceptable.
+//
+// When this option is set and the response does not contain an X-Agent-Message
+// header, the [client.ExecutionResponse] returned by the call to [Execute] will
+// be nil.
+//
+// Note: this does not prevent the client from sending authorized requests, it
+// only affects how responses are interpreted.
+func WithPublicRetrieval() ExecutionOption {
+	return func(cfg *execConfig) {
+		cfg.allowPublicRetrieval = true
+	}
+}
+
 // Execute performs a UCAN invocation using the headercar transport,
 // implementing a "probe and retry" pattern to handle HTTP header size
 // limitations when the invocation is too large to fit.
@@ -128,7 +154,12 @@ func (c *Connection) Hasher() hash.Hash {
 //
 // Returns the execution response, the final HTTP response, and any error
 // encountered.
-func Execute(ctx context.Context, inv invocation.Invocation, conn client.Connection) (client.ExecutionResponse, transport.HTTPResponse, error) {
+func Execute(ctx context.Context, inv invocation.Invocation, conn client.Connection, options ...ExecutionOption) (client.ExecutionResponse, transport.HTTPResponse, error) {
+	cfg := execConfig{}
+	for _, o := range options {
+		o(&cfg)
+	}
+
 	input, err := message.Build([]invocation.Invocation{inv}, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("building message: %w", err)
@@ -170,6 +201,9 @@ func Execute(ctx context.Context, inv invocation.Invocation, conn client.Connect
 
 	output, err := conn.Codec().Decode(response)
 	if err != nil {
+		if cfg.allowPublicRetrieval && errors.Is(err, hcmsg.ErrMissingHeader) {
+			return nil, response, nil
+		}
 		return nil, nil, fmt.Errorf("decoding message: %w", err)
 	}
 

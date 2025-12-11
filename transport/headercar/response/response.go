@@ -23,7 +23,7 @@ func Encode(msg message.AgentMessage) (transport.HTTPResponse, error) {
 func Decode(response transport.HTTPResponse) (message.AgentMessage, error) {
 	msgHdr := response.Headers().Get(hcmsg.HeaderName)
 	if msgHdr == "" {
-		return nil, fmt.Errorf("missing %s header in response", hcmsg.HeaderName)
+		return nil, hcmsg.ErrMissingHeader
 	}
 	return hcmsg.DecodeHeader(msgHdr)
 }
