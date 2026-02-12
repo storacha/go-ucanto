@@ -2,9 +2,11 @@ package http
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"go.opentelemetry.io/otel"
@@ -95,6 +97,83 @@ func mustSpanIDFromHex(t *testing.T, hex string) trace.SpanID {
 		t.Fatalf("parsing span ID: %v", err)
 	}
 	return spanID
+}
+
+func TestChannelErrorIncludesResponseBody(t *testing.T) {
+	const errorBody = `{"error":"InternalServerError","message":"something went wrong"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(errorBody))
+	}))
+	t.Cleanup(server.Close)
+
+	endpoint, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("parsing server URL: %v", err)
+	}
+
+	channel := NewChannel(endpoint, WithClient(server.Client()))
+
+	_, err = channel.Request(context.Background(), NewRequest(http.NoBody, nil))
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if !strings.Contains(err.Error(), errorBody) {
+		t.Fatalf("expected error to contain response body %q, got: %s", errorBody, err.Error())
+	}
+}
+
+func TestChannelErrorHandlesEmptyBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(server.Close)
+
+	endpoint, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("parsing server URL: %v", err)
+	}
+
+	channel := NewChannel(endpoint, WithClient(server.Client()))
+
+	_, err = channel.Request(context.Background(), NewRequest(http.NoBody, nil))
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	expected := fmt.Sprintf("HTTP Request failed. POST %s → 500", server.URL)
+	if err.Error() != expected {
+		t.Fatalf("expected %q, got %q", expected, err.Error())
+	}
+}
+
+func TestChannelErrorTruncatesLongBody(t *testing.T) {
+	longBody := strings.Repeat("x", 5000)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(longBody))
+	}))
+	t.Cleanup(server.Close)
+
+	endpoint, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("parsing server URL: %v", err)
+	}
+
+	channel := NewChannel(endpoint, WithClient(server.Client()))
+
+	_, err = channel.Request(context.Background(), NewRequest(http.NoBody, nil))
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "... (truncated)") {
+		t.Fatalf("expected error to contain truncation marker, got: %s", err.Error())
+	}
+	if strings.Contains(err.Error(), longBody) {
+		t.Fatal("expected error to NOT contain the full body")
+	}
 }
 
 func setTraceContextPropagator() func() {
