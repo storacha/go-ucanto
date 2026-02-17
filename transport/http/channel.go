@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 
@@ -77,7 +78,22 @@ func (c *Channel) Request(ctx context.Context, req transport.HTTPRequest) (trans
 		return nil, fmt.Errorf("doing HTTP request: %w", err)
 	}
 	if !slices.Contains(c.statuses, res.StatusCode) {
-		return nil, NewHTTPError(fmt.Sprintf("HTTP Request failed. %s %s → %d", hr.Method, c.url.String(), res.StatusCode), res.StatusCode, res.Header)
+		const maxBodyLen = 4096
+		b, readErr := io.ReadAll(io.LimitReader(res.Body, maxBodyLen+1))
+		res.Body.Close()
+
+		msg := fmt.Sprintf("HTTP Request failed. %s %s → %d", hr.Method, c.url.String(), res.StatusCode)
+		if readErr != nil {
+			msg += fmt.Sprintf(" (failed to read response body: %s)", readErr)
+		} else if len(b) > 0 {
+			body := string(b)
+			if len(body) > maxBodyLen {
+				body = body[:maxBodyLen] + "... (truncated)"
+			}
+			msg += ": " + body
+		}
+
+		return nil, NewHTTPError(msg, res.StatusCode, res.Header)
 	}
 
 	ctx = extractTraceContext(ctx, res.Header)
