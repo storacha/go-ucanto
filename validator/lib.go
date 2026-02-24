@@ -241,6 +241,51 @@ func (vc validationContext[Caveats]) Capability() CapabilityParser[Caveats] {
 	return vc.capability
 }
 
+// PruneProofs finds the minimal set of supporting proofs for dlg from the
+// proofs already embedded in dlg, and returns them without dlg itself.
+//
+// It is the client-side counterpart of [Access]: where Access validates an
+// invocation arriving at a server, PruneProofs selects the proof subset for a
+// delegation being built by a client to send over a size-constrained channel
+// (e.g. an HTTP header).
+//
+// dlg must be built with the full candidate proof pool — all proof blocks
+// present in its blockstore and all proof CIDs listed in its prf field.
+// PruneProofs walks the delegation chain using the same logic as [Claim] and
+// returns only the delegations actually needed to form a valid chain.
+//
+// The [ValidationContext] Authority must be the verifier of the service that
+// issued the ucan/attest delegations in the pool (e.g. the upload-service in
+// the storacha network). This is what allows non-did:key issuers (such as
+// did:mailto accounts) to be authorized through attestation, without requiring
+// the client to know the specific trust configuration of the server that will
+// ultimately receive the delegation.
+//
+// Because the proof set is discovered from a root delegation, usage requires
+// two steps:
+//
+//  1. Build a draft delegation with all candidate proofs attached.
+//  2. Call PruneProofs to discover the minimal subset.
+//  3. Build the final delegation with only the needed proofs.
+//
+// Note: the capability in vctx must match the capability in dlg, or
+// PruneProofs will return [Unauthorized]. If dlg contains multiple
+// capabilities, only the chain for the first matching one is discovered.
+func PruneProofs[Caveats any](ctx context.Context, dlg delegation.Delegation, vctx ValidationContext[Caveats]) ([]delegation.Proof, Unauthorized) {
+	all, err := SelectProofs(ctx, vctx.Capability(), []delegation.Proof{delegation.FromDelegation(dlg)}, vctx)
+	if err != nil {
+		return nil, err
+	}
+	dlgCID := dlg.Link().String()
+	var result []delegation.Proof
+	for _, d := range all {
+		if d.Link().String() != dlgCID {
+			result = append(result, delegation.FromDelegation(d))
+		}
+	}
+	return result, nil
+}
+
 // SelectProofs attempts to find a valid proof chain for the claimed capability
 // given the set of proofs, and returns the minimal set of [delegation.Delegation]s
 // needed to prove the claim. This includes any ucan/attest delegations found
