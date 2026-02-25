@@ -272,17 +272,33 @@ func (vc validationContext[Caveats]) Capability() CapabilityParser[Caveats] {
 // PruneProofs will return [Unauthorized]. If dlg contains multiple
 // capabilities, only the chain for the first matching one is discovered.
 func PruneProofs[Caveats any](ctx context.Context, dlg delegation.Delegation, vctx ValidationContext[Caveats]) ([]delegation.Proof, Unauthorized) {
-	all, err := SelectProofs(ctx, vctx.Capability(), []delegation.Proof{delegation.FromDelegation(dlg)}, vctx)
-	if err != nil {
-		return nil, err
+	all, unauth := SelectProofs(ctx, vctx.Capability(), []delegation.Proof{delegation.FromDelegation(dlg)}, vctx)
+	if unauth != nil {
+		return nil, unauth
 	}
 	dlgCID := dlg.Link().String()
 	var result []delegation.Proof
 	for _, d := range all {
-		if d.Link().String() != dlgCID {
-			result = append(result, delegation.FromDelegation(d))
+		if d.Link().String() == dlgCID {
+			continue
 		}
+
+		// Re-export the delegation into a fresh blockstore so it only carries
+		// the blocks from its own proof chain, not the full candidate pool that
+		// was inherited from the draft's blockstore.
+		bs, err := blockstore.NewBlockStore(blockstore.WithBlocksIterator(d.Export()))
+		if err != nil {
+			return nil, NewUnauthorizedError(vctx.Capability(), nil, nil, []InvalidProof{NewUnavailableProofError(d.Link(), err)}, nil)
+		}
+
+		exported, err := delegation.NewDelegation(d.Root(), bs)
+		if err != nil {
+			return nil, NewUnauthorizedError(vctx.Capability(), nil, nil, []InvalidProof{NewUnavailableProofError(d.Link(), err)}, nil)
+		}
+
+		result = append(result, delegation.FromDelegation(exported))
 	}
+
 	return result, nil
 }
 
