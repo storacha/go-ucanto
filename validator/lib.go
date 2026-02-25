@@ -563,9 +563,11 @@ func Authorize[Caveats any](ctx context.Context, match Match[Caveats], cctx Clai
 
 	var failedprf []InvalidClaim
 	for _, matched := range matches {
+		relevantAttestations := attestationsFor(matched.Source()[0].Delegation().Link(), attestations)
+
 		selector := matched.Prune(canissuer[Caveats]{canIssue: cctx.CanIssue})
 		if selector == nil {
-			return NewAuthorization(matched, nil, attestations), nil
+			return NewAuthorization(matched, nil, relevantAttestations), nil
 		}
 
 		auth, err := Authorize(ctx, selector, cctx)
@@ -574,10 +576,24 @@ func Authorize[Caveats any](ctx context.Context, match Match[Caveats], cctx Clai
 			continue
 		}
 
-		return NewAuthorization(matched, []Authorization[Caveats]{auth}, attestations), nil
+		return NewAuthorization(matched, []Authorization[Caveats]{auth}, relevantAttestations), nil
 	}
 
 	return nil, NewInvalidClaimError(match, dlgerrs, unknowns, invalidprf, failedprf)
+}
+
+// attestationsFor returns the attestations that attest to the given delegation
+// link, discarding any that belong to other delegations in the pool.
+func attestationsFor(link ucan.Link, attestations []Authorization[any]) []Authorization[any] {
+	var result []Authorization[any]
+	for _, attest := range attestations {
+		if model, ok := attest.Capability().Nb().(vdm.AttestationModel); ok {
+			if model.Proof.String() == link.String() {
+				result = append(result, attest)
+			}
+		}
+	}
+	return result
 }
 
 func ResolveMatch[Caveats any](ctx context.Context, match Match[Caveats], context ClaimContext) (sources []Source, attestations []Authorization[any], errors []ProofError) {
