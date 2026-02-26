@@ -241,18 +241,21 @@ func (vc validationContext[Caveats]) Capability() CapabilityParser[Caveats] {
 	return vc.capability
 }
 
-// PruneProofs finds the minimal set of supporting proofs for dlg from the
-// proofs already embedded in dlg, and returns them without dlg itself.
+// PruneProofs selects the minimal subset of proofs from dlg's embedded proof
+// pool that form a valid chain for dlg's issuer. The typical use case is
+// building a delegation from scratch: assemble a draft with all candidate
+// proofs, call PruneProofs to discover which are actually needed, then build
+// the final delegation with only those proofs. This is useful to build delegations
+// that are optimized for size, but can also be used to confirm the proof chain
+// is valid before sending it over to the server.
 //
-// It is the client-side counterpart of [Access]: where Access validates an
-// invocation arriving at a server, PruneProofs selects the proof subset for a
-// delegation being built by a client to send over a size-constrained channel
-// (e.g. an HTTP header).
-//
-// dlg must be built with the full candidate proof pool — all proof blocks
-// present in its blockstore and all proof CIDs listed in its prf field.
-// PruneProofs walks the delegation chain using the same logic as [Claim] and
-// returns only the delegations actually needed to form a valid chain.
+// dlg serves as both the subject being optimized and the principal context for
+// chain validation. [Claim] enforces principal alignment at each level of the
+// chain by checking that each proof's audience matches the issuer of the
+// delegation it proves. Passing a flat pool of proofs directly to [SelectProofs]
+// would break this: any self-issued or authority-issued delegation in the pool
+// would appear valid on its own, without establishing a chain back to dlg's
+// issuer.
 //
 // The [ValidationContext] Authority must be the verifier of the service that
 // issued the ucan/attest delegations in the pool (e.g. the upload-service in
@@ -260,13 +263,6 @@ func (vc validationContext[Caveats]) Capability() CapabilityParser[Caveats] {
 // did:mailto accounts) to be authorized through attestation, without requiring
 // the client to know the specific trust configuration of the server that will
 // ultimately receive the delegation.
-//
-// Because the proof set is discovered from a root delegation, usage requires
-// two steps:
-//
-//  1. Build a draft delegation with all candidate proofs attached.
-//  2. Call PruneProofs to discover the minimal subset.
-//  3. Build the final delegation with only the needed proofs.
 //
 // Note: the capability in vctx must match the capability in dlg, or
 // PruneProofs will return [Unauthorized]. If dlg contains multiple
@@ -323,9 +319,6 @@ func SelectProofs[C any](ctx context.Context, capability CapabilityParser[C], pr
 		}
 		for _, attest := range a.Attestations() {
 			walk(attest)
-		}
-		for _, prf := range a.Proofs() {
-			walk(prf)
 		}
 	}
 	walk(ConvertUnknownAuthorization(auth))
