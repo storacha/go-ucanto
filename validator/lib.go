@@ -317,6 +317,9 @@ func SelectProofs[C any](ctx context.Context, capability CapabilityParser[C], pr
 			seen[cid] = struct{}{}
 			result = append(result, a.Delegation())
 		}
+		for _, p := range a.Proofs() {
+			walk(p)
+		}
 		for _, attest := range a.Attestations() {
 			walk(attest)
 		}
