@@ -15,12 +15,13 @@ import (
 type Option func(cfg *delegationConfig) error
 
 type delegationConfig struct {
-	exp   *int
-	noexp bool
-	nbf   int
-	nnc   string
-	fct   []ucan.FactBuilder
-	prf   Proofs
+	exp       *int
+	noexp     bool
+	nbf       int
+	nnc       string
+	fct       []ucan.FactBuilder
+	prf       Proofs
+	optimizer ProofChainOptimizer
 }
 
 // WithExpiration configures the expiration time in UTC seconds since Unix
@@ -80,6 +81,27 @@ func WithProof(prf ...Proof) Option {
 	}
 }
 
+// ProofChainOptimizer selects the minimal subset of proofs that form a valid
+// chain from a delegation's full proof pool. It receives the base delegation
+// and returns only the proofs required to authorize it.
+//
+// Use [validator.NewProofChainOptimizer] to create one.
+type ProofChainOptimizer func(base Delegation) (Proofs, error)
+
+// WithOptimizedProofChain configures proof chain optimization. The optimizer
+// selects the minimal subset of proofs that form a valid chain. If it's not
+// possible to build a valid proof chain, an error will be returned.
+// Delegations with optimized proof chains don't include unnecessary proofs,
+// which makes them suitable for size-constrained channels, such as HTTP headers.
+//
+// Use [validator.NewProofChainOptimizer] to create an optimizer.
+func WithOptimizedProofChain(optimizer ProofChainOptimizer) Option {
+	return func(cfg *delegationConfig) error {
+		cfg.optimizer = optimizer
+		return nil
+	}
+}
+
 // Delegate creates a new signed token with a given `options.issuer`. If
 // expiration is not set it defaults to 30 seconds from now. Returns UCAN in
 // primary IPLD representation.
@@ -129,5 +151,36 @@ func Delegate[C ucan.CaveatBuilder](issuer ucan.Signer, audience ucan.Principal,
 		return nil, fmt.Errorf("adding delegation root to store: %w", err)
 	}
 
-	return NewDelegation(rt, bs)
+	del, err := NewDelegation(rt, bs)
+	if err != nil {
+		return nil, fmt.Errorf("creating delegation: %w", err)
+	}
+
+	if cfg.optimizer != nil {
+		prunedPfs, err := cfg.optimizer(del)
+		if err != nil {
+			return nil, fmt.Errorf("optimizing proof chain: %w", err)
+		}
+		// Rebuild with only the pruned proofs. cfg.optimizer is intentionally
+		// omitted to avoid recursion.
+		var rebuildOpts []Option
+		if cfg.noexp {
+			rebuildOpts = append(rebuildOpts, WithNoExpiration())
+		} else if cfg.exp != nil {
+			rebuildOpts = append(rebuildOpts, WithExpiration(*cfg.exp))
+		}
+		if cfg.nbf != 0 {
+			rebuildOpts = append(rebuildOpts, WithNotBefore(cfg.nbf))
+		}
+		if cfg.nnc != "" {
+			rebuildOpts = append(rebuildOpts, WithNonce(cfg.nnc))
+		}
+		if len(cfg.fct) > 0 {
+			rebuildOpts = append(rebuildOpts, WithFacts(cfg.fct))
+		}
+		rebuildOpts = append(rebuildOpts, WithProof(prunedPfs...))
+		return Delegate(issuer, audience, capabilities, rebuildOpts...)
+	}
+
+	return del, nil
 }
