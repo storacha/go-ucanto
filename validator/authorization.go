@@ -11,11 +11,15 @@ type Authorization[Caveats any] interface {
 	Delegation() delegation.Delegation
 	Issuer() ucan.Principal
 	Proofs() []Authorization[Caveats]
+	// Attestations returns ucan/attest delegations that were used to authorize
+	// non-did:key issuers (e.g. did:mailto accounts) in this authorization.
+	Attestations() []Authorization[any]
 }
 
 type authorization[Caveats any] struct {
-	match  Match[Caveats]
-	proofs []Authorization[Caveats]
+	match        Match[Caveats]
+	proofs       []Authorization[Caveats]
+	attestations []Authorization[any]
 }
 
 func (a authorization[Caveats]) Audience() ucan.Principal {
@@ -38,8 +42,12 @@ func (a authorization[Caveats]) Proofs() []Authorization[Caveats] {
 	return a.proofs
 }
 
-func NewAuthorization[Caveats any](match Match[Caveats], proofs []Authorization[Caveats]) Authorization[Caveats] {
-	return authorization[Caveats]{match, proofs}
+func (a authorization[Caveats]) Attestations() []Authorization[any] {
+	return a.attestations
+}
+
+func NewAuthorization[Caveats any](match Match[Caveats], proofs []Authorization[Caveats], attestations []Authorization[any]) Authorization[Caveats] {
+	return authorization[Caveats]{match, proofs, attestations}
 }
 
 type unknownauth[C any] struct {
@@ -69,6 +77,10 @@ func (a unknownauth[C]) Proofs() []Authorization[any] {
 		prf = append(prf, ConvertUnknownAuthorization(p))
 	}
 	return prf
+}
+
+func (a unknownauth[C]) Attestations() []Authorization[any] {
+	return a.auth.Attestations()
 }
 
 // ConvertUnknownAuthorization converts an Authorization[Caveats] to Authorization[any]

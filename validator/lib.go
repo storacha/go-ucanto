@@ -264,13 +264,17 @@ func Claim[Caveats any](ctx context.Context, capability CapabilityParser[Caveats
 		invalidprf = append(invalidprf, err)
 	}
 
+	var claimAttestations []Authorization[any]
 	for _, prf := range delegations {
 		// Validate each proof if valid add each capability to the list of sources
 		// or collect the error.
-		validation, err := Validate(ctx, prf, delegations, cctx)
+		validation, attest, err := Validate(ctx, prf, delegations, cctx)
 		if err != nil {
 			invalidprf = append(invalidprf, err)
 			continue
+		}
+		if attest != nil {
+			claimAttestations = append(claimAttestations, attest)
 		}
 
 		for _, c := range validation.Capabilities() {
@@ -285,7 +289,7 @@ func Claim[Caveats any](ctx context.Context, capability CapabilityParser[Caveats
 	for _, matched := range matches {
 		selector := matched.Prune(canissuer[Caveats]{canIssue: cctx.CanIssue})
 		if selector == nil {
-			auth := NewAuthorization(matched, nil)
+			auth := NewAuthorization(matched, nil, claimAttestations)
 			revoked := cctx.ValidateAuthorization(ctx, ConvertUnknownAuthorization(auth))
 			if revoked != nil {
 				invalidprf = append(invalidprf, revoked)
@@ -300,7 +304,7 @@ func Claim[Caveats any](ctx context.Context, capability CapabilityParser[Caveats
 			continue
 		}
 
-		auth := NewAuthorization(matched, []Authorization[Caveats]{a})
+		auth := NewAuthorization(matched, []Authorization[Caveats]{a}, claimAttestations)
 		revoked := cctx.ValidateAuthorization(ctx, ConvertUnknownAuthorization(auth))
 		if revoked != nil {
 			invalidprf = append(invalidprf, revoked)
@@ -335,10 +339,12 @@ func ResolveProofs(ctx context.Context, proofs []delegation.Proof, resolver Proo
 }
 
 // Validate a delegation to check it is within the time bound and that it is
-// authorized by the issuer.
-func Validate(ctx context.Context, dlg delegation.Delegation, prfs []delegation.Delegation, cctx ClaimContext) (delegation.Delegation, InvalidProof) {
+// authorized by the issuer. The second return value is a ucan/attest
+// Authorization if one was used to authorize a non-did:key issuer, or nil
+// otherwise.
+func Validate(ctx context.Context, dlg delegation.Delegation, prfs []delegation.Delegation, cctx ClaimContext) (delegation.Delegation, Authorization[any], InvalidProof) {
 	if invalid := cctx.ValidateTimeBounds(dlg); invalid != nil {
-		return nil, invalid
+		return nil, nil, invalid
 	}
 
 	return VerifyAuthorization(ctx, dlg, prfs, cctx)
@@ -350,51 +356,55 @@ func Validate(ctx context.Context, dlg delegation.Delegation, prfs []delegation.
 // issued by the principal identified by other DID method attempts to resolve a
 // valid `ucan/attest` attestation from the authority, if attestation is not
 // found falls back to resolving did:key for the issuer and verifying its
-// signature.
-func VerifyAuthorization(ctx context.Context, dlg delegation.Delegation, prfs []delegation.Delegation, cctx ClaimContext) (delegation.Delegation, InvalidProof) {
+// signature. The second return value is the ucan/attest Authorization when one
+// was used, or nil otherwise.
+func VerifyAuthorization(ctx context.Context, dlg delegation.Delegation, prfs []delegation.Delegation, cctx ClaimContext) (delegation.Delegation, Authorization[any], InvalidProof) {
 	issuer := dlg.Issuer().DID()
 	// If the issuer is a did:key we just verify a signature
 	if strings.HasPrefix(issuer.String(), "did:key:") {
 		vfr, err := cctx.ParsePrincipal(issuer.String())
 		if err != nil {
-			return nil, NewUnverifiableSignatureError(dlg, err)
+			return nil, nil, NewUnverifiableSignatureError(dlg, err)
 		}
-		return VerifySignature(dlg, vfr)
+		dlg, invalid := VerifySignature(dlg, vfr)
+		return dlg, nil, invalid
 	}
 
 	if dlg.Issuer().DID() == cctx.Authority().DID() {
-		return VerifySignature(dlg, cctx.Authority())
+		dlg, invalid := VerifySignature(dlg, cctx.Authority())
+		return dlg, nil, invalid
 	}
 
 	// If issuer is not a did:key principal nor configured authority, we
 	// attempt to resolve embedded authorization session from the authority
-	_, err := VerifySession(ctx, dlg, prfs, cctx)
+	attest, err := VerifySession(ctx, dlg, prfs, cctx)
 	if err != nil {
 		if len(err.FailedProofs()) > 0 {
-			return nil, NewSessionEscalationError(dlg, err)
+			return nil, nil, NewSessionEscalationError(dlg, err)
 		}
 
 		// Otherwise we try to resolve did:key from the DID instead
 		// and use that to verify the signature
 		did, err := cctx.ResolveDIDKey(ctx, issuer)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		vfr, perr := cctx.ParsePrincipal(did.String())
 		if perr != nil {
-			return nil, NewUnverifiableSignatureError(dlg, perr)
+			return nil, nil, NewUnverifiableSignatureError(dlg, perr)
 		}
 
 		wvfr, werr := verifier.Wrap(vfr, issuer)
 		if werr != nil {
-			return nil, NewUnverifiableSignatureError(dlg, perr)
+			return nil, nil, NewUnverifiableSignatureError(dlg, perr)
 		}
 
-		return VerifySignature(dlg, wvfr)
+		dlg, invalid := VerifySignature(dlg, wvfr)
+		return dlg, nil, invalid
 	}
 
-	return dlg, nil
+	return dlg, ConvertUnknownAuthorization(attest), nil
 }
 
 // VerifySignature verifies the delegation was signed by the passed verifier.
@@ -472,15 +482,17 @@ func VerifySession(ctx context.Context, dlg delegation.Delegation, prfs []delega
 // Authorize verifies whether any of the delegated proofs grant capability.
 func Authorize[Caveats any](ctx context.Context, match Match[Caveats], cctx ClaimContext) (Authorization[Caveats], InvalidClaim) {
 	// load proofs from all delegations
-	sources, invalidprf := ResolveMatch(ctx, match, cctx)
+	sources, attestations, invalidprf := ResolveMatch(ctx, match, cctx)
 
 	matches, dlgerrs, unknowns := match.Select(sources)
 
 	var failedprf []InvalidClaim
 	for _, matched := range matches {
+		relevantAttestations := attestationsFor(matched.Source()[0].Delegation().Link(), attestations)
+
 		selector := matched.Prune(canissuer[Caveats]{canIssue: cctx.CanIssue})
 		if selector == nil {
-			return NewAuthorization(matched, nil), nil
+			return NewAuthorization(matched, nil, relevantAttestations), nil
 		}
 
 		auth, err := Authorize(ctx, selector, cctx)
@@ -489,13 +501,27 @@ func Authorize[Caveats any](ctx context.Context, match Match[Caveats], cctx Clai
 			continue
 		}
 
-		return NewAuthorization(matched, []Authorization[Caveats]{auth}), nil
+		return NewAuthorization(matched, []Authorization[Caveats]{auth}, relevantAttestations), nil
 	}
 
 	return nil, NewInvalidClaimError(match, dlgerrs, unknowns, invalidprf, failedprf)
 }
 
-func ResolveMatch[Caveats any](ctx context.Context, match Match[Caveats], context ClaimContext) (sources []Source, errors []ProofError) {
+// attestationsFor returns the attestations that attest to the given delegation
+// link, discarding any that belong to other delegations in the pool.
+func attestationsFor(link ucan.Link, attestations []Authorization[any]) []Authorization[any] {
+	var result []Authorization[any]
+	for _, attest := range attestations {
+		if model, ok := attest.Capability().Nb().(vdm.AttestationModel); ok {
+			if model.Proof.String() == link.String() {
+				result = append(result, attest)
+			}
+		}
+	}
+	return result
+}
+
+func ResolveMatch[Caveats any](ctx context.Context, match Match[Caveats], context ClaimContext) (sources []Source, attestations []Authorization[any], errors []ProofError) {
 	includes := map[string]struct{}{}
 	var wg sync.WaitGroup
 	var lock sync.RWMutex
@@ -505,11 +531,12 @@ func ResolveMatch[Caveats any](ctx context.Context, match Match[Caveats], contex
 			includes[id] = struct{}{}
 			wg.Add(1)
 			go func(s Source) {
-				srcs, errs := ResolveSources(ctx, s, context)
+				srcs, attests, errs := ResolveSources(ctx, s, context)
 				lock.Lock()
 				defer lock.Unlock()
 				defer wg.Done()
 				sources = append(sources, srcs...)
+				attestations = append(attestations, attests...)
 				errors = append(errors, errs...)
 			}(source)
 		}
@@ -518,7 +545,7 @@ func ResolveMatch[Caveats any](ctx context.Context, match Match[Caveats], contex
 	return
 }
 
-func ResolveSources(ctx context.Context, source Source, cctx ClaimContext) (sources []Source, errors []ProofError) {
+func ResolveSources(ctx context.Context, source Source, cctx ClaimContext) (sources []Source, attestations []Authorization[any], errors []ProofError) {
 	dlg := source.Delegation()
 	var prfs []delegation.Delegation
 
@@ -551,13 +578,16 @@ func ResolveSources(ctx context.Context, source Source, cctx ClaimContext) (sour
 	}
 	// In the second pass we attempt to proofs that were resolved and are aligned.
 	for _, prf := range prfs {
-		_, err := Validate(ctx, prf, prfs, cctx)
+		_, attest, err := Validate(ctx, prf, prfs, cctx)
 
 		// If proof is not valid (expired, not active yet or has incorrect
 		// signature) save a corresponding proof error.
 		if err != nil {
 			errors = append(errors, NewProofError(prf.Link(), err))
 			continue
+		}
+		if attest != nil {
+			attestations = append(attestations, attest)
 		}
 
 		// Otherwise create source objects for it's capabilities, so we could

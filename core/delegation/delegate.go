@@ -15,12 +15,13 @@ import (
 type Option func(cfg *delegationConfig) error
 
 type delegationConfig struct {
-	exp   *int
-	noexp bool
-	nbf   int
-	nnc   string
-	fct   []ucan.FactBuilder
-	prf   Proofs
+	exp    *int
+	noexp  bool
+	nbf    int
+	nnc    string
+	fct    []ucan.FactBuilder
+	prf    Proofs
+	pruner ProofPruner
 }
 
 // WithExpiration configures the expiration time in UTC seconds since Unix
@@ -80,6 +81,28 @@ func WithProof(prf ...Proof) Option {
 	}
 }
 
+// ProofPruner selects the minimal subset of proofs that form a valid chain
+// from a candidate proof pool. It has the same signature as [Delegate] but
+// returns only the proofs required instead of the final delegation.
+//
+// Use [validator.NewProofPruner] to create one.
+type ProofPruner func(issuer ucan.Signer, audience ucan.Principal, capabilities []ucan.Capability[ucan.CaveatBuilder], options ...Option) (Proofs, error)
+
+// WithProofPruning configures proof pruning. The pruner selects the minimal
+// subset of proofs that form a valid chain, and the delegation is rebuilt with
+// only those proofs. If it's not possible to build a valid proof chain, an
+// error will be returned.
+// Delegations with pruned proofs don't include unnecessary proofs, which makes
+// them suitable for size-constrained channels, such as HTTP headers.
+//
+// Use [validator.NewProofPruner] to create a pruner.
+func WithProofPruning(pruner ProofPruner) Option {
+	return func(cfg *delegationConfig) error {
+		cfg.pruner = pruner
+		return nil
+	}
+}
+
 // Delegate creates a new signed token with a given `options.issuer`. If
 // expiration is not set it defaults to 30 seconds from now. Returns UCAN in
 // primary IPLD representation.
@@ -89,6 +112,25 @@ func Delegate[C ucan.CaveatBuilder](issuer ucan.Signer, audience ucan.Principal,
 		if err := opt(&cfg); err != nil {
 			return nil, err
 		}
+	}
+
+	if cfg.pruner != nil {
+		// Cast capabilities to the CaveatBuilder-typed slice expected by ProofPruner.
+		castedCaps := make([]ucan.Capability[ucan.CaveatBuilder], len(capabilities))
+		for i, c := range capabilities {
+			castedCaps[i] = ucan.NewCapability[ucan.CaveatBuilder](c.Can(), c.With(), c.Nb())
+		}
+
+		// Pass all options except the pruner so the pruner can build its own
+		// draft without recursing.
+		prunedPfs, err := cfg.pruner(issuer, audience, castedCaps, cfgToOptions(cfg)...)
+		if err != nil {
+			return nil, fmt.Errorf("pruning proofs: %w", err)
+		}
+
+		// Replace the proof pool with the pruned subset and build the final
+		// delegation normally
+		cfg.prf = prunedPfs
 	}
 
 	bs, err := blockstore.NewBlockStore()
@@ -130,4 +172,28 @@ func Delegate[C ucan.CaveatBuilder](issuer ucan.Signer, audience ucan.Principal,
 	}
 
 	return NewDelegation(rt, bs)
+}
+
+// cfgToOptions reconstructs a slice of Options from a parsed delegationConfig,
+// excluding the pruner. Used to pass a clean option set to a ProofPruner.
+func cfgToOptions(cfg delegationConfig) []Option {
+	var opts []Option
+	if cfg.noexp {
+		opts = append(opts, WithNoExpiration())
+	} else if cfg.exp != nil {
+		opts = append(opts, WithExpiration(*cfg.exp))
+	}
+	if cfg.nbf != 0 {
+		opts = append(opts, WithNotBefore(cfg.nbf))
+	}
+	if cfg.nnc != "" {
+		opts = append(opts, WithNonce(cfg.nnc))
+	}
+	if len(cfg.fct) > 0 {
+		opts = append(opts, WithFacts(cfg.fct))
+	}
+	if len(cfg.prf) > 0 {
+		opts = append(opts, WithProof(cfg.prf...))
+	}
+	return opts
 }

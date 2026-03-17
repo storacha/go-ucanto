@@ -694,6 +694,193 @@ func TestSession(t *testing.T) {
 		require.Error(t, x)
 	})
 
+	t.Run("attestation surfaces in Authorization.Attestations", func(t *testing.T) {
+		agent := fixtures.Alice
+		account := absentee.From(helpers.Must(did.Parse("did:mailto:web.mail:alice")))
+
+		prf, err := debugEcho.Delegate(
+			account,
+			agent,
+			account.DID().String(),
+			debugEchoCaveats{},
+		)
+		require.NoError(t, err)
+
+		session, err := attest.Delegate(
+			service,
+			agent,
+			service.DID().String(),
+			attestCaveats{Proof: prf.Link()},
+		)
+		require.NoError(t, err)
+
+		msg := "Hello World"
+		nb := debugEchoCaveats{Message: &msg}
+		inv, err := debugEcho.Invoke(
+			agent,
+			service,
+			account.DID().String(),
+			nb,
+			delegation.WithProof(
+				delegation.FromDelegation(prf),
+				delegation.FromDelegation(session),
+			),
+		)
+		require.NoError(t, err)
+
+		vctx := NewValidationContext(
+			service.Verifier(),
+			debugEcho,
+			IsSelfIssued,
+			validateAuthOk,
+			ProofUnavailable,
+			parseEdPrincipal,
+			FailDIDKeyResolution,
+			NotExpiredNotTooEarly,
+		)
+
+		a, x := Access(t.Context(), inv, vctx)
+		require.NoError(t, x)
+
+		// The attestation must appear somewhere in the authorization tree.
+		var findAttestation func(Authorization[debugEchoCaveats]) bool
+		findAttestation = func(auth Authorization[debugEchoCaveats]) bool {
+			if len(auth.Attestations()) > 0 {
+				return true
+			}
+			for _, p := range auth.Proofs() {
+				if findAttestation(p) {
+					return true
+				}
+			}
+			return false
+		}
+		require.True(t, findAttestation(a), "expected attestation in Authorization tree")
+	})
+
+	t.Run("SelectProofs returns proof and attestation delegations", func(t *testing.T) {
+		agent := fixtures.Alice
+		account := absentee.From(helpers.Must(did.Parse("did:mailto:web.mail:alice")))
+
+		prf, err := debugEcho.Delegate(
+			account,
+			agent,
+			account.DID().String(),
+			debugEchoCaveats{},
+		)
+		require.NoError(t, err)
+
+		session, err := attest.Delegate(
+			service,
+			agent,
+			service.DID().String(),
+			attestCaveats{Proof: prf.Link()},
+		)
+		require.NoError(t, err)
+
+		// extra unrelated delegation that should be excluded
+		unrelated, err := debugEcho.Delegate(
+			fixtures.Bob,
+			agent,
+			fixtures.Bob.DID().String(),
+			debugEchoCaveats{},
+		)
+		require.NoError(t, err)
+
+		vctx := NewValidationContext(
+			service.Verifier(),
+			debugEcho,
+			IsSelfIssued,
+			validateAuthOk,
+			ProofUnavailable,
+			parseEdPrincipal,
+			FailDIDKeyResolution,
+			NotExpiredNotTooEarly,
+		)
+
+		selected, x := selectProofs(
+			t.Context(),
+			debugEcho,
+			[]delegation.Proof{
+				delegation.FromDelegation(prf),
+				delegation.FromDelegation(session),
+				delegation.FromDelegation(unrelated),
+			},
+			vctx,
+		)
+		require.NoError(t, x)
+
+		cids := make([]string, 0, len(selected))
+		for _, s := range selected {
+			cids = append(cids, s.Link().String())
+		}
+		require.ElementsMatch(t, []string{prf.Link().String(), session.Link().String()}, cids)
+	})
+
+	t.Run("PruneProofs returns only the required proof chain", func(t *testing.T) {
+		agent := fixtures.Alice
+		account := absentee.From(helpers.Must(did.Parse("did:mailto:web.mail:alice")))
+
+		prf, err := debugEcho.Delegate(
+			account,
+			agent,
+			account.DID().String(),
+			debugEchoCaveats{},
+		)
+		require.NoError(t, err)
+
+		session, err := attest.Delegate(
+			service,
+			agent,
+			service.DID().String(),
+			attestCaveats{Proof: prf.Link()},
+		)
+		require.NoError(t, err)
+
+		// extra unrelated delegation that should be excluded
+		unrelated, err := debugEcho.Delegate(
+			fixtures.Bob,
+			agent,
+			fixtures.Bob.DID().String(),
+			debugEchoCaveats{},
+		)
+		require.NoError(t, err)
+
+		// draft delegation with all candidate proofs attached
+		draft, err := debugEcho.Delegate(
+			agent,
+			fixtures.Bob,
+			account.DID().String(),
+			debugEchoCaveats{},
+			delegation.WithProof(
+				delegation.FromDelegation(prf),
+				delegation.FromDelegation(session),
+				delegation.FromDelegation(unrelated),
+			),
+		)
+		require.NoError(t, err)
+
+		vctx := NewValidationContext(
+			service.Verifier(),
+			debugEcho,
+			IsSelfIssued,
+			validateAuthOk,
+			ProofUnavailable,
+			parseEdPrincipal,
+			FailDIDKeyResolution,
+			NotExpiredNotTooEarly,
+		)
+
+		pruned, x := pruneProofs(t.Context(), draft, vctx)
+		require.NoError(t, x)
+
+		cids := make([]string, 0, len(pruned))
+		for _, p := range pruned {
+			cids = append(cids, p.Link().String())
+		}
+		require.ElementsMatch(t, []string{prf.Link().String(), session.Link().String()}, cids)
+	})
+
 	t.Run("redundant proofs have no impact", func(t *testing.T) {
 		accountDID := helpers.Must(did.Parse("did:mailto:web.mail:alice"))
 		account := absentee.From(accountDID)
