@@ -798,7 +798,7 @@ func TestSession(t *testing.T) {
 			NotExpiredNotTooEarly,
 		)
 
-		selected, x := SelectProofs(
+		selected, x := selectProofs(
 			t.Context(),
 			debugEcho,
 			[]delegation.Proof{
@@ -871,7 +871,7 @@ func TestSession(t *testing.T) {
 			NotExpiredNotTooEarly,
 		)
 
-		pruned, x := PruneProofs(t.Context(), draft, vctx)
+		pruned, x := pruneProofs(t.Context(), draft, vctx)
 		require.NoError(t, x)
 
 		cids := make([]string, 0, len(pruned))
