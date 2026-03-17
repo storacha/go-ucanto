@@ -22,7 +22,7 @@ import (
 // attestor must be the verifier of the service that issued the ucan/attest
 // delegations in the proof pool (e.g. the upload-service in the storacha
 // network).
-func NewProofPruner(attestor principal.Verifier, cap CapabilityParser[any]) delegation.ProofPruner {
+func NewProofPruner[Caveats any](attestor principal.Verifier, cap CapabilityParser[Caveats]) delegation.ProofPruner {
 	return func(issuer ucan.Signer, audience ucan.Principal, capabilities []ucan.Capability[ucan.CaveatBuilder], options ...delegation.Option) (delegation.Proofs, error) {
 		draft, err := delegation.Delegate(issuer, audience, capabilities, options...)
 		if err != nil {
