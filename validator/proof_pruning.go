@@ -24,6 +24,8 @@ import (
 // network).
 func NewProofPruner[Caveats any](attestor principal.Verifier, cap CapabilityParser[Caveats]) delegation.ProofPruner {
 	return func(issuer ucan.Signer, audience ucan.Principal, capabilities []ucan.Capability[ucan.CaveatBuilder], options ...delegation.Option) (delegation.Proofs, error) {
+		capabilities = replaceNoCaveatsCaps(capabilities, cap)
+
 		draft, err := delegation.Delegate(issuer, audience, capabilities, options...)
 		if err != nil {
 			return nil, fmt.Errorf("building draft delegation: %w", err)
@@ -53,6 +55,30 @@ func NewProofPruner[Caveats any](attestor principal.Verifier, cap CapabilityPars
 
 		return prunedPfs, nil
 	}
+}
+
+// replaceNoCaveatsCaps returns a copy of capabilities where any capability
+// whose ability matches cap and whose Nb is ucan.NoCaveats is replaced with a
+// new capability carrying the zero value of Caveats. NoCaveats encodes as a
+// schema-less empty map in IPLD; the capability parser's Nb schema reader
+// cannot rebind that to the specific Caveats type. Using the zero value of
+// Caveats produces a properly typed IPLD representation that the parser can
+// handle.
+func replaceNoCaveatsCaps[Caveats any](capabilities []ucan.Capability[ucan.CaveatBuilder], cap CapabilityParser[Caveats]) []ucan.Capability[ucan.CaveatBuilder] {
+	result := make([]ucan.Capability[ucan.CaveatBuilder], len(capabilities))
+	copy(result, capabilities)
+	for i, c := range capabilities {
+		if _, ok := c.Nb().(ucan.NoCaveats); !ok || c.Can() != cap.Can() {
+			continue
+		}
+		zeroCaveats := *new(Caveats)
+		if bc, ok := any(zeroCaveats).(ucan.CaveatBuilder); ok {
+			result[i] = ucan.NewCapability(c.Can(), c.With(), bc)
+		} else if bc, ok := any(&zeroCaveats).(ucan.CaveatBuilder); ok {
+			result[i] = ucan.NewCapability(c.Can(), c.With(), bc)
+		}
+	}
+	return result
 }
 
 // PruneProofs selects the minimal subset of proofs from dlg's embedded proof
